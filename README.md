@@ -26,7 +26,7 @@ winner. The study design is in [docs/PAPER.md](docs/PAPER.md) and the draft anal
 ### 1. Install
 
 ```bash
-git clone <this repo> && cd <this repo>
+git clone https://github.com/OmidMLdata/AGENTIC_VMD_v2.git && cd AGENTIC_VMD_v2
 python -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"            # core + tests. Python >= 3.9
 pip install -e ".[server]"         # + the MCP server (Python >= 3.10; mcp 1.x and 2.x both work)
