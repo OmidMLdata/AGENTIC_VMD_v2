@@ -1,0 +1,80 @@
+# From the repo root:
+#   docker compose -f docker/docker-compose.yml run --rm vmd-agent probe
+#   docker compose -f docker/docker-compose.yml --profile hostvmd run --rm hostvmd probe
+#
+# Benchmark runs (real VMD, real model): use docker/bench.sh, which wraps these
+# services and checks your VMD first.
+#
+# Mount your project data at ./data (or set DATA_DIR). All paths the tools use
+# must be under /data inside the container (VMD_AGENT_ALLOWED_ROOTS).
+x-hardened: &hardened
+  stdin_open: true            # MCP speaks JSON-RPC over stdio
+  read_only: true
+  # HOME must be writable (VMD and matplotlib write caches); everything the
+  # benchmark produces goes to the /data volume.
+  tmpfs: ["/tmp", "/home/vmdagent"]
+  cap_drop: [ALL]
+  security_opt: ["no-new-privileges:true"]
+  volumes: ["${DATA_DIR:-../data}:/data"]
+
+# Extra limits for runs that execute model-written code.
+x-bench: &bench
+  <<: *hardened
+  stdin_open: false
+  pids_limit: 256
+  mem_limit: ${BENCH_MEM:-8g}
+  # Passed through from your shell by name only: the value is never written to
+  # this file or to the image. Use a dedicated key with a spending limit.
+  environment: [ANTHROPIC_API_KEY]
+
+services:
+  vmd-agent:
+    <<: *hardened
+    build: { context: .., dockerfile: docker/Dockerfile, target: runtime }
+    image: vmd-agent:latest
+
+  # Your own VMD install on the host, mounted read-only (Linux, same CPU arch).
+  hostvmd:
+    <<: *hardened
+    profiles: ["hostvmd"]
+    build: { context: .., dockerfile: docker/Dockerfile, target: vmd-libs }
+    image: vmd-agent:hostvmd
+    platform: ${VMD_PLATFORM:-linux/amd64}
+    environment: { VMD_BIN: /opt/vmd/bin/vmd }
+    volumes:
+      - "${DATA_DIR:-../data}:/data"
+      - "${VMD_HOME:?set VMD_HOME to your VMD install dir}:/opt/vmd:ro"
+
+  # VMD baked in from docker/vmd-dist/*.tar.gz. For local use only; never push.
+  withvmd:
+    <<: *hardened
+    profiles: ["withvmd"]
+    build: { context: .., dockerfile: docker/Dockerfile, target: with-vmd }
+    image: vmd-agent:vmd-local
+    platform: ${VMD_PLATFORM:-linux/amd64}
+
+  # ---- benchmark services (one per way of supplying VMD) -------------------
+  # No VMD: the toolkit arms render with matplotlib; the plain-VMD arm is unavailable.
+  bench:
+    <<: *bench
+    profiles: ["bench"]
+    build: { context: .., dockerfile: docker/Dockerfile, target: runtime }
+    image: vmd-agent:latest
+
+  bench-hostvmd:
+    <<: *bench
+    profiles: ["bench-hostvmd"]
+    build: { context: .., dockerfile: docker/Dockerfile, target: vmd-libs }
+    image: vmd-agent:hostvmd
+    platform: ${VMD_PLATFORM:-linux/amd64}
+    environment: [ANTHROPIC_API_KEY, "VMD_BIN=/opt/vmd/bin/vmd"]
+    volumes:
+      - "${DATA_DIR:-../data}:/data"
+      - "${VMD_HOME:?set VMD_HOME to your VMD install dir}:/opt/vmd:ro"
+
+  bench-withvmd:
+    <<: *bench
+    profiles: ["bench-withvmd"]
+    build: { context: .., dockerfile: docker/Dockerfile, target: with-vmd }
+    image: vmd-agent:vmd-local
+    platform: ${VMD_PLATFORM:-linux/amd64}

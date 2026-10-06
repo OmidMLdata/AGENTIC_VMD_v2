@@ -1,0 +1,202 @@
+"""Shared fixtures: real structures, synthetic builders and real-tool gates.
+
+Nothing here pretends to be another program. Tests that need VMD, Tachyon,
+ffmpeg, the MCP SDK, a model API or the network use the real thing and are
+**skipped, with the reason shown**, on a machine that does not have it. Run
+``pytest -rs`` to see exactly what was skipped; a skipped test is a test that
+did not run, not a test that passed.
+
+* real VMD / Tachyon:  set ``VMD_BIN`` or install VMD; marker ``requires_vmd``
+* real ffmpeg:         ``requires_ffmpeg``
+* real MCP SDK:        Python >= 3.10 and ``pip install mcp``; ``requires_mcp``
+* real model API:      ``VMD_AGENT_LIVE_TESTS=1`` and ``ANTHROPIC_API_KEY``
+                       (spends a few cents); ``requires_api``
+* real network:        reachable rcsb.org; ``requires_network``
+"""
+import os
+import shutil
+import sys
+import warnings
+
+import numpy as np
+import pytest
+
+warnings.filterwarnings("ignore")
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+DATA = os.path.join(HERE, "data")
+SAMPLE_DIR = os.path.join(DATA, "sample")
+UBQ_MD_DIR = os.path.join(DATA, "ubq_md")          # real 20 ns ubiquitin MD, 50 frames
+UBQ_MD_FILES = (os.path.join(UBQ_MD_DIR, "protein.pdb"),
+                os.path.join(UBQ_MD_DIR, "protein.dcd"))
+
+
+# ------------------------------------------------------------ real structures
+@pytest.fixture(scope="session")
+def ubq():
+    return os.path.join(DATA, "1ubq.pdb")          # ubiquitin, 76 res
+
+
+@pytest.fixture(scope="session")
+def lyz():
+    return os.path.join(DATA, "1lyz.pdb")          # lysozyme, 4 disulfides
+
+
+@pytest.fixture(scope="session")
+def hbb():
+    return os.path.join(DATA, "4hhb.pdb")          # hemoglobin + heme
+
+
+@pytest.fixture(scope="session")
+def whey():
+    return os.path.join(DATA, "1beb.pdb")
+
+
+@pytest.fixture(scope="session")
+def sample():
+    """Synthetic protein+ligand+ions+water system with an 8-frame DCD."""
+    pdb = os.path.join(SAMPLE_DIR, "sample.pdb")
+    dcd = os.path.join(SAMPLE_DIR, "sample.dcd")
+    if not (os.path.exists(pdb) and os.path.exists(dcd)):
+        sys.path.insert(0, SAMPLE_DIR)
+        import make_sample
+        make_sample.build()
+    return pdb, dcd
+
+
+# -------------------------------------------------------- synthetic builders
+def pdb_text(atoms):
+    """``atoms``: (name, resname, resid, chain, x, y, z, element) tuples."""
+    out = []
+    for i, (name, resn, resid, chain, x, y, z, el) in enumerate(atoms, 1):
+        out.append(f"ATOM  {i:5d} {name:<4s} {resn:>3s} {chain}{resid:4d}    "
+                   f"{x:8.3f}{y:8.3f}{z:8.3f}  1.00  0.00          {el:>2s}")
+    return "\n".join(out) + "\nEND\n"
+
+
+@pytest.fixture
+def write_pdb(tmp_path):
+    def _write(atoms, name="x.pdb"):
+        p = tmp_path / name
+        p.write_text(pdb_text(atoms))
+        return str(p)
+    return _write
+
+
+def backbone_atoms(n_res, phi, psi, chain="A", offset=(0.0, 0.0, 0.0)):
+    """Idealised polyalanine backbone as PDB atom tuples (N, CA, C, O, CB)."""
+    from vmd_agent.bench.synth import backbone_coords
+    P = backbone_coords(n_res, phi, psi) + np.asarray(offset)
+    atoms = []
+    for r in range(n_res):
+        for (name, el), q in zip((("N", "N"), ("CA", "C"), ("C", "C"),
+                                  ("O", "O"), ("CB", "C")), P[r]):
+            atoms.append((name, "ALA", r + 1, chain, q[0], q[1], q[2], el))
+    return atoms
+
+
+@pytest.fixture
+def helix_pdb(write_pdb):
+    return write_pdb(backbone_atoms(24, -57.0, -47.0), "helix.pdb")
+
+
+@pytest.fixture
+def strand_pdb(write_pdb):
+    return write_pdb(backbone_atoms(12, -120.0, 130.0), "strand.pdb")
+
+
+# ----------------------------------------------------------- real-tool gates
+def _find_real_vmd():
+    """Resolve VMD once, before any test edits the environment."""
+    from vmd_agent.environment import find_vmd
+    return find_vmd()
+
+
+REAL_VMD = _find_real_vmd()
+
+
+no_real_vmd = pytest.mark.skipif(
+    REAL_VMD is not None,
+    reason="a real VMD is installed here, so 'VMD absent' cannot be tested")
+
+
+def _have_mcp():
+    try:
+        import mcp  # noqa: F401
+        from vmd_agent import server  # noqa: F401
+        return True
+    except BaseException:                              # SystemExit when absent
+        return False
+
+
+_NET = {}
+
+
+def have_network() -> bool:
+    """Can this machine reach the structure databases the fetch code uses?"""
+    if "ok" not in _NET:
+        import socket
+        try:
+            for host in ("files.rcsb.org", "alphafold.ebi.ac.uk"):
+                socket.create_connection((host, 443), timeout=4).close()
+            _NET["ok"] = True
+        except OSError:
+            _NET["ok"] = False
+    return _NET["ok"]
+
+
+def pytest_report_header(config):
+    from vmd_agent.environment import find_tachyon
+    return [
+        f"real VMD:     {REAL_VMD or 'NOT FOUND (requires_vmd tests will be skipped)'}",
+        f"real Tachyon: {(find_tachyon(REAL_VMD) if REAL_VMD else None) or 'not found'}",
+        f"real ffmpeg:  {shutil.which('ffmpeg') or 'NOT FOUND (requires_ffmpeg tests will be skipped)'}",
+        f"real MCP SDK: {'yes' if _have_mcp() else 'NOT AVAILABLE (requires_mcp tests will be skipped)'}",
+        f"real network: {'reachable' if have_network() else 'UNREACHABLE (requires_network tests will be skipped)'}",
+        "live model API tests: " + ("ON" if os.environ.get("VMD_AGENT_LIVE_TESTS") == "1"
+                                    and os.environ.get("ANTHROPIC_API_KEY") else "off"),
+    ]
+
+
+def pytest_collection_modifyitems(config, items):
+    """Apply the gates for the markers, so a test says what it needs once."""
+    skips = {
+        "requires_vmd": (REAL_VMD is None, "no real VMD found (set VMD_BIN)"),
+        "requires_ffmpeg": (shutil.which("ffmpeg") is None, "no real ffmpeg"),
+        "requires_network": (not have_network(),
+                             "cannot reach files.rcsb.org / alphafold.ebi.ac.uk"),
+        "requires_mcp": (not _have_mcp(), "real MCP SDK not importable "
+                         "(needs Python >= 3.10 and `pip install mcp`)"),
+        "requires_api": (not (os.environ.get("VMD_AGENT_LIVE_TESTS") == "1"
+                              and os.environ.get("ANTHROPIC_API_KEY")),
+                         "live model tests are off (set VMD_AGENT_LIVE_TESTS=1 "
+                         "and ANTHROPIC_API_KEY; this spends a few cents)"),
+    }
+    for item in items:
+        for marker, (missing, why) in skips.items():
+            if marker in item.keywords and missing:
+                item.add_marker(pytest.mark.skip(reason=why))
+
+
+@pytest.fixture(scope="session")
+def real_vmd():
+    """Path to a real VMD launcher (tests using this are marked requires_vmd)."""
+    return REAL_VMD
+
+
+@pytest.fixture(scope="session")
+def real_tachyon(real_vmd):
+    from vmd_agent.environment import find_tachyon
+    t = find_tachyon(real_vmd)
+    if not t:
+        pytest.skip("VMD found but no Tachyon ray tracer next to it")
+    return t
+
+
+@pytest.fixture(autouse=True)
+def _clean_env(monkeypatch):
+    """Tests must not inherit a developer's sandbox settings (VMD_BIN is kept: the
+    real VMD must stay discoverable)."""
+    for k in ("VMD_AGENT_ALLOWED_ROOTS", "VMD_AGENT_ALLOW_UNSAFE_TCL",
+              "VMD_AGENT_ALLOW_PRIVATE_URLS", "VMD_AGENT_ENABLE_TCL"):
+        monkeypatch.delenv(k, raising=False)

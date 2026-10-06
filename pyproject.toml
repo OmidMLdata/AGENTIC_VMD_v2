@@ -1,0 +1,58 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vmd-agent"
+version = "0.9.4"
+description = "Agentic molecular-visualization toolkit: grounded interpretation, statistically principled trajectory analysis, event-aware keyframes, claim verification and a benchmark, exposed as MCP tools. VMD optional (not bundled)."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "vmd-agent contributors" }]
+keywords = ["molecular dynamics", "VMD", "MCP", "visualization", "LLM agents", "benchmark"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Topic :: Scientific/Engineering :: Chemistry",
+]
+# Core deps only. Everything except the MCP *server* works with these.
+dependencies = [
+    "MDAnalysis>=2.7",
+    "numpy",
+    "scipy",
+    "matplotlib",
+    "pillow",
+]
+
+[project.optional-dependencies]
+# The MCP server needs the `mcp` SDK, which requires Python >=3.10.
+server = ["mcp>=1.2.0"]
+sasa = ["freesasa"]
+dssp = ["mdtraj"]            # only to cross-check the built-in DSSP (vmd-agent validate-dssp)
+bench = ["anthropic"]
+dev = ["pytest>=7", "hypothesis", "pyyaml"]
+all = ["mcp>=1.2.0", "freesasa", "mdtraj", "anthropic", "pytest>=7", "hypothesis", "pyyaml"]
+
+[project.scripts]
+vmd-agent = "vmd_agent.cli:main"
+vmd-agent-server = "vmd_agent.server:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "requires_vmd: needs a real VMD (set VMD_BIN); skipped otherwise",
+    "requires_ffmpeg: needs a real ffmpeg; skipped otherwise",
+    "requires_mcp: needs the real MCP SDK (Python >= 3.10); skipped otherwise",
+    "requires_api: calls the real model API (VMD_AGENT_LIVE_TESTS=1 + ANTHROPIC_API_KEY); skipped otherwise",
+    "requires_network: needs the real network (rcsb.org); skipped when unreachable",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::UserWarning",
+    "ignore::FutureWarning",
+]

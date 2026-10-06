@@ -1,0 +1,15 @@
+**/__pycache__
+**/*.pyc
+*.egg-info
+.pytest_cache
+tests
+docs
+.git
+.github
+CHANGELOG.md
+# keep the VMD drop-folder, but never send anything else from it
+docker/vmd-dist/*
+!docker/vmd-dist/README.md
+!docker/vmd-dist/*.tar.gz
+!docker/vmd-dist/*.tgz
+!docker/vmd-dist/*.tar.Z
