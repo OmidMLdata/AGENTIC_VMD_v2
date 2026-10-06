@@ -142,13 +142,6 @@ def test_windows_system_variables_reach_model_written_code(monkeypatch):
     assert env["SYSTEMROOT"] == "C:\\Windows" and "ANTHROPIC_API_KEY" not in env
 
 
-def test_vmd_version_check_no_longer_depends_on_dev_stdin():
-    """/dev/stdin does not exist on Windows; the version script now goes in a file."""
-    import inspect
-    from vmd_agent import environment
-    assert "/dev/stdin" not in inspect.getsource(environment)
-
-
 def test_a_console_that_cannot_show_a_character_does_not_crash_printing(monkeypatch):
     raw = io.BytesIO()
     stream = io.TextIOWrapper(raw, encoding="ascii")

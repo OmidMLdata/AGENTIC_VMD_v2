@@ -1223,6 +1223,12 @@ syntax, not identical strings.
 > builds, and whether VMD behaves headless in the container are unverified. `preflight` is how you find out, and
 > `pytest -m requires_vmd -rs` runs the real-VMD tests on a machine that has it.
 
+### Writing to the mounted folder
+
+The image runs as an unprivileged user, so a folder mounted at `/data` must be writable by that user. If a command fails with
+"Permission denied: '/data/...'", run the container as the owner of the folder: `docker run --user "$(id -u):$(id -g)" -e HOME=/tmp ...`
+(or make the folder writable). Caught by the CI smoke test; not yet tried on a Docker Desktop for Mac or Windows.
+
 ### Hardening used by the compose file
 
 Non-root user (uid 10001), read-only root filesystem, tmpfs `/tmp` and `/home/vmdagent`, all capabilities dropped,

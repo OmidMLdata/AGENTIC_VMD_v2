@@ -27,8 +27,8 @@ jobs:
       # Real network tests run here (RCSB, AlphaFold). Tests that need a real VMD
       # are SKIPPED on CI (VMD cannot be installed from a public package); -rs
       # prints every skip with its reason. Run them on a machine that has VMD.
-      - name: Tests
-        run: pytest -q -rs
+      - name: Lint, dead-code check and the whole test suite
+        run: pip install ruff vulture && python scripts/dev.py test
       - name: Cross-validation against independent NumPy
         run: vmd-agent validate tests/data/sample/sample.pdb tests/data/sample/sample.dcd --sel2 "resname LIG" --cutoff 6
 
@@ -53,8 +53,10 @@ jobs:
       - name: Smoke test
         run: |
           mkdir -p data && cp tests/data/1ubq.pdb data/
-          docker run --rm -v "$PWD/data:/data" vmd-agent:ci probe | grep -q matplotlib
-          docker run --rm -v "$PWD/data:/data" vmd-agent:ci \
+          # the image runs as an unprivileged user; run as the owner of the mounted folder so it can write there
+          U="--user $(id -u):$(id -g) -e HOME=/tmp"
+          docker run --rm $U -v "$PWD/data:/data" vmd-agent:ci probe | grep -q matplotlib
+          docker run --rm $U -v "$PWD/data:/data" vmd-agent:ci \
             visualize /data/1ubq.pdb --out-dir /data/out --views front --renderer matplotlib
           test -s data/out/views/front.png
       - name: Server path sandbox is active in the image
