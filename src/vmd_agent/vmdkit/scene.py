@@ -22,7 +22,7 @@ import tempfile
 import time
 from typing import Dict, List, Optional
 
-from vmd_agent import security
+from vmd_agent import progress, security
 from vmd_agent.environment import find_tachyon, find_vmd
 from vmd_agent.visual import render as R
 from vmd_agent.vmdkit import script as S
@@ -257,13 +257,16 @@ def render_turntable(spec: dict, topology: Optional[str], trajectory: Optional[s
         tcl = os.path.join(tmp, "turn.tcl")
         with open(tcl, "w") as fh:
             fh.write("\n".join(lines + ["quit"]) + "\n")
+        progress.report(f"writing {n} scene files with VMD")
         R._run_vmd_text(vmd, tcl, 1800, cwd=tmp)
         jobs = [(sc, os.path.join(tmp, f"f{i:05d}.png")) for i, sc in enumerate(scenes) if os.path.exists(sc)]
         if len(jobs) != n:
             return {"ok": False, "error": f"VMD wrote {len(jobs)} of {n} scenes"}
+        progress.report(f"ray tracing {n} frames with Tachyon (the slow step)")
         done = R._tachyon_many(tach, jobs, int(width), int(height), 8)
         if not all(r.get("ok") for r in done.values()):
             return {"ok": False, "error": "Tachyon failed on some frames"}
+        progress.report("encoding the video")
         proc = subprocess.run([ffmpeg, "-y", "-framerate", str(int(fps)), "-i", os.path.join(tmp, "f%05d.png"),
                                "-pix_fmt", "yuv420p", "-vf", "pad=ceil(iw/2)*2:ceil(ih/2)*2", os.path.abspath(out_mp4)],
                               capture_output=True, text=True, timeout=600)

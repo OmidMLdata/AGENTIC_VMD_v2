@@ -17,10 +17,10 @@ import pytest
 
 SRC = os.path.join(os.path.dirname(__file__), "..", "..", "src", "vmd_agent")
 FOUNDATION = ("environment", "security", "llm_client", "platform_info", "settings",
-              "models", "ollama_local")
+              "models", "ollama_local", "progress")
 
 COMPOSERS = ("auto", "cli", "server", "mcp_check", "toolset", "chat",
-             "launcher", "wizard", "vmd_tools", "vmd_cli", "__init__")
+             "launcher", "wizard", "vmd_tools", "vmd_cli", "workflows", "reporting", "__init__")
 
 ALLOWED = {
     "inputs": set(),
@@ -28,7 +28,8 @@ ALLOWED = {
     "dynamics": {"inputs", "structure"},
     "visual": {"inputs", "structure", "environment", "security"},
     "evidence": {"inputs", "structure", "dynamics", "environment", "security"},
-    "vmdkit": {"inputs", "structure", "visual", "environment", "security"},
+    "vmdkit": {"inputs", "structure", "visual", "environment", "security", "progress"},
+    "progress": set(),
     "bench": {"inputs", "structure", "dynamics", "visual", "evidence", "auto",
               "environment", "security", "llm_client", "platform_info", "settings"},
     "environment": {"platform_info", "settings"},

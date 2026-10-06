@@ -165,3 +165,59 @@ def test_a_real_model_answers_and_lists_itself():
     r = L.chat_completion(url, model, [{"role": "user", "content": "Say OK."}],
                           max_tokens=16, api_key=os.environ.get("VMD_AGENT_LLM_KEY"))
     assert L.parse_choice(r)["content"]
+
+
+# ------------------------------------------------------------------ streaming, against a real HTTP server
+import http.server  # noqa: E402
+
+
+def _sse_server(events):
+    """A real local HTTP server that answers /chat/completions with the given server-sent events (an OpenAI-style
+    streaming reply). It exercises the real client code, which is what is under test."""
+    class H(http.server.BaseHTTPRequestHandler):
+        def do_POST(self):
+            self.rfile.read(int(self.headers.get("Content-Length", 0)))
+            self.send_response(200)
+            self.send_header("Content-Type", "text/event-stream")
+            self.end_headers()
+            for ev in events:
+                self.wfile.write(f"data: {ev}\n\n".encode())
+            self.wfile.write(b"data: [DONE]\n\n")
+
+        def log_message(self, *a):
+            pass
+    srv = http.server.HTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    return srv
+
+
+def test_a_streamed_answer_arrives_in_pieces_and_is_rebuilt():
+    import json
+    from vmd_agent import llm_client as L
+    ev = [json.dumps({"choices": [{"delta": {"content": t}, "finish_reason": None}]}) for t in ("Hel", "lo ", "world")]
+    ev.append(json.dumps({"choices": [{"delta": {}, "finish_reason": "stop"}], "usage": {"prompt_tokens": 7, "completion_tokens": 3}}))
+    srv = _sse_server(ev)
+    try:
+        got = []
+        resp = L.chat_completion(f"http://127.0.0.1:{srv.server_port}/v1", "m", [{"role": "user", "content": "hi"}],
+                                 on_token=got.append)
+    finally:
+        srv.shutdown()
+    parsed = L.parse_choice(resp)
+    assert got == ["Hel", "lo ", "world"] and parsed["content"] == "Hello world"
+    assert parsed["finish_reason"] == "stop" and parsed["usage"] == {"input_tokens": 7, "output_tokens": 3}
+
+
+def test_a_streamed_tool_call_is_rebuilt_from_its_pieces():
+    import json
+    from vmd_agent import llm_client as L
+    ev = [json.dumps({"choices": [{"delta": {"tool_calls": [{"index": 0, "id": "c1", "function": {"name": "inspect_files", "arguments": ""}}]}}]}),
+          json.dumps({"choices": [{"delta": {"tool_calls": [{"index": 0, "function": {"arguments": '{"paths": '}}]}}]}),
+          json.dumps({"choices": [{"delta": {"tool_calls": [{"index": 0, "function": {"arguments": '["a.pdb"]}'}}]}, "finish_reason": "tool_calls"}]})]
+    srv = _sse_server(ev)
+    try:
+        resp = L.chat_completion(f"http://127.0.0.1:{srv.server_port}/v1", "m", [{"role": "user", "content": "x"}], on_token=lambda t: None)
+    finally:
+        srv.shutdown()
+    call = L.parse_choice(resp)["tool_calls"][0]
+    assert call["name"] == "inspect_files" and call["arguments"] == {"paths": ["a.pdb"]} and call["id"] == "c1"

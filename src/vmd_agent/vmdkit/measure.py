@@ -63,7 +63,7 @@ def measure(topology: str, trajectory: Optional[str] = None, kind: str = "rgyr",
     body = S.load(topology, trajectory) + [
         f"set s1 [atomselect top {{{s1}}}]",
         'emit INFO natoms [$s1 num] nframes [molinfo top get numframes]',
-        f"set frames [framerange top {first} {last} {step}]",
+        f"set frames [framerange top {first} {last} {step}]", S.TICK_INIT,
     ]
     if s2:
         body.append(f"set s2 [atomselect top {{{s2}}}]")
@@ -71,7 +71,7 @@ def measure(topology: str, trajectory: Optional[str] = None, kind: str = "rgyr",
         body.append(f"set s3 [atomselect top {{{s3}}}]")
     if s4:
         body.append(f"set s4 [atomselect top {{{s4}}}]")
-    loop = ["foreach f $frames {", "  $s1 frame $f"]
+    loop = ["foreach f $frames {", "  " + S.TICK, "  $s1 frame $f"]
     if kind == "rgyr":
         loop += [f"  emit V $f [measure rgyr $s1{w}]"]
     elif kind == "sasa":
@@ -96,14 +96,15 @@ def measure(topology: str, trajectory: Optional[str] = None, kind: str = "rgyr",
         loop = []
         body += [f'if {{[${n} num] != 1}} {{ error "{kind}: every selection must be exactly one atom" }}' for n in names]
         idx = " ".join(f"[list [${n} get index] [molinfo top get id]]" for n in names)
-        loop = ["foreach f $frames {"] + [f"  ${n} frame $f" for n in names] + [
+        loop = ["foreach f $frames {", "  " + S.TICK] + [f"  ${n} frame $f" for n in names] + [
             f"  emit V $f [measure {'angle' if kind == 'angle' else 'dihed'} [list {idx}] frame $f]"]
     elif kind == "contacts":
         loop += ["  $s2 frame $f", f"  emit V $f [llength [lindex [measure contacts {S.num(cutoff, 'cutoff')} $s1 $s2] 0]]"]
     elif kind == "hbonds":
         loop += [f"  emit V $f [llength [lindex [measure hbonds {S.num(cutoff, 'cutoff')} {S.num(angle_cutoff, 'angle_cutoff')} $s1] 0]]"]
     if kind == "rmsf":
-        body += [f"set ref [atomselect top {{{s1}}} frame {ref}]", "set all [atomselect top all]"]
+        body += [f"set ref [atomselect top {{{s1}}} frame {ref}]", "set all [atomselect top all]",
+                 'progress "fitting and averaging the frames"']
         if align:
             body += ["foreach f $frames { $all frame $f; $s1 frame $f; " + f"$all move [measure fit $s1 $ref{w}] }}"]
         body += [f"set r [measure rmsf $s1 first {first} last {last} step {step}]",

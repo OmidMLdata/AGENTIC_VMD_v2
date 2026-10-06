@@ -14,16 +14,20 @@ from __future__ import annotations
 
 import os
 import re
+import subprocess
 import tempfile
+import threading
+import time
 from typing import Dict, List, Optional, Sequence
 
-from vmd_agent import security
-from vmd_agent.environment import find_vmd
-from vmd_agent.visual.render import _load_lines, _run_vmd_text
+from vmd_agent import progress, security
+from vmd_agent.environment import find_vmd, vmd_runtime_env
+from vmd_agent.visual.render import _load_lines
 
 _PREAMBLE = """\
 set ::vmdagent_out [open {RESULTS} w]
 proc emit {args} { puts $::vmdagent_out [join $args { }]; flush $::vmdagent_out }
+proc progress {args} { emit PROGRESS [join $args { }] }
 proc framerange {mol first last step} {
     set n [molinfo $mol get numframes]
     if {$last < 0 || $last >= $n} { set last [expr {$n - 1}] }
@@ -38,6 +42,7 @@ _STANDALONE_PREAMBLE = """\
 # Results are printed as lines starting with RESULT. Run headless with:
 #   vmd -dispdev text -eofexit -e THIS_FILE < /dev/null
 proc emit {args} { puts "RESULT [join $args { }]" }
+proc progress {args} { puts "PROGRESS [join $args { }]" }
 proc framerange {mol first last step} {
     set n [molinfo $mol get numframes]
     if {$last < 0 || $last >= $n} { set last [expr {$n - 1}] }
@@ -57,6 +62,39 @@ def configure(script_dir: Optional[str], label: str = "script") -> None:
     _CTX.update(dir=script_dir, label=label, last=None)
 
 
+def _run_watching(vmd: str, main: str, resfile: str, timeout: int, cwd: str) -> dict:
+    """Run VMD on ``main`` and, while it runs, pass every ``progress`` line it writes to the listeners."""
+    proc = subprocess.Popen([vmd, "-dispdev", "text", "-e", main], stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                            stdin=subprocess.DEVNULL, cwd=cwd, env=vmd_runtime_env(vmd), text=True)
+    outs: list = []
+    reader = threading.Thread(target=lambda: outs.append(proc.communicate()), daemon=True)
+    reader.start()                                         # drains the pipes so VMD never blocks on a full buffer
+    deadline, seen = time.time() + timeout, 0
+    while reader.is_alive():
+        reader.join(0.4)
+        seen = _relay(resfile, seen)
+        if time.time() > deadline and reader.is_alive():
+            proc.kill()
+            reader.join(5)
+            return {"returncode": -1, "stdout": "", "stderr": f"VMD timed out after {timeout}s"}
+    _relay(resfile, seen)
+    out, err = outs[0] if outs else ("", "")
+    return {"returncode": proc.returncode, "stdout": out[-4000:], "stderr": err[-4000:]}
+
+
+def _relay(resfile: str, seen: int) -> int:
+    """Send the PROGRESS lines written since ``seen`` lines ago to the listeners; returns the new line count."""
+    try:
+        with open(resfile) as fh:
+            lines = fh.read().splitlines()
+    except OSError:
+        return seen
+    for ln in lines[seen:]:
+        if ln.startswith("PROGRESS "):
+            progress.report(ln[len("PROGRESS "):])
+    return len(lines)
+
+
 def last_script() -> Optional[str]:
     """Path of the standalone script saved by the most recent run, if saving is on."""
     return _CTX["last"]
@@ -74,6 +112,11 @@ def _save(body: Sequence[str], vmd_path: str) -> None:
         fh.write(f"# vmd-agent {__version__}: the exact Tcl behind one `{_CTX['label']}` call (VMD at {vmd_path})\n")
         fh.write(_STANDALONE_PREAMBLE + "\n".join(body) + "\n")
     _CTX["last"] = path
+
+
+#: put after ``set frames [...]``, and ``TICK`` at the top of the loop body: about ten progress messages per run
+TICK_INIT = "set _n 0; set _tot [llength $frames]"
+TICK = ('incr _n; if {$_tot > 12 && $_n % [expr {max(5, $_tot / 10)}] == 0} { progress "frame $_n of $_tot" }')
 
 
 def no_vmd() -> dict:
@@ -161,7 +204,7 @@ def run(body: Sequence[str], vmd_path: Optional[str] = None, timeout: int = 900,
             fh.write(_PREAMBLE.replace("RESULTS", resfile))
             fh.write(f'if {{[catch {{source {{{bodyfile}}}}} err]}} {{ emit ERROR $err }}\n')
             fh.write("emit DONE\nquit\n")
-        res = _run_vmd_text(vmd, main, timeout, cwd=cwd or tmp)
+        res = _run_watching(vmd, main, resfile, timeout, cwd or tmp)
         try:
             with open(resfile) as fh:
                 result_text = fh.read()

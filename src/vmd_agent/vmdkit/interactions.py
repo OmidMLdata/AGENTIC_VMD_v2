@@ -34,13 +34,13 @@ def interactions(topology: str, trajectory: Optional[str] = None, kind: str = "h
         s2 = s1
     cut = S.num(cutoff or (3.0 if kind == "hbonds" else 4.0), "cutoff")
     body = S.load(topology, trajectory) + [f"set frames [framerange top {first} {last} {step}]",
-                                            "emit INFO [llength $frames]"]
+                                            "emit INFO [llength $frames]", S.TICK_INIT]
     if kind == "hbonds":
         body += [f"set a [atomselect top {{{s1}}}]"]
         if s2:
             body += [f"set b [atomselect top {{{s2}}}]"]
         call = f"measure hbonds {cut} {S.num(angle_cutoff, 'angle_cutoff')} $a" + (" $b" if s2 else "")
-        body += ["foreach f $frames {", "  $a frame $f" + ("; $b frame $f" if s2 else ""),
+        body += ["foreach f $frames {", "  " + S.TICK, "  $a frame $f" + ("; $b frame $f" if s2 else ""),
                  f"  set h [{call}]",
                  "  foreach d [lindex $h 0] ac [lindex $h 1] {",
                  "    set x [atomselect top \"index $d\"]; set y [atomselect top \"index $ac\"]",
@@ -50,7 +50,7 @@ def interactions(topology: str, trajectory: Optional[str] = None, kind: str = "h
     else:
         a_sel, b_sel = (f"({_ACID}) and ({s1})", f"({_BASE}) and ({s1})") if kind == "salt_bridges" else (s1, s2)
         body += [f"set a [atomselect top {{{a_sel}}}]", f"set b [atomselect top {{{b_sel}}}]",
-                 "foreach f $frames {", "  $a frame $f; $b frame $f",
+                 "foreach f $frames {", "  " + S.TICK, "  $a frame $f; $b frame $f",
                  f"  set c [measure contacts {cut} $a $b]",
                  "  set seen {}",
                  "  foreach i [lindex $c 0] j [lindex $c 1] {",

@@ -191,6 +191,19 @@ def _bench_agent(args):
 def _bench(args):
     from vmd_agent import bench
     from vmd_agent.bench import sampling, rating_study, conditions
+    if args.bench_cmd == "docker":
+        from vmd_agent import launcher
+        rest, mode = list(args.rest), args.mode
+        for i, a in enumerate(rest):                      # --mode may come anywhere: argparse leaves everything after the action in `rest`
+            if a == "--mode" and i + 1 < len(rest):
+                mode = rest[i + 1]
+                del rest[i:i + 2]
+                break
+            if a.startswith("--mode="):
+                mode = a.split("=", 1)[1]
+                del rest[i]
+                break
+        return launcher.docker_bench(args.action, rest, mode)
     if args.bench_cmd.startswith("agent-"):
         return _bench_agent(args)
     if args.bench_cmd == "truth":
@@ -248,14 +261,16 @@ def _bench(args):
 
 #: the commands, grouped the way a person would look for them (every command must appear exactly once: a test checks)
 GROUPS = [
-    ("Get started", ["setup", "menu", "chat", "doctor", "models"]),
-    ("Look at a structure", ["show", "visualize", "inspect", "detect", "stats", "render", "recipe", "reps", "annotate"]),
-    ("Measure a simulation", ["analyze", "keyframes", "claims"]),
-    ("Drive VMD itself (needs VMD)", ["vmd"]),
-    ("Get structures", ["fetch", "search"]),
-    ("Videos, reports, records", ["probe-video", "interpret-video", "report", "provenance"]),
+    ("1. Set up", ["setup", "doctor", "models", "start"]),
+    ("2. Get a structure", ["fetch", "search"]),
+    ("3. Look at it", ["show", "visualize", "inspect", "detect", "stats", "render", "recipe", "reps", "annotate"]),
+    ("4. Measure a simulation", ["analyze", "keyframes", "claims"]),
+    ("5. Run a whole job and get a report", ["workflow", "report"]),
+    ("6. Drive VMD itself (needs VMD)", ["vmd"]),
+    ("7. Check and keep records", ["probe-video", "interpret-video", "provenance", "validate", "validate-dssp", "bench"]),
+    ("Ask in plain language", ["menu", "chat"]),
     ("Connect other programs", ["mcp-config", "mcp-check", "tools", "tool"]),
-    ("This computer, and advanced", ["probe", "renderers", "start", "validate", "validate-dssp", "bench"]),
+    ("This computer", ["probe", "renderers"]),
 ]
 
 INTRO = """vmd-agent: ask questions about molecular structures and simulations in plain language, and get answers
@@ -433,8 +448,16 @@ def build_parser():
     sp.add_argument("--base-url", help="native mode: the model server (default Ollama on localhost)")
     sp.add_argument("--print-plan", action="store_true",
                     help="show what would be run on this computer, and run nothing")
+    sp.add_argument("--down", action="store_true", help="stop the Docker model server and chat, and do nothing else")
     from vmd_agent import vmd_cli
     vmd_cli.add_commands(sub)
+    sp = sub.add_parser("workflow", help="run a whole multi-step job on your files and get a report (`vmd-agent workflow` lists them)")
+    sp.add_argument("name", nargs="?", help="which workflow (omit to list them)")
+    sp.add_argument("files", nargs="*", help="the files it needs, in order (see the list)")
+    sp.add_argument("--out-dir", default=None, help="where the report and the figures go (default: <name>_report)")
+    sp.add_argument("--option", action="append", default=[], metavar="KEY=VALUE",
+                    help="a setting for the workflow, e.g. --option partner=\"resname LIG\" (repeat for several)")
+    sp.add_argument("--quiet", action="store_true", help="do not show progress while it runs")
     sp = sub.add_parser("tools", help="list every tool (the chat's and the MCP server's), with what it does")
     sp.add_argument("--group", choices=["all", "core", "vmd"], default="all")
     sp = sub.add_parser("tool", help="run any single tool once, with its arguments as JSON",
@@ -464,6 +487,8 @@ def build_parser():
     sp.add_argument("--temperature", type=float, default=0.0)
     sp.add_argument("--no-check", action="store_true",
                     help="do not check that the server lists the model")
+    sp.add_argument("--no-stream", action="store_true",
+                    help="show each answer when it is complete instead of as it is written")
     sp.add_argument("--tools", choices=["all", "core", "vmd"], default="all",
                     help="which tools the model gets: all (47), core (the original 27) or vmd (the ones that drive "
                          "VMD itself); fewer tools suit small models better")
@@ -574,6 +599,13 @@ def build_parser():
     b.add_argument("--live-api", action="store_true",
                    help="make one tiny API call to prove the key and model work")
     b.add_argument("--no-require-container", action="store_true")
+    b = bsub.add_parser("docker", help="run the benchmark commands in a container with your VMD (Linux VMD only; "
+                        "check-vmd tests the VMD you point at)")
+    b.add_argument("action", choices=["check-vmd", "preflight", "suite", "plan", "run", "shell"])
+    b.add_argument("--mode", choices=["plain", "hostvmd", "withvmd"], default="plain",
+                   help="plain: no VMD; hostvmd: mount a Linux VMD ($VMD_HOME); withvmd: VMD built into a local image "
+                        "from docker/vmd-dist/")
+    b.add_argument("rest", nargs=argparse.REMAINDER, help="arguments for the benchmark command")
     b = bsub.add_parser("agent-compare", help="mean per-task difference between two runs "
                         "(label A minus label B) with a cluster-bootstrap interval")
     b.add_argument("records", help="records.jsonl written by agent-run")
@@ -612,6 +644,8 @@ def main(argv=None):
     args = p.parse_args(argv)
     from vmd_agent import platform_info
     platform_info.console_safe()
+    import warnings
+    warnings.filterwarnings("ignore", module=r"MDAnalysis(\..*)?")      # the library's own notices are not for a user at a terminal
     try:
         if args.cmd == "setup":
             from vmd_agent import wizard
@@ -625,10 +659,37 @@ def main(argv=None):
 
         if args.cmd == "start":
             from vmd_agent import launcher
+            if args.down:
+                return launcher.stop_docker()
             return launcher.start(model=args.model, data_dir=args.data_dir, mode=args.mode,
                                   base_url=args.base_url,
                                   prompt=" ".join(args.prompt) or None,
                                   print_plan=args.print_plan)
+        if args.cmd == "workflow":
+            from vmd_agent import progress, workflows
+            if not args.name:
+                for n, w in workflows.WORKFLOWS.items():
+                    print(f"{n:<20} {w.summary}\n{'':<20} files: {' '.join(w.roles)}   e.g.  {w.example}\n")
+                return 0
+            opts = {}
+            for kv in args.option:
+                key, _, val = kv.partition("=")
+                opts[key.strip()] = (float(val) if val.replace(".", "", 1).replace("-", "", 1).isdigit() and "." in val
+                                     else int(val) if val.lstrip("-").isdigit() else val)
+            try:
+                if args.quiet:
+                    r = workflows.run_named(args.name, args.files, args.out_dir or f"{args.name}_report", opts)
+                else:
+                    with progress.listen(progress.terminal()):
+                        r = workflows.run_named(args.name, args.files, args.out_dir or f"{args.name}_report", opts)
+            except Exception as e:                       # InvalidInput, SecurityError: a plain message, not a traceback
+                print(f"vmd-agent workflow: {e}", file=sys.stderr)
+                return 2
+            print(f"\n{r['verdict']}\n")
+            for f in r["findings"]:
+                print(f"  {f['level'].upper():8} {f['text']}")
+            print(f"\nreport:  {r['report']}\n         {r['report_html']}")
+            return 1 if r["finding_counts"]["problem"] else 0
         if args.cmd == "vmd":
             from vmd_agent import vmd_cli
             return vmd_cli.run(args, _print)
@@ -697,7 +758,7 @@ def main(argv=None):
                 roots=args.roots, max_turns=args.max_turns,
                 temperature=args.temperature,
                 prompt=" ".join(args.prompt) or None,
-                check_model=not args.no_check, tools=args.tools)
+                check_model=not args.no_check, tools=args.tools, stream=not args.no_stream)
         if args.cmd == "mcp-check":
             from vmd_agent import mcp_check
             res = mcp_check.check_mcp_server(

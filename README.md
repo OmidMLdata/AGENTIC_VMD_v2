@@ -1,24 +1,38 @@
 # vmd-agent
 
 Ask questions about your molecular structures and simulations **in plain language** and get answers worked out from real
-measurements: what is in a system, how it moves, whether a statement about it is true. It draws figures with **VMD**
-when you have it. A language model does the talking (a free open-source one that runs on your own computer, or an
-online one you choose); this program gives it the tools and checks its work.
+measurements: what is in a system, how it moves, whether a statement about it is true. VMD (free, from UIUC) does the
+measuring and the drawing; a language model does the talking (a free open-source one on your own computer, or an online one you
+choose); this program gives the model the tools and checks its work.
 
-**You need:** a Mac, Windows or Linux computer, an internet connection, and VMD (free, from UIUC) if you want VMD-quality
-pictures. **You do not need:** Python, Git, Docker, ffmpeg, an account, or any AI app. You do need to know what VMD does.
+**You need:** a Mac, Windows or Linux computer, an internet connection, and VMD if you want VMD-quality pictures and the VMD-driven
+tools. **You do not need:** Python, Git, Docker, ffmpeg, an account, or any AI app.
 
-**On this page:** [Install](#install-and-start-about-5-minutes) · [Free models](#free-models-as-of-2026-10-06) ·
-[VMD versions](#which-vmd-version) · [What you can do](#what-can-i-do) · [Every command](#every-command) ·
-[Driving VMD itself](#driving-vmd-itself) · [Where everything lives](#everything-stays-in-one-folder) ·
-[Troubleshooting](#if-something-goes-wrong) · [What is verified](#what-has-and-has-not-been-verified)
+## The pipeline
 
-## Install and start (about 5 minutes)
+One project goes through the same stages whichever way you work (the menu, the chat, commands, or an AI app). Each stage is a
+section below.
 
-**1. Open a terminal.** Mac: press `Cmd` + `Space`, type `Terminal`, press Enter. Windows: Start menu, type `PowerShell`,
-press Enter. Linux: your terminal app.
+| Stage | You want to | Main commands |
+|---|---|---|
+| [1. Set up](#1-set-up) | install, find VMD, choose who answers | `vmd-agent setup` · `doctor` · `models` |
+| [2. Get a structure](#2-get-a-structure) | have a file to work with | `vmd-agent fetch` · `search` |
+| [3. Look at it](#3-look-at-it) | see and describe what is in it | `vmd-agent show` · `visualize` · `inspect` · `detect` · `stats` |
+| [4. Measure a simulation](#4-measure-a-simulation) | numbers, events, true-or-false checks | `vmd-agent analyze` · `keyframes` · `claims` |
+| [5. Run a whole job](#5-run-a-whole-job-and-get-a-report) | several steps, a verdict, a written report | `vmd-agent workflow` |
+| [6. Drive VMD itself](#6-drive-vmd-itself) | build systems, maps, scenes, hand-offs | `vmd-agent vmd ...` |
+| [7. Check and keep records](#7-check-and-keep-records) | re-check hashes, videos, validation | `vmd-agent provenance` · `report` · `validate` |
 
-**2. Paste ONE line and press Enter.** Mac or Linux:
+Around the pipeline: [ways to work](#ways-to-work) (menu, chat, commands), [troubleshooting](#if-something-goes-wrong),
+[what has been verified](#what-has-and-has-not-been-verified), and a [reference](#reference) for AI-app connections,
+development, architecture, methods, security and Docker.
+
+## 1. Set up
+
+### Install (about 5 minutes)
+
+**Open a terminal.** Mac: press `Cmd` + `Space`, type `Terminal`, press Enter. Windows: Start menu, type `PowerShell`, press
+Enter. Linux: your terminal app. **Paste ONE line and press Enter.** Mac or Linux:
 
 ```bash
 curl -LsSf https://raw.githubusercontent.com/OmidMLdata/AGENTIC_VMD_v2/main/install.sh | sh
@@ -30,12 +44,15 @@ Windows (PowerShell):
 powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/OmidMLdata/AGENTIC_VMD_v2/main/install.ps1 | iex"
 ```
 
-It puts a small helper called [uv](https://docs.astral.sh/uv/) (which fetches Python for you) and vmd-agent, with everything
-they need including a bundled ffmpeg for movies, into **one private folder** (`~/vmd-agent`). No administrator password, no
-changes to your PATH or any file outside that folder. Deleting the folder removes everything. It takes a few minutes, mostly
-downloading.
+It puts a small helper called [uv](https://docs.astral.sh/uv/) (which fetches Python for you) and vmd-agent, with everything they
+need including a bundled ffmpeg for movies, into **one private folder** (`~/vmd-agent`; Windows `%USERPROFILE%\vmd-agent`). No
+administrator password, no changes to your PATH or to any file outside that folder. It takes a few minutes, mostly downloading.
+The two installers (`install.sh`, `install.ps1`) are separate files only because a Mac's shell and PowerShell cannot read each
+other's language, and they must run before Python exists; they do the same thing.
 
-**3. Answer the setup questions.** The installer starts `vmd-agent setup` for you. It explains each step and asks only four things:
+### Answer the setup questions
+
+The installer starts `vmd-agent setup`. It explains each step and asks four things:
 
 | Step | What happens | What you answer |
 |---|---|---|
@@ -44,16 +61,11 @@ downloading.
 | 3. The AI | you choose who answers (below) | a number from 1 to 4 |
 | 4. Finish | saves your choices | nothing |
 
-**4. From now on, run `~/vmd-agent/bin/vmd-agent`** (Windows: `%USERPROFILE%\vmd-agent\bin\vmd-agent.cmd`). It opens a menu in
-plain words; you pick a number. Put your structure and trajectory files in your files folder and ask for them by name.
-(Optional: add that `bin` folder to your PATH yourself to type just `vmd-agent`; the installer never does it for you.
-Examples below write `vmd-agent`.)
-
-> **What has been run:** on 2026-10-06, on a Mac with Apple Silicon, `install.sh` was run end to end from a local copy of
-> this repository, `vmd-agent setup` downloaded a private Ollama (checksum-verified) and `granite4.1:8b`, and the chat called the
-> tools. **Not run:** the one-line GitHub URLs above (the repository was not published yet), Linux, Windows and PowerShell, a
-> machine with no Python at all, and the system-Ollama path. If a step fails the message says which one, and
-> [Other ways to install](#other-ways-to-install) lists the manual route. Please report what broke.
+From now on run `~/vmd-agent/bin/vmd-agent` (Windows: `%USERPROFILE%\vmd-agent\bin\vmd-agent.cmd`). Put your structure and
+trajectory files in your files folder and ask for them by name. (Add that `bin` folder to your PATH yourself if you want to type just
+`vmd-agent`; the installer never does it for you. Examples here write `vmd-agent`.) `vmd-agent setup` can be run again at any time to
+change a choice, and `vmd-agent doctor` says what this computer has, whether VMD really starts, which model is ready, and what to do
+next.
 
 ### Choosing who answers you (setup step 3)
 
@@ -64,10 +76,10 @@ Examples below write `vmd-agent`.)
 | **3. Claude Desktop or Claude Code** | Connects the tools to an AI app you already use ([details](#use-it-from-an-mcp-client)). | It edits that app's settings file only after you say yes, and keeps a backup. |
 | **4. Skip** | No chat. | Every other command still works. |
 
-A model on a computer without a graphics card can take a minute or more per answer. On a Mac, running Ollama directly
-(which setup does) uses the Mac's graphics chip and is much faster than running it inside Docker.
+A model on a computer without a graphics card can take a minute or more per answer. On a Mac, running Ollama directly (which setup
+does) uses the Mac's graphics chip and is much faster than running it inside Docker.
 
-## Free models (as of 2026-10-06)
+### Free models (as of 2026-10-06)
 
 These are the open-source models this toolkit suggests. On **2026-10-06**, while writing the code, each was checked against
 the public [Ollama library](https://ollama.com/library): the name exists, the download size is what the registry reported,
@@ -88,93 +100,100 @@ quickly, so `vmd-agent models --check` asks the library again, and setup does th
 guide, not a measurement. **Only `granite4.1:8b` and `granite4.1:3b` were run with this toolkit** (on a Mac, 2026-10-06, a few dozen
 questions about local files, trajectories and system building; this is not a benchmark). The 8B chose the right tools and reported
 their numbers correctly in the questions tried, though it sometimes fills arguments badly. The 3B chose tools but often misread what
-they returned, which is why the chat now flags any number a tool did not return; **start with the 8B or larger**. The others are
+they returned, which is why the chat flags any number a tool did not return; **start with the 8B or larger**. The others are
 unverified. Any other Ollama model, or any online OpenAI-compatible service, can be used instead. `vmd-agent claims` checks any
 statement against the data.
 
-### How the chat keeps a model honest
+### Which VMD version?
 
-Language models guess; these checks stop a guess from passing as a measurement. (They were added after running a real model.)
-
-* **A data question needs a tool.** If a model answers a question about your files from memory, the chat sends it back once and
-  requires a tool call.
-* **Numbers are checked.** After the answer, every number the model wrote is compared with what the tools returned; any that no tool
-  returned is listed under the answer ("check these numbers yourself").
-* **Inputs are protected.** No tool writes over a file the same call reads (a model once passed the input's own name as the output
-  name), and a trajectory that does not match its topology is an error, not an empty result.
-* **Invented settings are ignored.** Models are not shown the `vmd_path` parameter (they invent paths); the toolkit finds VMD itself.
-* **The context is big enough.** The private Ollama runs with a 16384-token context (Ollama's default of 4096 cut off the model's
-  own instructions and tools). With your own Ollama, set `OLLAMA_CONTEXT_LENGTH=16384`.
-* **Answers are capped** (3000 tokens), so a rambling model is cut off instead of waited for.
-
-## Which VMD version?
-
-**Use a VMD 1.9.x release** ([download](https://www.ks.uiuc.edu/Research/vmd/); the toolkit never downloads VMD for you,
-because VMD's licence requires you to accept it yourself).
+**Use a VMD 1.9.x release** ([download](https://www.ks.uiuc.edu/Research/vmd/); the toolkit never downloads VMD for you, because
+VMD's licence requires you to accept it yourself).
 
 * **Tested:** VMD **1.9.4a57**, macOS on Apple Silicon (run from its disk image), on 2026-10-06: the tests that need a real VMD
-  passed (loading, selections agreeing with MDAnalysis, Tachyon renders, several views and frame sets in one session, movies,
-  the safe-Tcl tool, the benchmark preflight, and each of the [20 tools that drive VMD itself](#driving-vmd-itself), whose numbers were compared with MDAnalysis, NumPy or SciPy where an independent implementation exists).
+  passed (loading, selections agreeing with MDAnalysis, Tachyon renders, several views and frame sets in one session, movies, the
+  safe-Tcl tool, the benchmark preflight, and each of the [24 tools that drive VMD itself](#6-drive-vmd-itself), whose numbers were
+  compared with MDAnalysis, NumPy or SciPy where an independent implementation exists).
 * **Not tested:** any other VMD version, **Linux or Windows builds** of VMD, the Docker route.
 * The version is **not enforced**. It is read (`vmdinfo version`), shown by `vmd-agent doctor` and setup, recorded in every
-  provenance record, and flagged when it is not a tested version or is outside 1.9.x (2.0, 1.8, a dev build), where VMD's
-  scripting may behave differently. The tested list is `VMD_VERSIONS_TESTED` in `environment.py`; to add yours, run
-  `python scripts/test.py` with VMD installed and tell the author what passed.
-* VMD's own pages list 1.9.3 and 1.9.4 as of 2026-10-06; I did not confirm which is the current stable release.
+  provenance record, and flagged when it is not a tested version or is outside 1.9.x (2.0, 1.8, a dev build), where VMD's scripting
+  may behave differently. The tested list is `VMD_VERSIONS_TESTED` in `environment.py`; to add yours, run
+  `python scripts/dev.py test` with VMD installed and tell the author what passed.
+* VMD's own pages list 1.9.3 and 1.9.4 as of 2026-10-06; which one is the current stable release was not confirmed.
 
-**How VMD is handled:** the toolkit finds VMD on your OS, proves it starts (and says why if not: missing `tcsh`, missing
-libraries, wrong CPU), runs it headless with a timeout and a cleaned environment, and confines it to your data folder. It covers
-loading structures and trajectories, representations, rendering with Tachyon, measurements, frame selection and checking claims.
-It does **not** expose all of VMD: other plugins, interactive features and arbitrary Tcl are out of scope (arbitrary Tcl exists
-only if you switch it on with `VMD_AGENT_ENABLE_TCL=1`, and is not a security boundary). Tell the author which VMD features you
-want next. Without VMD everything still works, with simpler built-in pictures.
+**How VMD is handled:** the toolkit finds VMD on your OS, proves it starts (and says why if not: missing `tcsh`, missing libraries,
+wrong CPU), runs it headless with a timeout and a cleaned environment, and confines it to your data folder. Arbitrary Tcl exists only
+if you switch it on with `VMD_AGENT_ENABLE_TCL=1`, and is not a security boundary. Without VMD everything else still works, with
+simpler built-in pictures. How much of VMD is wrapped is in [stage 6](#how-much-of-vmd-is-this).
 
-## What can I do?
+### Where everything lives, updating, uninstalling
 
-Three ways in. They all use the same tools, so pick whichever suits you:
+The installer puts **everything** in one folder, by default `~/vmd-agent`: the helper tool, Python, the program and its packages
+(including ffmpeg), your settings, and, if you choose a free local model, a private copy of Ollama and its models. It uses no
+administrator rights, installs nothing system-wide and does not edit your shell's startup files. Your own data folder
+(`~/vmd-agent-data`) and VMD itself are separate and are never touched. **Update:** run the install line again. **Uninstall:** delete
+the `~/vmd-agent` folder. (If you used Docker, `vmd-agent start --down` stops it and `docker compose down -v` removes its model
+volume.)
+
+### Other ways to install
+
+* **You already use Python:** `pip install "vmd-agent[server] @ https://github.com/OmidMLdata/AGENTIC_VMD_v2/archive/refs/heads/main.zip"`,
+  then `vmd-agent setup`. The packages are listed once, in [`pyproject.toml`](pyproject.toml) (`[all]` adds the optional ones).
+* **From a downloaded copy:** run `./install.sh` (Mac/Linux) or `install.ps1` (Windows) from inside the folder; it installs that copy.
+* **Docker (advanced):** `vmd-agent start` picks native or Docker from the facts about your computer and starts the chat
+  (`--print-plan` shows what it would do, `--down` stops the containers). Docker cannot run a Mac or Windows VMD (it needs VMD's
+  **Linux** build in `docker/vmd-dist/`) and on a Mac cannot use the Mac's graphics chip. See [Docker](#docker).
+* **An MCP client** (Claude Code, Claude Desktop, others): [Use it from an MCP client](#use-it-from-an-mcp-client).
+
+## Ways to work
+
+Three ways in. They all call the same tools, so pick whichever suits you:
 
 | Way | For whom | How |
 |---|---|---|
 | **The menu** | you would rather not learn commands | type `vmd-agent`, pick a number |
 | **Chat** | you want to ask in plain words | `vmd-agent chat` (or `vmd-agent chat "your question"` for a single answer) |
-| **Commands** | scripts, batches, no AI | `vmd-agent <command> ...`, all listed below |
+| **Commands** | scripts, batches, no AI | `vmd-agent <command> ...`, in the stages below |
 
-Common tasks:
+Things to type into `vmd-agent chat` (examples of what to ask, not results): *"What is in 1ubq.pdb?"*, *"Draw it from the front and
+the side and tell me what each colour means."*, *"Has my run settled? Use run.psf and run.dcd."*, *"Which salt bridges persist?"*,
+*"Build a solvated, neutral system from 1ubq.pdb."*, *"Does this structure really have a ligand and a disulfide bond?"* Inside the
+chat, `/tools` lists the tools, `/reset` starts over, `/help` shows this, `/quit` leaves. `vmd-agent tools` lists all 53 tools; for
+small models, `vmd-agent chat --tools core` or `--tools vmd` gives a shorter menu.
 
-| I want to... | Type |
-|---|---|
-| ask questions in plain language | `vmd-agent chat` |
-| look at a protein from the PDB | `vmd-agent show 1UBQ` |
-| draw my own structure (or simulation) | `vmd-agent visualize my.pdb --traj run.dcd` |
-| measure a simulation | `vmd-agent analyze my.psf run.dcd --do rmsd rmsf rgyr` |
-| check a statement against the data | `vmd-agent claims my.pdb "It has 4 disulfide bridges"` |
-| find when something happens in a run | `vmd-agent keyframes my.psf run.dcd -k 9` |
-| know what a file is | `vmd-agent inspect my.dcd` |
-| use VMD's own commands (measure, build a system, maps, export a scene) | `vmd-agent vmd` lists them |
-| use Claude Desktop or Claude Code | `vmd-agent mcp-config --write` |
-| see if everything works | `vmd-agent doctor` |
-| change my choices | `vmd-agent setup` |
+You can *see* what is happening: the answer appears as the model writes it (`--no-stream` to wait for the whole thing), each tool call
+is shown with its progress ("frame 20 of 50", "adding a water box", "ray tracing 72 frames") and, for long ones, how long it took, and
+a line says so when the model is still thinking. The `vmd` and `workflow` commands print the same progress on the error stream
+(`--quiet` hides it), so the result on standard output stays clean to pipe.
 
-Things to type into `vmd-agent chat` (examples of what to ask, not results): *"What is in 1ubq.pdb?"*, *"Draw it from the front and the
-side and tell me what each colour means."*, *"Has my run settled? Use run.psf and run.dcd."*, *"Which salt bridges persist?"*,
-*"Build a solvated, neutral system from 1ubq.pdb."*, *"Does this structure really have a ligand and a disulfide bond?"* Inside the chat,
-`/tools` lists the tools, `/reset` starts over, `/help` shows this, `/quit` leaves.
+### How the chat keeps a model honest
 
-### Every command
+Language models guess; these checks stop a guess from passing as a measurement.
 
-`vmd-agent --help` shows this list; `vmd-agent <command> --help` shows one command's flags. File names are examples.
+* **A data question needs a tool.** If a model answers a question about your files from memory, the chat sends it back once and
+  requires a tool call.
+* **Numbers are checked.** After the answer, every number the model wrote is compared with what the tools returned; any that no tool
+  returned is listed under the answer ("check these numbers yourself").
+* **Inputs are protected.** No tool writes over a file the same call reads, and a trajectory that does not match its topology is an
+  error, not an empty result.
+* **Invented settings are ignored.** Models are not shown the `vmd_path` parameter (they invent paths); the toolkit finds VMD itself.
+* **The context is big enough.** The private Ollama runs with a 16384-token context (Ollama's default of 4096 cuts off the model's own
+  instructions and tools). With your own Ollama, set `OLLAMA_CONTEXT_LENGTH=16384`.
+* **Answers are capped** (3000 tokens), so a rambling model is cut off instead of waited for.
 
-**Get started**
+`vmd-agent chat` options: `--model NAME`, `--base-url ADDRESS`, `--api-key KEY`, `--roots FOLDER ...` (what the AI may see),
+`--tools all|core|vmd`, `--max-turns N`, `--temperature T`, `--no-stream`, `--no-check`.
+
+## 2. Get a structure
 
 | Command | What it does | Flags worth knowing |
 |---|---|---|
-| `vmd-agent setup` | first-time setup: finds VMD, picks your files folder, sets up the AI | `--yes` accept defaults · `--check` only show the settings · `--use local\|online\|app\|skip` · `--model NAME` · `--data-dir FOLDER` · `--vmd PATH` |
-| `vmd-agent` (or `menu`) | the numbered menu | none |
-| `vmd-agent chat ["question"]` | talk to the tools with a language model | `--model NAME` · `--base-url ADDRESS` · `--api-key KEY` · `--roots FOLDER ...` (what the AI may see) · `--tools all\|core\|vmd` (a shorter menu for small models) · `--max-turns N` · `--temperature T` · `--no-check` |
-| `vmd-agent doctor` | what this computer has, whether VMD really starts, which chat model is ready, what to do next | none |
-| `vmd-agent models` | the suggested free models, with the date they were checked | `--check` ask the Ollama library again |
+| `vmd-agent fetch ID` | download a PDB ID, UniProt (AlphaFold) accession or URL to a file | `--out-dir DIR` · `--source auto\|rcsb\|alphafold\|url` · `--format auto\|pdb\|cif` |
+| `vmd-agent search words ...` | find PDB IDs by keyword | `--limit N` |
 
-**Look at a structure**
+Or use your own files: put them in your files folder. `vmd-agent inspect FILE ...` says what kind of files they are and which companion
+file (for example the PSF that goes with a DCD) is missing.
+
+## 3. Look at it
 
 | Command | What it does | Flags worth knowing |
 |---|---|---|
@@ -188,7 +207,9 @@ side and tell me what each colour means."*, *"Has my run settled? Use run.psf an
 | `vmd-agent reps` | the VMD representations and when to use each | `--category backbone\|atomic\|surface\|special` · `--name NAME` |
 | `vmd-agent annotate IMAGE` | draw a colour key and statistics onto an image | `--topology FILE` · `--title TEXT` · `-o out.png` · `--panel-side right\|left` |
 
-**Measure a simulation**
+Pictures use VMD + Tachyon when you have them (best), or a built-in matplotlib drawing (backbone trace, no shading, no surfaces).
+
+## 4. Measure a simulation
 
 | Command | What it does | Flags worth knowing |
 |---|---|---|
@@ -196,75 +217,54 @@ side and tell me what each colour means."*, *"Has my run settled? Use run.psf an
 | `vmd-agent keyframes TOP TRAJ` | the frames where something actually happens, not evenly spaced ones | `-k N` how many · `--sel` · `--sel2` · `--step` · `--z-min` · `--render` draw them · `--renderer` · `--out-dir DIR` |
 | `vmd-agent claims FILE "statement" ...` | check statements against the data: supported, contradicted, or "cannot tell" | `--traj FILE` · `--step N` |
 
-**Drive VMD itself** (needs VMD): `vmd-agent vmd` lists twenty commands, described in [Driving VMD itself](#driving-vmd-itself).
+Every result says *how* it was obtained. These need no VMD: inspecting files, loading PDB / PSF / GRO / XTC / DCD and mmCIF (read
+natively), detecting components, integrity checks, bonds, disulfides, H-bonds, salt bridges, secondary structure (DSSP), trajectory
+analysis, keyframes and claim checking.
 
-**Get structures**
+## 5. Run a whole job and get a report
 
-| Command | What it does | Flags worth knowing |
-|---|---|---|
-| `vmd-agent fetch ID` | download a structure to a file | `--out-dir DIR` · `--source auto\|rcsb\|alphafold\|url` · `--format auto\|pdb\|cif` |
-| `vmd-agent search words ...` | find PDB IDs by keyword | `--limit N` |
-
-**Videos, reports, records**
-
-| Command | What it does | Flags worth knowing |
-|---|---|---|
-| `vmd-agent probe-video VIDEO` | read a video's metadata and prove it decodes | `--count-frames` |
-| `vmd-agent interpret-video VIDEO` | verify a video and pull out stills you can map back to simulation frames | `-n N` stills · `--out-dir DIR` · `--timestamps ...` · `--stride N` · `--first-frame N` · `--time-per-frame T` · `--time-unit` · `--count-frames` |
-| `vmd-agent report SESSION_DIR` | assemble a written report from a finished session | `--out FILE` · `--title TEXT` |
-| `vmd-agent provenance PATH` | re-check the hashes of the inputs and outputs of an earlier run | none |
-
-**Connect other programs**
+A workflow is a named job that runs several tools in a fixed order, the way a person would, and ends with a **verdict**, a list of
+**findings** and a **report**. Nothing in it is decided by a language model: the findings come from the tools' own numbers and wording, and each is
+graded **ok**, **note**, **warning** or **problem**. A step that needs VMD is skipped, and reported as skipped, when there is no VMD.
 
 | Command | What it does | Flags worth knowing |
 |---|---|---|
-| `vmd-agent mcp-config` | the settings that connect Claude Desktop / Code to the tools | `--write` add them to Claude Desktop (with a backup) · `--roots FOLDER ...` · `--vmd PATH` |
-| `vmd-agent mcp-check` | test an MCP server install the way a real client uses it | `--roots` · `--vmd` · `--render` · `--command` · `--args` · `--env KEY=VALUE` |
-| `vmd-agent tools` | list every tool the chat and MCP server offer | `--group all\|core\|vmd` |
-| `vmd-agent tool NAME '{json}'` | run any one tool with its arguments as JSON | example: `vmd-agent tool probe_environment '{}'` |
+| `vmd-agent workflow` | list the workflows and the files each needs | none |
+| `vmd-agent workflow NAME FILE ...` | run the job, collect findings, write `report.md` and `report.html` | `--out-dir DIR` · `--option KEY=VALUE` (repeat) · `--quiet` |
 
-**This computer, and advanced**
+```bash
+vmd-agent workflow                                          # the list
+vmd-agent workflow equilibration_check run.psf run.dcd      # runs, shows progress, writes equilibration_check_report/
+```
 
-| Command | What it does | Flags worth knowing |
+| Workflow | Files | What it does |
 |---|---|---|
-| `vmd-agent probe` / `vmd-agent renderers` | what VMD, drawing backends and libraries this computer has | `--vmd PATH` |
-| `vmd-agent start ["question"]` | the Docker route: picks native or Docker from the facts and starts the chat | `--mode auto\|docker\|native` · `--model` · `--data-dir` · `--base-url` · `--print-plan` (show, run nothing) |
-| `vmd-agent validate TOP TRAJ` | cross-check the analysis against independent NumPy | `--sel` · `--sel2` · `--cutoff` |
-| `vmd-agent validate-dssp ID_OR_FILE ...` | compare the secondary-structure code with the PDB's own annotations | `--cache DIR` · `--mdtraj` |
-| `vmd-agent bench ...` | the research benchmark | see [Development](#running-and-reproducing) |
+| `structure_overview` | structure | what is in it (components, bonds, disulfides, secondary structure), backbone torsions, chirality, cis peptides, chain gaps, two pictures |
+| `equilibration_check` | topology, trajectory | RMSD and size with convergence tests, the periodic box over time, and the RMSD measured a second time by VMD as a cross-check (the two engines must agree to 2%) |
+| `interaction_report` | topology, trajectory | hydrogen bonds and salt bridges as how often each pair is present; `--option partner="resname LIG"` adds contacts with that group and its surface area |
+| `compare_runs` | topology, trajectory A, trajectory B | RMSD, radius of gyration and per-residue fluctuation side by side, with the caveat that one run each is not evidence about the systems |
+| `prepare_simulation` | structure | checks the input, builds a solvated neutral CHARMM36 system, writes a NAMD input and a SLURM script; warns about everything that was left out |
+| `cryoem_fit` | model, map | fits the model into the map, draws it inside the isosurface, exports a session for VMD |
 
-**Flags that mean the same everywhere**
+Settings go in `--option key=value`: `selection`, `partner`, `step`, `padding`, `salt`, `temperature`, `resolution`, `renderer`.
+In the chat, ask in words (*"Has my run settled? Use run.psf and run.dcd."*). When a question clearly matches a workflow (settled / equilibrated, compare runs, prepare a simulation, fit into a cryo-EM map, overview), the toolkit tells the model which workflow fits and the model makes the call (`run_workflow`); it then quotes the verdict and findings and gives you the report path.
 
-| Flag | Meaning |
-|---|---|
-| `--traj FILE` (also `--trajectory`) | the trajectory that goes with the structure |
-| `--sel "..."` (also `--selection`), `--sel2 "..."` | a VMD atom selection, and a second one |
-| `--vmd PATH` | use this VMD instead of the one found automatically |
-| `--out-dir DIR`, `-o FILE`, `--out PATH` | where results are written |
-| `--views`, `--focus`, `--rep`, `--renderer`, `--style`, `--bg` | how pictures look |
-| `--step N` | use every Nth frame |
-| `--json` | machine-readable output where a command prints a summary |
-| `--yes` | accept the defaults without asking (setup) |
-| `--full` | everything, not shortened (the `vmd` commands) |
+**The report** (`report.md`, and `report.html` to open in a browser) is written next to the figures, which it copies in, so the folder can be
+sent to someone. It holds: the verdict and findings; a table of every step with its time and key numbers; the figures; every **caveat the
+tools raised** (for example "DCD headers often hold a default timestep"); the methods (settings, the version of VMD and of this toolkit, which engine
+measured what); and a reproducibility section with the **SHA-256 of every input file** and the **exact Tcl of every VMD step**, copied into
+`scripts/`. A reviewer can re-run it with the one command printed at the bottom.
 
-Which parts need what:
+Each workflow was run on real data and its findings checked (the two RMSD engines agree to three decimals on the test run; the known
+K27-D52 salt bridge is found; a model displaced by a known amount is put back within half an angstrom). **Not tested:** `prepare_simulation`'s NAMD
+input has never been run in NAMD, and the SLURM script has never been run on a cluster; `cryoem_fit` was tested on a map simulated from
+the structure itself, not on an experimental map from the EMDB.
 
-| Capability | Needs VMD? | Notes |
-|---|---|---|
-| Inspect files, load PDB / PSF / GRO / XTC / DCD and mmCIF, detect components, integrity checks | no | mmCIF is read natively |
-| Bonds, disulfides, H-bonds, salt bridges, secondary structure (DSSP), trajectory analysis, keyframes, claim checking | no | every result says *how* it was obtained |
-| Pictures | **optional** | VMD + Tachyon (best), or the built-in matplotlib drawing (backbone trace, no shading, no surfaces) |
-| Movies | VMD | one VMD session with a fixed camera; ffmpeg is bundled, nothing to install |
-| Checking a video file (metadata, decode test, frame mapping) | no | uses the bundled ffmpeg |
+## 6. Drive VMD itself
 
-`vmd-agent tools` lists all 47 tools. For small models, `vmd-agent chat --tools core` or `--tools vmd` gives a shorter menu. The twenty that
-drive VMD itself are also ordinary commands: [Driving VMD itself](#driving-vmd-itself).
-
-## Driving VMD itself
-
-**Is it a separate thing? Yes.** These twenty commands need only VMD: no language model, no chat, no internet. They are VMD's own
+**Is it a separate thing? Yes.** These twenty-four commands need only VMD (the cryo-EM, map, NAMD and SLURM ones need not even that): no language model, no chat, no internet. They are VMD's own
 `measure` commands, its plugins, system building, density maps, scenes and a hand-off to the VMD GUI, run headless and returned as
-numbers. You can reach the same twenty commands in four ways, and every way gives the same answer:
+numbers. You can reach the same commands in four ways, and every way gives the same answer:
 
 | Way | How | Good for |
 |---|---|---|
@@ -273,7 +273,7 @@ numbers. You can reach the same twenty commands in four ways, and every way give
 | **An MCP client** | Claude Desktop / Code, after `vmd-agent mcp-config --write` | working inside an AI app |
 | **Python** | `from vmd_agent.vmdkit.measure import measure` | your own analysis code |
 
-`vmd-agent vmd` lists the commands; `vmd-agent vmd <action> --help` shows one command's flags and an example. Required structure
+`vmd-agent vmd` lists the commands in the order a project goes (build, check, measure, convert, render, fit and hand off); `vmd-agent vmd <action> --help` shows one command's flags and an example. Required structure
 files are positional (`TOPOLOGY [TRAJECTORY]`), anything written goes to `--out`, options are `--kebab-case` flags, a yes/no option that is on by
 default turns off with `--no-<name>`, and `--vmd PATH` points at a particular VMD. A scene is described in JSON (`--scene file.json`,
 or the JSON text itself). Results are JSON with long lists shortened; add `--full` for everything. Every command saves the Tcl it ran
@@ -287,50 +287,58 @@ numbers, choices from fixed lists), runs it in headless VMD with a scrubbed envi
 
 | Command | What it does | Checked against |
 |---|---|---|
-| `vmd-agent vmd capabilities` | List the plugins of your VMD and which of them this toolkit wraps | every plugin of the installed VMD is classified |
-| `vmd-agent vmd measure` | VMD's measure commands over a trajectory: radius of gyration, SASA, RMSD, RMSF, distances, g(r), clusters ... | MDAnalysis, NumPy, SciPy (KD-tree), an independent Shrake-Rupley |
-| `vmd-agent vmd interactions` | Hydrogen bonds, salt bridges or contacts, as how often each pair is present | the known K27-D52 salt bridge of ubiquitin |
-| `vmd-agent vmd secondary-structure` | Secondary structure of every residue in every frame (what the Timeline window shows) | the toolkit's own DSSP (Q3 agreement) |
-| `vmd-agent vmd backbone-torsions` | Phi/psi angles and coarse Ramachandran regions of one frame | NumPy dihedrals |
-| `vmd-agent vmd structure-check` | Chirality errors, cis peptides and chain gaps (the structurecheck plugin) | a clean structure and one with residues deleted |
-| `vmd-agent vmd align-structures` | Superpose one structure on another and report the RMSD | a known rotation and translation |
-| `vmd-agent vmd pbc-info` | Periodic box per frame: is there one, and does its volume drift | MDAnalysis box |
-| `vmd-agent vmd convert-trajectory` | Write a trajectory in another format, or just some atoms/frames, wrapped or fitted | coordinates read back |
-| `vmd-agent vmd write-structure` | Write one frame of a selection as pdb, psf, xyz, gro, mol2 or namdbin | atom counts |
-| `vmd-agent vmd volmap` | Make a density, occupancy, distance, mask or electrostatic-potential map | density integrates to the selection's mass |
-| `vmd-agent vmd volume-info` | What is in a density map file (dx, mrc, ccp4, cube, situs): grid, range, suggested isosurface levels | synthetic maps written to spec |
 | `vmd-agent vmd build-system` | PDB to a solvated, neutral CHARMM36 system (psfgen, solvate, autoionize) | MDAnalysis (atoms, charge, residues) |
 | `vmd-agent vmd mutate-residue` | Mutate one residue of a PSF/PDB pair | MDAnalysis residue names |
 | `vmd-agent vmd merge-structures` | Combine two PSF/PDB systems into one | atom counts |
 | `vmd-agent vmd build-membrane` | Build a POPC or POPE lipid bilayer patch | MDAnalysis atoms; P-to-P thickness against the known ~38 A |
 | `vmd-agent vmd build-nanotube` | Build a carbon or boron-nitride nanotube | the analytic radius for the chirality |
+| `vmd-agent vmd capabilities` | List the plugins of your VMD and which of them this toolkit wraps | every plugin of the installed VMD is classified |
+| `vmd-agent vmd structure-check` | Chirality errors, cis peptides and chain gaps (the structurecheck plugin) | a clean structure and one with residues deleted |
+| `vmd-agent vmd pbc-info` | Periodic box per frame: is there one, and does its volume drift | MDAnalysis box |
+| `vmd-agent vmd volume-info` | What is in a density map file (dx, mrc, ccp4, cube, situs): grid, range, suggested isosurface levels | synthetic maps written to spec |
+| `vmd-agent vmd measure` | VMD's measure commands over a trajectory: radius of gyration, SASA, RMSD, RMSF, distances, g(r), clusters ... | MDAnalysis, NumPy, SciPy (KD-tree), an independent Shrake-Rupley |
+| `vmd-agent vmd interactions` | Hydrogen bonds, salt bridges or contacts, as how often each pair is present | the known K27-D52 salt bridge of ubiquitin |
+| `vmd-agent vmd secondary-structure` | Secondary structure of every residue in every frame (what the Timeline window shows) | the toolkit's own DSSP (Q3 agreement) |
+| `vmd-agent vmd backbone-torsions` | Phi/psi angles and coarse Ramachandran regions of one frame | NumPy dihedrals |
+| `vmd-agent vmd align-structures` | Superpose one structure on another and report the RMSD | a known rotation and translation |
+| `vmd-agent vmd volmap` | Make a density, occupancy, distance, mask or electrostatic-potential map | density integrates to the selection's mass |
+| `vmd-agent vmd convert-trajectory` | Write a trajectory in another format, or just some atoms/frames, wrapped or fitted | coordinates read back |
+| `vmd-agent vmd write-structure` | Write one frame of a selection as pdb, psf, xyz, gro, mol2 or namdbin | atom counts |
 | `vmd-agent vmd render-scene` | Draw a scene you describe (representations, isosurfaces, camera) to a PNG | image content |
-| `vmd-agent vmd export-session` | Write a folder you can open in your own VMD (session.tcl, inputs, checksums) | opened again in a fresh VMD from another location |
 | `vmd-agent vmd render-turntable` | A rotating-view movie of a scene | the video read back with ffmpeg (frames, size) |
+| `vmd-agent vmd export-session` | Write a folder you can open in your own VMD (session.tcl, inputs, checksums) | opened again in a fresh VMD from another location |
+| `vmd-agent vmd fit-to-map` | Cryo-EM: fit a model into a density map as a rigid body, and report the correlation before and after (NumPy, no VMD) | a model displaced by a known rotation and shift is put back within 0.5 A |
+| `vmd-agent vmd map-arithmetic` | Add, subtract, mask, smooth, threshold or normalise density maps (NumPy, no VMD; VMD's own `volutil` did not load) | NumPy and SciPy results |
+| `vmd-agent vmd prepare-namd` | Write a NAMD input file (CHARMM36, PME, minimise then equilibrate) for a built system | the box, atoms and parameter files match the system; **never run in NAMD** |
+| `vmd-agent vmd slurm-script` | Write a SLURM job script for a cluster (NAMD, a VMD script, or any command) | the requested resources appear in the script; **never run on a cluster** |
 
 ### One example each
 
 ```bash
-vmd-agent vmd capabilities
-vmd-agent vmd measure run.pdb run.dcd --kind rgyr --step 10
-vmd-agent vmd interactions run.pdb run.dcd --kind salt_bridges
-vmd-agent vmd secondary-structure run.pdb run.dcd --step 5
-vmd-agent vmd backbone-torsions 1ubq.pdb
-vmd-agent vmd structure-check 1ubq.pdb
-vmd-agent vmd align-structures model.pdb reference.pdb --out aligned.pdb
-vmd-agent vmd pbc-info run.pdb run.dcd --step 10
-vmd-agent vmd convert-trajectory run.pdb run.dcd --out ca.dcd --selection "name CA" --step 5
-vmd-agent vmd write-structure run.pdb run.dcd --out frame10.pdb --frame 10
-vmd-agent vmd volmap run.pdb run.dcd --out water.dx --kind occupancy --selection "water and name OH2"
-vmd-agent vmd volume-info map.mrc
 vmd-agent vmd build-system 1ubq.pdb --out build/ubq --padding 10
 vmd-agent vmd mutate-residue ubq.psf ubq.pdb P0 6 ALA --out ubq_K6A
 vmd-agent vmd merge-structures a.psf a.pdb b.psf b.pdb --out merged
 vmd-agent vmd build-membrane --out membrane --lipid POPC --x-size 80 --y-size 80
 vmd-agent vmd build-nanotube --out tube.pdb --n 6 --m 6 --length-nm 10
+vmd-agent vmd capabilities
+vmd-agent vmd structure-check 1ubq.pdb
+vmd-agent vmd pbc-info run.pdb run.dcd --step 10
+vmd-agent vmd volume-info map.mrc
+vmd-agent vmd measure run.pdb run.dcd --kind rgyr --step 10
+vmd-agent vmd interactions run.pdb run.dcd --kind salt_bridges
+vmd-agent vmd secondary-structure run.pdb run.dcd --step 5
+vmd-agent vmd backbone-torsions 1ubq.pdb
+vmd-agent vmd align-structures model.pdb reference.pdb --out aligned.pdb
+vmd-agent vmd volmap run.pdb run.dcd --out water.dx --kind occupancy --selection "water and name OH2"
+vmd-agent vmd convert-trajectory run.pdb run.dcd --out ca.dcd --selection "name CA" --step 5
+vmd-agent vmd write-structure run.pdb run.dcd --out frame10.pdb --frame 10
 vmd-agent vmd render-scene run.pdb run.dcd --scene scene.json --out picture.png
-vmd-agent vmd export-session run.pdb run.dcd --scene scene.json --out session1
 vmd-agent vmd render-turntable run.pdb --scene scene.json --out spin.mp4
+vmd-agent vmd export-session run.pdb run.dcd --scene scene.json --out session1
+vmd-agent vmd fit-to-map model.pdb map.mrc --resolution 6 --out fitted.pdb
+vmd-agent vmd map-arithmetic a.dx subtract --map-b b.dx --out difference.dx
+vmd-agent vmd prepare-namd system.psf system.pdb --out sim/equilibrate --temperature 310
+vmd-agent vmd slurm-script equilibrate.namd --kind namd --gpus 1 --modules namd/3.0 --out run.sbatch
 ```
 
 A scene file (`scene.json`) is a plain description; every key is optional except `reps` or `isosurfaces`:
@@ -365,7 +373,7 @@ A VMD user's first question about any number is "can I get it in my own VMD?". T
 ### How much of VMD is this?
 
 `vmd_capabilities` classifies every plugin of *your* VMD. The classes: **wrapped** (a tool does it), **library** (a helper other plugins
-use), **gui_only** (a window with no scripting interface worth wrapping), **external_program** (needs NAMD, APBS, PROPKA, or a helper binary of its own such as `volutil`, ...),
+use), **gui_only** (a window with no scripting interface worth wrapping), **external_program** (needs NAMD, APBS, PROPKA, ...),
 **not_wrapped** (scriptable, no tool yet) and **unclassified** (newer than the table in `vmdkit/capabilities.py`). The wrapper is therefore
 not "all of VMD": the plugins that are windows or that drive another program are listed, not wrapped, and these scriptable ones are open:
 coarse-graining, topotools writers (LAMMPS and GROMACS writers produced empty files in the one real test),
@@ -386,14 +394,49 @@ installed VMD has a plugin the table does not know, so the table cannot silently
 * Salt bridges use the oxygen-nitrogen distance criterion of the `saltbr` plugin, computed with VMD's `measure contacts`.
 * The Timeline, Hydrogen Bonds and other windows are not opened; their computations are done headless.
 
-## Everything stays in one folder
+## 7. Check and keep records
 
-The installer puts **everything** in one folder, by default `~/vmd-agent` (Windows: `%USERPROFILE%\vmd-agent`): the helper
-tool, Python, the program and its packages (including ffmpeg), your settings, and, if you choose a free local model, a private
-copy of Ollama and its models. It uses no administrator rights, installs nothing system-wide and does not edit your shell's
-startup files. Your own data folder (`~/vmd-agent-data`) and VMD itself are separate and are never touched.
+| Command | What it does | Flags worth knowing |
+|---|---|---|
+| `vmd-agent provenance PATH` | re-check the hashes of the inputs and outputs of an earlier run | none |
+| `vmd-agent report SESSION_DIR` | assemble a written report from a finished session | `--out FILE` · `--title TEXT` |
+| `vmd-agent probe-video VIDEO` | read a video's metadata and prove it decodes (uses the bundled ffmpeg) | `--count-frames` |
+| `vmd-agent interpret-video VIDEO` | verify a video and pull out stills you can map back to simulation frames | `-n N` stills · `--out-dir DIR` · `--timestamps ...` · `--stride N` · `--first-frame N` · `--time-per-frame T` · `--time-unit` · `--count-frames` |
+| `vmd-agent validate TOP TRAJ` | cross-check the analysis against independent NumPy | `--sel` · `--sel2` · `--cutoff` |
+| `vmd-agent validate-dssp ID_OR_FILE ...` | compare the secondary-structure code with the PDB's own annotations | `--cache DIR` · `--mdtraj` |
+| `vmd-agent bench ...` | the research benchmark, also in a container with your VMD (`vmd-agent bench docker`) | see [Development](#running-and-reproducing) and [Docker](#docker) |
 
-**Update:** run the install line again. **Uninstall:** delete the `~/vmd-agent` folder. (If you used Docker, `docker compose down -v` removes its model volume.)
+## Other commands
+
+| Command | What it does | Flags worth knowing |
+|---|---|---|
+| `vmd-agent setup` | first-time setup: finds VMD, picks your files folder, sets up the AI | `--yes` accept defaults · `--check` only show the settings · `--use local\|online\|app\|skip` · `--model NAME` · `--data-dir FOLDER` · `--vmd PATH` |
+| `vmd-agent` (or `menu`) | the numbered menu | none |
+| `vmd-agent chat ["question"]` | talk to the tools with a language model | see [Ways to work](#ways-to-work) |
+| `vmd-agent doctor` | what this computer has, whether VMD really starts, which chat model is ready, what to do next | none |
+| `vmd-agent models` | the suggested free models, with the date they were checked | `--check` ask the Ollama library again |
+| `vmd-agent start ["question"]` | the Docker route: picks native or Docker from the facts and starts the chat | `--mode auto\|docker\|native` · `--model` · `--data-dir` · `--base-url` · `--print-plan` (show, run nothing) · `--down` (stop the containers) |
+| `vmd-agent probe` / `vmd-agent renderers` | what VMD, drawing backends and libraries this computer has | `--vmd PATH` |
+| `vmd-agent mcp-config` | the settings that connect Claude Desktop / Code to the tools | `--write` add them to Claude Desktop (with a backup) · `--roots FOLDER ...` · `--vmd PATH` |
+| `vmd-agent mcp-check` | test an MCP server install the way a real client uses it | `--roots` · `--vmd` · `--render` · `--command` · `--args` · `--env KEY=VALUE` |
+| `vmd-agent tools` | list every tool the chat and MCP server offer | `--group all\|core\|vmd` |
+| `vmd-agent tool NAME '{json}'` | run any one tool with its arguments as JSON | example: `vmd-agent tool probe_environment '{}'` |
+
+`vmd-agent --help` shows every command grouped in the order of this page; `vmd-agent <command> --help` shows one command's flags.
+
+**Flags that mean the same everywhere**
+
+| Flag | Meaning |
+|---|---|
+| `--traj FILE` (also `--trajectory`) | the trajectory that goes with the structure |
+| `--sel "..."` (also `--selection`), `--sel2 "..."` | a VMD atom selection, and a second one |
+| `--vmd PATH` | use this VMD instead of the one found automatically |
+| `--out-dir DIR`, `-o FILE`, `--out PATH` | where results are written |
+| `--views`, `--focus`, `--rep`, `--renderer`, `--style`, `--bg` | how pictures look |
+| `--step N` | use every Nth frame |
+| `--json` | machine-readable output where a command prints a summary |
+| `--yes` | accept the defaults without asking (setup) |
+| `--full` | everything, not shortened (the `vmd` commands) |
 
 ## If something goes wrong
 
@@ -408,33 +451,22 @@ startup files. Your own data folder (`~/vmd-agent-data`) and VMD itself are sepa
 | the model's answers are poor or wrong | a small model may be the cause: try a larger one (`vmd-agent setup`, option 1) or an online model. `vmd-agent claims` checks any statement against the data. |
 | anything else | run `vmd-agent doctor` and read its notes |
 
-## Other ways to install
-
-* **You already use Python:** `pip install "vmd-agent[server] @ https://github.com/OmidMLdata/AGENTIC_VMD_v2/archive/refs/heads/main.zip"`,
-  then `vmd-agent setup`. [`requirements.txt`](requirements.txt) lists the packages for people who manage them by hand
-  (`requirements-all.txt` adds the optional ones).
-* **From a downloaded copy:** run `./install.sh` (Mac/Linux) or `install.ps1` (Windows) from inside the folder; it installs that copy.
-* **Docker (advanced):** `./start.sh` (Windows: `.\start.ps1`) runs a model server and the chat in containers. Docker cannot run a
-  Mac or Windows VMD (it needs VMD's **Linux** build in `docker/vmd-dist/`) and on a Mac cannot use the Mac's graphics chip.
-  `vmd-agent start --print-plan` shows what is right for your computer. See [Docker](#docker).
-* **An MCP client** (Claude Code, Claude Desktop, others): [Use it from an MCP client](#use-it-from-an-mcp-client).
-
 ## What has and has not been verified
 
 | | |
 |---|---|
 | **Verified by running** | the analysis and structure code (against independent implementations by procedures you can repeat, see the [development guide](#4-reproduce-the-validation-checks)); the tools against **a real VMD 1.9.4a57 on macOS Apple Silicon** and a real ffmpeg; the setup logic, menu and settings; `install.sh` from a local copy; the private Ollama download and start; a real chat with `granite4.1:8b` calling the tools; both MCP SDK generations |
-| **Never run** | the one-line installer URLs (not published yet), `install.ps1`, Linux, anything on Windows; any model other than the two named above; VMD on Linux or Windows and any other VMD version; the Docker images; any real MCP client |
+| **Never run** | the one-line installer URLs (the repository is private for now, so they cannot be fetched), `install.ps1`, Linux, anything on Windows; any model other than the two named above; VMD on Linux or Windows and any other VMD version; the Docker images and route; any real MCP client; a NAMD run of the written input and a SLURM run of the written script |
 | **Results** | **none are included.** This repository ships no measured results, benchmark scores or model evaluations; everything is produced by running the commands on your own data. |
 
-Tests that need something the machine lacks are **skipped with the reason shown, never counted as passed**. Run everything
-with `python scripts/test.py` (lint, dead-code check, the whole suite, every skip listed).
+Tests that need something the machine lacks are **skipped with the reason shown, never counted as passed**. Run everything with
+`python scripts/dev.py test` (lint, dead-code check, the whole suite, every skip listed).
 
-The repository also holds a **benchmark** (*can an LLM agent carry out VMD analysis and visualization workflows correctly,
-and say so when it cannot?*): six task families with answers known by construction, scored on success and **silent errors**.
-`vmd-agent` is one entrant in it, not the presumed winner, and the model that wrote the benchmark must not run it. How to run
-it: [development guide](#5-run-the-automation-benchmark); the design: [research paper](docs/RESEARCH.md); the draft
-analysis plan: [preregistration draft](docs/RESEARCH.md#part-ii-preregistration-draft).
+The repository also holds a **benchmark** (*can an LLM agent carry out VMD analysis and visualization workflows correctly, and say so
+when it cannot?*): six task families with answers known by construction, scored on success and **silent errors**. `vmd-agent` is one
+entrant in it, not the presumed winner, and the model that wrote the benchmark must not run it. How to run it:
+[development guide](#5-run-the-automation-benchmark); the design: [research paper](docs/RESEARCH.md); the draft analysis plan:
+[preregistration draft](docs/RESEARCH.md#part-ii-preregistration-draft).
 
 ---
 
@@ -446,7 +478,7 @@ For integrators and developers. Everything above is enough to use the toolkit.
 
 Optional. The chat (`vmd-agent chat`) needs no MCP client; this is for people who already use Claude Code, Claude Desktop or another MCP client.
 
-The same 47 tools are available to any MCP client (Claude Code, Claude Desktop and others) through an MCP server. The server exposes the 47 tools below to an MCP client (Claude Code, Claude Desktop, or any other) over stdio. This
+The same 53 tools are available to any MCP client (Claude Code, Claude Desktop and others) through an MCP server. The server exposes the 53 tools below to an MCP client (Claude Code, Claude Desktop, or any other) over stdio. This
 section is everything needed to run it on a **Linux machine that has VMD installed**.
 
 ### 1. What the Linux machine needs
@@ -477,7 +509,7 @@ Run these **as the same user the server will run as**:
 gives the server **only** the environment you pass it (MCP clients typically do not forward your shell's exports or
 `PATH`, and the SDK's own client does not), so a variable that works in your terminal but is missing from the client's
 configuration shows up here. It reports:
-`connect` (the server starts and speaks MCP), `tools` (47 registered), `analysis_libraries`, `vmd` and `tachyon` (found?
+`connect` (the server starts and speaks MCP), `tools` (53 registered), `analysis_libraries`, `vmd` and `tachyon` (found?
 which version?), `ffmpeg`, the sandbox (a path outside the roots is refused; relative paths resolve inside the first root),
 whether the raw Tcl tool is disabled, and with `--render` a real VMD + Tachyon render of a tiny structure. `FAIL` means a
 client cannot work; `WARN` means reduced capability or a risk (no VMD, no sandbox). Exit code 2 on any `FAIL`.
@@ -565,11 +597,11 @@ Inside the container the data directory is `/data` and the sandbox is already se
 | the connection works over SSH for a while, then breaks | something on the remote side wrote to stdout (login banner, `.bashrc` output). Make the remote shell silent. |
 | movies or video tools fail | `vmd-agent probe` shows whether ffmpeg was found (the bundled copy normally is); check that the server runs in the environment where vmd-agent was installed. |
 
-47 tools. The original 27: `probe_environment` · `inspect_files` · `detect_system` · `generate_visualization_recipe` · `structure_stats` ·
+53 tools. The original 27: `probe_environment` · `inspect_files` · `detect_system` · `generate_visualization_recipe` · `structure_stats` ·
 `color_key` · `annotate_image` · `list_representations` · `describe_representation` · `render_image` · `render_movie` ·
 `run_vmd_tcl` · `search_pdb` · `fetch_structure` · `fetch_and_visualize` · `visualize_and_interpret` ·
 `analyze_trajectory` · `select_keyframes` · `verify_claims` · `verify_provenance` · `extract_video_frames` ·
-`probe_video` · `validate_video` · `interpret_video` · `view_image` · `record_visual_interpretation` · `assemble_report`. The 20 that drive VMD itself ([Driving VMD itself](#driving-vmd-itself)): `vmd_capabilities` · `vmd_measure` · `vmd_interactions` · `vmd_secondary_structure` · `vmd_backbone_torsions` · `vmd_structure_check` · `vmd_align_structures` · `vmd_pbc_info` · `vmd_convert_trajectory` · `vmd_write_structure` · `vmd_volmap` · `vmd_volume_info` · `vmd_build_system` · `vmd_mutate_residue` · `vmd_merge_structures` · `vmd_render_scene` · `vmd_render_turntable` · `vmd_build_membrane` · `vmd_build_nanotube` · `export_vmd_session`.
+`probe_video` · `validate_video` · `interpret_video` · `view_image` · `record_visual_interpretation` · `assemble_report`. The 24 that drive VMD itself ([Driving VMD itself](#6-drive-vmd-itself)): `vmd_capabilities` · `vmd_measure` · `vmd_interactions` · `vmd_secondary_structure` · `vmd_backbone_torsions` · `vmd_structure_check` · `vmd_align_structures` · `vmd_pbc_info` · `vmd_convert_trajectory` · `vmd_write_structure` · `vmd_volmap` · `vmd_volume_info` · `vmd_build_system` · `vmd_mutate_residue` · `vmd_merge_structures` · `vmd_render_scene` · `vmd_render_turntable` · `vmd_build_membrane` · `vmd_build_nanotube` · `export_vmd_session` · `vmd_fit_to_map` · `vmd_map_arithmetic` · `vmd_prepare_namd` · `vmd_slurm_script`. And the two that run whole jobs ([Whole jobs](#5-run-a-whole-job-and-get-a-report)): `list_workflows` · `run_workflow`.
 
 ## Development
 
@@ -598,7 +630,7 @@ images and lists its caveats; the legend is generated from what that renderer ac
 
 #### The research benchmark commands
 
-Every other command is in [Every command](#every-command). The benchmark ones (`vmd-agent bench <action>`; `vmd-agent bench --help`):
+Every other command is in [Every command](#ways-to-work). The benchmark ones (`vmd-agent bench <action>`; `vmd-agent bench --help`):
 
 | Action | What it does |
 |---|---|
@@ -612,9 +644,9 @@ Every other command is in [Every command](#every-command). The benchmark ones (`
 ### Contributing and publishing
 
 * **Set up for development:** `pip install -e ".[dev]"` (the `dev` extra is pytest, hypothesis, pyyaml, ruff and vulture; `".[all]"` adds the optional parts).
-* **Check everything:** `python scripts/test.py` runs lint, the dead-code check and the whole suite (CI runs the same command).
-* **Publish to GitHub:** `sh scripts/publish.sh` (or `--no-push` for a local commit only; `GITHUB_REPO=owner/name` to publish elsewhere). It starts a git
-  repository if there is none, refuses to commit anything that looks like a secret (an API key, a private key, a saved `llm_key`) or any file over 5 MB
+* **Check everything:** `python scripts/dev.py test` runs lint, the dead-code check and the whole suite (CI runs the same command).
+* **Publish to GitHub:** `python scripts/dev.py publish` (`--no-push` for a local commit only; `--branch NAME`; `GITHUB_REPO=owner/name` to publish elsewhere; `--skip-workflows` if your token lacks the `workflow` scope). It starts a git
+  repository if there is none, starts a new branch from the remote's main or fast-forwards a branch you already published (it never overwrites or forces), refuses to commit anything that looks like a secret (an API key, a private key, a saved `llm_key`) or any file over 5 MB
   outside `tests/data`, shows what it will commit, then pushes with the GitHub CLI or tells you the two commands to run by hand.
 * **`.gitignore`** keeps out caches and build output, editor files, everything vmd-agent writes while running (`vmd_scripts/`, `vmd_agent_output/`,
   `pdb_cache/`, `/data/`), anything that could hold a key (`.env`, `settings.json`, `/config/`), and VMD itself (`docker/vmd-dist/*`, which UIUC's
@@ -642,7 +674,7 @@ build has no `ffprobe`, so video metadata and frame counts are then read with `f
 #### 2. Run the tests
 
 ```bash
-python scripts/test.py        # lint + dead-code check + the whole suite, skip reasons listed; works on every OS
+python scripts/dev.py test    # lint + dead-code check + the whole suite, skip reasons listed; works on every OS
 pytest -rs                    # or just the tests
 ```
 
@@ -728,12 +760,12 @@ refuses a suite whose files changed.
 ```bash
 export ANTHROPIC_API_KEY=...                     # a dedicated key with a spending limit
 export DATA_DIR=$PWD/data                        # your trajectories; the suite and outputs go here too
-MODE=withvmd docker/bench.sh preflight --arms vmd_agent python_mdanalysis vmd_plain --allow-exec --model anthropic:<id>
-MODE=withvmd docker/bench.sh suite --out /data/suite --seed 100 --base /data/top.pdb /data/traj.dcd --structures /data/real/*.pdb
-MODE=withvmd docker/bench.sh run --suite /data/suite --out-dir /data/out --repeats 3 --allow-exec --model anthropic:<id> --arms vmd_agent python_mdanalysis
+vmd-agent bench docker preflight --mode withvmd --arms vmd_agent python_mdanalysis vmd_plain --allow-exec --model anthropic:<id>
+vmd-agent bench docker suite --mode withvmd --out /data/suite --seed 100 --base /data/top.pdb /data/traj.dcd --structures /data/real/*.pdb
+vmd-agent bench docker run --mode withvmd --suite /data/suite --out-dir /data/out --repeats 3 --allow-exec --model anthropic:<id> --arms vmd_agent python_mdanalysis
 ```
 
-`MODE=withvmd` builds VMD from a **Linux** tarball you place in `docker/vmd-dist/`; `MODE=hostvmd VMD_HOME=...` mounts a
+`--mode withvmd` builds VMD from a **Linux** tarball you place in `docker/vmd-dist/`; `--mode hostvmd` with `VMD_HOME=...` mounts a
 Linux install. A Mac's VMD.app cannot run in a Linux container (run natively instead). Details:
 [Running the benchmark with your VMD](#running-the-benchmark-with-your-vmd-and-your-key).
 
@@ -778,8 +810,11 @@ src/vmd_agent/
   wizard.py       `vmd-agent setup` and the plain-language menu behind a bare `vmd-agent`
   platform_info.py  OS, CPU, Docker, GPU, Ollama; where VMD and client configs live on each OS
   launcher.py     `vmd-agent start` / `doctor`: picks native or Docker from the facts and runs it
-  toolset.py      the 47 tools as plain functions + JSON schemas (no MCP, no AI client); the 27 original ones are `CORE_TOOLS`
-  vmd_tools.py    the 20 tools that drive VMD itself, built on vmdkit/ (each saves the Tcl it ran)
+  toolset.py      the 53 tools as plain functions + JSON schemas (no MCP, no AI client); the 27 original ones are `CORE_TOOLS`
+  vmd_tools.py    the 24 tools that drive VMD itself, built on vmdkit/ (each saves the Tcl it ran)
+  workflows.py    named multi-step jobs (structure_overview, equilibration_check, ...): findings, a verdict, a report
+  reporting.py    writes report.md / report.html from a workflow: findings, figures, caveats, methods, checksums, the Tcl
+  progress.py     what a long job reports as it runs, and who listens (the terminal, the chat)
   models.py       the dated catalogue of suggested open-source models + a live registry check
   ollama_local.py a private copy of Ollama inside the vmd-agent folder (checksum-verified download)
   server.py       MCP surface: registers the toolset with the MCP SDK
@@ -791,7 +826,7 @@ src/vmd_agent/
   security.py     path sandbox, Tcl deny-list
 
   vmdkit/         script (run generated Tcl in headless VMD, parse results) · measure · interactions · structure · trajectory
-                  volumetric · build · scene (render + export_session) · capabilities (plugin coverage map)
+                  volumetric · build · scene (render + export_session) · maps (cryo-EM fitting, map arithmetic) · prepare (NAMD, SLURM) · capabilities (plugin coverage map)
   inputs/         molio      load_universe + native mmCIF reader
                   volume     read OpenDX / CCP4 / MRC / cube / Situs maps
                   fetch      RCSB / AlphaFold / URL, with a safe downloader
@@ -823,7 +858,7 @@ ones; no cycles):
 
 | unit | may import |
 |---|---|
-| `inputs`, `llm_client`, `platform_info`, `settings`, `models` | nothing else in the package |
+| `inputs`, `llm_client`, `platform_info`, `settings`, `models`, `progress` | nothing else in the package |
 | `security` | `settings` (the saved files folder is the default sandbox) |
 | `ollama_local` | `platform_info`, `settings` |
 | `environment` | `platform_info`, `settings` |
@@ -831,9 +866,9 @@ ones; no cycles):
 | `dynamics` | `inputs`, `structure` |
 | `visual` | `inputs`, `structure`, `environment`, `security` |
 | `evidence` | `inputs`, `structure`, `dynamics`, `environment`, `security` |
-| `vmdkit` | `inputs`, `structure`, `visual`, `environment`, `security` |
+| `vmdkit` | `inputs`, `structure`, `visual`, `environment`, `security`, `progress` |
 | `bench` | all of the above, `auto` and `llm_client` |
-| `auto.py`, `cli.py`, `server.py`, `toolset.py`, `vmd_tools.py`, `chat.py`, `launcher.py`, `wizard.py`, `mcp_check.py`, `__init__.py` | anything: they are the only places that compose units |
+| `auto.py`, `cli.py`, `server.py`, `toolset.py`, `vmd_tools.py`, `vmd_cli.py`, `workflows.py`, `reporting.py`, `chat.py`, `launcher.py`, `wizard.py`, `mcp_check.py`, `__init__.py` | anything: they are the only places that compose units |
 
 `dynamics` and `visual` are siblings and never import each other, which is why rendering the chosen keyframes
 (`auto.select_keyframes`) and the renderer inventory (`auto.probe_environment`) live in `auto.py`.
@@ -855,7 +890,7 @@ ones; no cycles):
 ### Tests
 
 `tests/` mirrors `src/vmd_agent/` (`inputs/ structure/ dynamics/ visual/ evidence/ bench/`) plus `surfaces/`
-(the server through the real MCP SDK, CLI) and `system/` (security, environment). About 700 tests, a few minutes; `python scripts/test.py` runs everything.
+(the server through the real MCP SDK, CLI) and `system/` (security, environment). About 700 tests, a few minutes; `python scripts/dev.py test` runs everything.
 Real data in `tests/data/`. **Nothing stands in for another program.** Tests that need a real VMD/Tachyon, ffmpeg, the MCP SDK
 (Python >= 3.10), the network or a live model are marked `requires_vmd`, `requires_ffmpeg`, `requires_mcp`,
 `requires_network`, `requires_api` and are **skipped, with the reason shown**, where that is missing: run `pytest -rs`
@@ -1075,16 +1110,16 @@ tested for Linux, macOS and Windows from any OS: VMD install folders and file na
 Windows paths turned into forward slashes for Tcl, the Windows system variables a child process needs, a console that cannot show a
 character, and the version check that no longer relies on a Linux/macOS-only device file. **Only macOS has been run by the author.**
 
-### The all-in-one chat stack (`./start.sh`)
+### The all-in-one chat stack (`vmd-agent start`)
 
-`start.sh` (and `start.ps1` for Windows) runs `docker/chat.compose.yml`: an **Ollama** model server (official image, models
+`vmd-agent start` (in Docker mode; `--down` stops it) runs `docker/chat.compose.yml`: an **Ollama** model server (official image, models
 kept in a named volume so they download once) and the `vmd-agent` image running `vmd-agent chat`, with your `./data` folder
 mounted at `/data` as the only place the agent can read or write (read-only root, no capabilities). If a Linux VMD tarball
 is in `docker/vmd-dist/` the image is built with it (`VMD_TARGET=with-vmd`, never to be shared); otherwise figures use the
 built-in renderer. `docker/chat.gpu.yml` adds NVIDIA GPU access when `nvidia-smi` and Docker's NVIDIA runtime are found.
 A Mac's Docker cannot use its GPU, so the model runs on the CPU there. The default model `granite4.1:8b` is a suggestion
-that has not been tested; set `MODEL=...`. **Never run:** the tests check the scripts' syntax, the compose structure and the
-no-Docker error path only.
+that has not been tested; choose another with `--model`. **Never run:** the tests check the compose structure, the plan the
+launcher makes and the no-Docker error path only.
 
 ### Three images
 
@@ -1138,10 +1173,10 @@ Three ways to supply VMD. Pick by where you work:
 | Route | When | Command prefix |
 |---|---|---|
 | **Native** | You run on the machine that has VMD (a Mac with VMD.app, or a Linux box). Simplest, but model-written code runs on your machine: use a disposable VM. | `vmd-agent bench ... --vmd <path>` |
-| **Mounted VMD** (`MODE=hostvmd`) | Linux host, VMD installed there, same CPU architecture as the image. | `MODE=hostvmd VMD_HOME=/opt/vmd docker/bench.sh ...` |
-| **Baked VMD** (`MODE=withvmd`) | **Use this on a Mac.** Put the **Linux** VMD tarball in `docker/vmd-dist/`; it is installed inside a local image. Local use only; never push. | `MODE=withvmd docker/bench.sh ...` |
+| **Mounted VMD** (`--mode hostvmd`) | Linux host, VMD installed there, same CPU architecture as the image. | `VMD_HOME=/opt/vmd vmd-agent bench docker ... --mode hostvmd` |
+| **Baked VMD** (`--mode withvmd`) | **Use this on a Mac.** Put the **Linux** VMD tarball in `docker/vmd-dist/`; it is installed inside a local image. Local use only; never push. | `vmd-agent bench docker ... --mode withvmd` |
 
-A Mac's VMD.app is a macOS binary and **cannot run in a Linux container**, so mounting it fails (`docker/bench.sh
+A Mac's VMD.app is a macOS binary and **cannot run in a Linux container**, so mounting it fails (`vmd-agent bench docker
 check-vmd` says so). VMD is also architecture-specific: the Linux tarball must match `VMD_PLATFORM` (default
 `linux/amd64`; on Apple Silicon this runs under emulation, which is slow). Check what VMD offers for your CPU.
 
@@ -1149,12 +1184,12 @@ check-vmd` says so). VMD is also architecture-specific: the Linux tarball must m
 export ANTHROPIC_API_KEY=...        # a dedicated key with a spending limit; passed by name, never stored
 export DATA_DIR=$PWD/data           # holds your trajectories; the suite and outputs go here too
 
-MODE=withvmd docker/bench.sh preflight --arms vmd_agent python_mdanalysis vmd_plain \
+vmd-agent bench docker preflight --mode withvmd --arms vmd_agent python_mdanalysis vmd_plain \
     --allow-exec --model anthropic:<id> --live-api            # first: prove VMD, selection, key, scrubbing
-MODE=withvmd docker/bench.sh suite --out /data/suite --seed 100 \
+vmd-agent bench docker suite --mode withvmd --out /data/suite --seed 100 \
     --base /data/top.pdb /data/traj.dcd --structures /data/real/*.pdb
-MODE=withvmd docker/bench.sh plan --suite /data/suite --labels 6 --repeats 3 --price-in <USD/M> --price-out <USD/M>
-MODE=withvmd docker/bench.sh run --suite /data/suite --out-dir /data/out --repeats 3 --allow-exec \
+vmd-agent bench docker plan --mode withvmd --suite /data/suite --labels 6 --repeats 3 --price-in <USD/M> --price-out <USD/M>
+vmd-agent bench docker run --mode withvmd --suite /data/suite --out-dir /data/out --repeats 3 --allow-exec \
     --model anthropic:<id> --arms vmd_agent vmd_agent_no_verify python_mdanalysis vmd_plain
 ```
 

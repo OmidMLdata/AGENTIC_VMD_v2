@@ -44,7 +44,7 @@ def volmap(topology: str, trajectory: Optional[str], out_dx: str, kind: str = "d
         f"set keep [framerange top {first} {last} {step}]",
         "for {set f [expr {[molinfo top get numframes] - 1}]} {$f >= 0} {incr f -1} {",
         "  if {[lsearch -exact $keep $f] < 0} { animate delete beg $f end $f top }", "}",
-        f"set s [atomselect top {{{S.sel(selection)}}}]",
+        f"set s [atomselect top {{{S.sel(selection)}}}]", 'progress "computing the map"',
         f"volmap {kind} $s {extra} -allframes -mol top -o {{{out}}}",
         "emit OK [molinfo top get numframes]"]
     res = S.run(body, vmd_path)

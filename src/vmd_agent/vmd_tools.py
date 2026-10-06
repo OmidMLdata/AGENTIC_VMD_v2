@@ -9,12 +9,12 @@ as ``reproduce_script``: open it in VMD to repeat exactly what the tool did.
 from __future__ import annotations
 
 import os
-from typing import Optional
+from typing import List, Optional
 
 from vmd_agent import security
 from vmd_agent.toolset import _p, tool
 from vmd_agent.vmdkit import build, capabilities, interactions, measure as measure_mod
-from vmd_agent.vmdkit import scene, script, structure, volumetric
+from vmd_agent.vmdkit import maps, prepare, scene, script, structure, volumetric
 from vmd_agent.vmdkit import trajectory as traj_mod
 
 
@@ -240,3 +240,44 @@ def vmd_render_turntable(scene_spec: dict, topology: Optional[str], trajectory: 
     `axis` over `frames` frames, rendered with VMD + Tachyon and encoded with ffmpeg."""
     return scene.render_turntable(scene_spec, _p(topology), _p(trajectory), _p(out_mp4), frames=frames,
                                   degrees=degrees, axis=axis, fps=fps, width=width, height=height, vmd_path=_p(vmd_path))
+
+
+@tool()
+def vmd_fit_to_map(model: str, map_file: str, resolution: float = 8.0, selection: str = "protein",
+                   out_pdb: Optional[str] = None) -> dict:
+    """Cryo-EM: move a model as a rigid body to where it fits a density map (OpenDX, CCP4/MRC, cube, Situs) best, and report
+    the map-model correlation before and after. resolution is the blur in angstrom of a map made from the model. Writes the
+    moved model to out_pdb. Needs no VMD; view the result with vmd_render_scene (map as an isosurface)."""
+    return _run("vmd_fit_to_map", maps.fit_to_map, model=_p(model), map_file=_p(map_file), resolution=resolution,
+                selection=selection, out_pdb=_p(out_pdb))
+
+
+@tool()
+def vmd_map_arithmetic(map_a: str, op: str, out_dx: str, map_b: Optional[str] = None, value: Optional[float] = None) -> dict:
+    """Combine or clean density maps and write OpenDX. op: add, subtract, multiply, average, mask (A where B >= value),
+    threshold, clamp, smooth (blur of `value` angstrom), normalize, scale. Two-map operations need map_b on the same grid.
+    Needs no VMD."""
+    return _run("vmd_map_arithmetic", maps.map_arithmetic, map_a=_p(map_a), op=op, out_dx=_p(out_dx), map_b=_p(map_b), value=value)
+
+
+@tool()
+def vmd_prepare_namd(psf: str, pdb: str, out_prefix: str, temperature: float = 310.0, minimize_steps: int = 1000,
+                     equilibrate_ps: float = 100.0, timestep_fs: float = 2.0, ensemble: str = "npt",
+                     vmd_path: Optional[str] = None) -> dict:
+    """Write a NAMD input file (CHARMM36, PME, rigid bonds, minimisation then equilibration at `temperature` K, npt or nvt)
+    for a solvated PSF/PDB such as vmd_build_system makes; the box is read from the coordinates and the parameter files
+    are copied beside it. Not run in NAMD: it says so; read it before you submit it."""
+    return _run("vmd_prepare_namd", prepare.prepare_namd, psf=_p(psf), pdb=_p(pdb), out_prefix=_p(out_prefix),
+                temperature=temperature, minimize_steps=minimize_steps, equilibrate_ps=equilibrate_ps,
+                timestep_fs=timestep_fs, ensemble=ensemble, vmd_path=_p(vmd_path))
+
+
+@tool()
+def vmd_slurm_script(command: str, out_path: str, job_name: str = "vmd-agent", partition: Optional[str] = None,
+                     nodes: int = 1, cpus: int = 8, gpus: int = 0, hours: float = 12.0, memory_gb: int = 16,
+                     modules: Optional[List[str]] = None, kind: str = "shell") -> dict:
+    """Write a SLURM batch script for a cluster. kind: namd (command is a .namd file), vmd (a Tcl script, run headless) or
+    shell (any command line). Not run on a cluster: check module names and partition."""
+    return _run("vmd_slurm_script", prepare.slurm_script, command=command, out_path=_p(out_path), job_name=job_name,
+                partition=partition, nodes=nodes, cpus=cpus, gpus=gpus, hours=hours, memory_gb=memory_gb, modules=modules,
+                kind=kind)

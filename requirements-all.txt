@@ -1,6 +1,0 @@
-# Everything, including the optional parts:   pip install -r requirements-all.txt
--r requirements.txt
-mcp>=1.2.0          # lets Claude Desktop / Claude Code use the tools (needs Python 3.10 or newer)
-anthropic           # only for running the benchmark on Anthropic models
-freesasa            # optional: solvent-accessible-surface analysis (needs a C compiler on some systems)
-mdtraj              # optional: independent check of the secondary-structure code

@@ -62,7 +62,7 @@ EXPECTED = {
 
 def test_all_tools_are_registered_with_the_sdk(server):
     from vmd_agent import toolset
-    assert tool_names(server) == set(toolset.TOOLS) and len(toolset.TOOLS) == 47
+    assert tool_names(server) == set(toolset.TOOLS) and len(toolset.TOOLS) == 53
     assert EXPECTED <= tool_names(server) and len(EXPECTED) == 27
 
 

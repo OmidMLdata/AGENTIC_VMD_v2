@@ -21,7 +21,8 @@ def secondary_structure(topology: str, trajectory: Optional[str] = None, selecti
     body = S.load(topology, trajectory) + [
         f"set s [atomselect top {{({s1}) and name CA}}]",
         "emit RES [join [$s get resid] { }]", "emit NAME [join [$s get resname] { }]",
-        f"foreach f [framerange top {first} {last} {step}] {{",
+        f"set frames [framerange top {first} {last} {step}]", S.TICK_INIT,
+        "foreach f $frames {", "  " + S.TICK,
         "  animate goto $f; mol ssrecalc top; $s frame $f; $s update",
         "  emit SS $f [join [$s get structure] {}]", "}"]
     res = S.run(body, vmd_path)

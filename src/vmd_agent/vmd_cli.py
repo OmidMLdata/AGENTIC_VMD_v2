@@ -14,8 +14,8 @@ import os
 import typing
 from typing import Callable, Dict, List
 
-from vmd_agent import toolset
-from vmd_agent.vmdkit import interactions, measure, trajectory, volumetric
+from vmd_agent import progress, toolset
+from vmd_agent.vmdkit import interactions, maps, measure, trajectory, volumetric
 
 #: tool name -> command name
 def command_name(tool: str) -> str:
@@ -23,7 +23,7 @@ def command_name(tool: str) -> str:
             else tool[4:].replace("_", "-") if tool.startswith("vmd_") else tool.replace("_", "-"))
 
 
-VMD_TOOLS: List[str] = [n for n in toolset.TOOLS if n not in toolset.CORE_TOOLS]
+VMD_TOOLS: List[str] = [n for n in toolset.TOOLS if n not in toolset.CORE_TOOLS and (n.startswith("vmd_") or n == "export_vmd_session")]
 
 #: parameters that name an output: always ``--out``
 OUTPUTS = ("out_path", "out_dx", "out_pdb", "out_png", "out_mp4", "out_prefix", "out_dir")
@@ -41,12 +41,18 @@ CHOICES: Dict[tuple, tuple] = {
     ("vmd_build_nanotube", "material"): ("C-C", "B-N"),
     ("vmd_render_scene", "axis"): ("x", "y", "z"),
     ("vmd_render_turntable", "axis"): ("x", "y", "z"),
+    ("vmd_map_arithmetic", "op"): tuple(maps.OPS),
+    ("vmd_prepare_namd", "ensemble"): ("npt", "nvt"),
+    ("vmd_slurm_script", "kind"): ("namd", "vmd", "shell"),
 }
 HELP_SHORT = {  # one-line help for flags whose name alone is not enough
     "topology": "structure file (PDB, PSF, GRO, mmCIF ...)", "trajectory": "trajectory file (DCD, XTC ...), optional",
     "mobile": "the structure to move", "reference": "the structure to move it onto", "psf": "PSF file", "pdb": "PDB file",
     "psf_a": "first PSF", "pdb_a": "first PDB", "psf_b": "second PSF", "pdb_b": "second PDB", "input_pdb": "protein PDB file",
-    "path": "map file", "segid": "segment name (for example P0)", "resid": "residue number", "new_resname": "new residue name (ALA ...)",
+    "path": "map file", "command": "what to run: a .namd file, a Tcl script, or a command line (quote it)",
+    "model": "the model to fit (PDB)", "map_file": "the density map (dx, mrc, ccp4, cube, situs)", "map_a": "the map",
+    "op": "what to do", "map_b": "second map on the same grid (for add, subtract, multiply, average, mask)",
+    "value": "the number the operation needs (threshold, width in angstrom, ...)", "segid": "segment name (for example P0)", "resid": "residue number", "new_resname": "new residue name (ALA ...)",
     "first": "first frame (0-based)", "last": "last frame (-1 = the end)", "step": "use every Nth frame",
     "selection": "VMD atom selection", "selection2": "second VMD atom selection", "selection3": "third selection",
     "selection4": "fourth selection", "kind": "what to compute", "fmt": "output format (default: from the file name)",
@@ -74,6 +80,10 @@ SUMMARY: Dict[str, str] = {   # what the command does, in the words of a person 
     "vmd_render_scene": "draw a scene you describe (representations, isosurfaces, camera) to a PNG",
     "vmd_render_turntable": "a rotating-view movie of a scene",
     "export_vmd_session": "write a folder you can open in your own VMD (session.tcl, inputs, checksums)",
+    "vmd_fit_to_map": "cryo-EM: fit a model into a density map as a rigid body, and report the correlation before and after",
+    "vmd_map_arithmetic": "add, subtract, mask, smooth, threshold or normalise density maps",
+    "vmd_prepare_namd": "write a NAMD input file (CHARMM36, PME, minimise then equilibrate) for a built system",
+    "vmd_slurm_script": "write a SLURM job script for a cluster (NAMD, a VMD script, or any command)",
 }
 EXAMPLES: Dict[str, str] = {
     "vmd_capabilities": "vmd-agent vmd capabilities",
@@ -96,6 +106,10 @@ EXAMPLES: Dict[str, str] = {
     "vmd_render_scene": "vmd-agent vmd render-scene run.pdb run.dcd --scene scene.json --out picture.png",
     "vmd_render_turntable": "vmd-agent vmd render-turntable run.pdb --scene scene.json --out spin.mp4",
     "export_vmd_session": "vmd-agent vmd export-session run.pdb run.dcd --scene scene.json --out session1",
+    "vmd_fit_to_map": "vmd-agent vmd fit-to-map model.pdb map.mrc --resolution 6 --out fitted.pdb",
+    "vmd_map_arithmetic": "vmd-agent vmd map-arithmetic a.dx subtract --map-b b.dx --out difference.dx",
+    "vmd_prepare_namd": "vmd-agent vmd prepare-namd system.psf system.pdb --out sim/equilibrate --temperature 310",
+    "vmd_slurm_script": "vmd-agent vmd slurm-script equilibrate.namd --kind namd --gpus 1 --modules namd/3.0 --out run.sbatch",
 }
 
 
@@ -128,6 +142,11 @@ def _optional(tp) -> bool:
     return typing.get_origin(tp) is typing.Union and type(None) in typing.get_args(tp)
 
 
+def _is_list(tp) -> bool:
+    inner = [a for a in typing.get_args(tp) if a is not type(None)] if typing.get_origin(tp) is typing.Union else [tp]
+    return bool(inner) and typing.get_origin(inner[0]) in (list, typing.List)
+
+
 def _kind_of(tp) -> type:
     origin, args = typing.get_origin(tp), typing.get_args(tp)
     if origin is typing.Union:
@@ -153,6 +172,7 @@ def add_commands(sub) -> None:
                              formatter_class=argparse.RawDescriptionHelpFormatter)
         cp.set_defaults(_tool=name)
         cp.add_argument("--full", action="store_true", help="print every value (long lists are shortened by default)")
+        cp.add_argument("--quiet", action="store_true", help="do not show progress while it runs")
         for pname, p in sig.parameters.items():
             raw = hints.get(pname, str)
             tp, has_default = _kind_of(raw), p.default is not inspect.Parameter.empty
@@ -167,6 +187,8 @@ def add_commands(sub) -> None:
                                 help="the scene: a JSON file, or JSON text (representations, isosurfaces, camera ...)")
             elif pname in ("topology", "trajectory") and (_optional(raw) or has_default):
                 cp.add_argument(pname, nargs="?", default=None, help=helptxt)
+            elif _is_list(raw):
+                cp.add_argument(_flag(pname), dest=pname, nargs="+", default=None, help=f"{helptxt} (one or more)")
             elif not has_default:
                 cp.add_argument(pname, type=tp, help=helptxt)                    # required: positional
             elif tp is bool:
@@ -190,10 +212,22 @@ def brief(obj, n: int = 4):
     return obj
 
 
+#: the order a project goes in: build, check, measure, convert, render, fit to data, then hand off to a cluster
+STAGES = [
+    ("Build a system", ["vmd_build_system", "vmd_mutate_residue", "vmd_merge_structures", "vmd_build_membrane", "vmd_build_nanotube"]),
+    ("Check a structure", ["vmd_capabilities", "vmd_structure_check", "vmd_pbc_info", "vmd_volume_info"]),
+    ("Measure", ["vmd_measure", "vmd_interactions", "vmd_secondary_structure", "vmd_backbone_torsions", "vmd_align_structures", "vmd_volmap"]),
+    ("Convert", ["vmd_convert_trajectory", "vmd_write_structure"]),
+    ("Render and save a session", ["vmd_render_scene", "vmd_render_turntable", "export_vmd_session"]),
+    ("Fit to data and hand off", ["vmd_fit_to_map", "vmd_map_arithmetic", "vmd_prepare_namd", "vmd_slurm_script"]),
+]
+
+
 def list_commands() -> str:
-    lines = ["Commands that drive VMD itself (each needs VMD):", ""]
-    for name in VMD_TOOLS:
-        lines.append(f"  vmd-agent vmd {command_name(name):<22} {SUMMARY.get(name, '')}")
+    lines = ["Commands that drive VMD itself (each needs VMD), in the order a project goes:"]
+    for title, names in STAGES:
+        lines += ["", title]
+        lines += [f"  vmd-agent vmd {command_name(n):<22} {SUMMARY.get(n, '')}" for n in names if n in VMD_TOOLS]
     lines += ["", "Details and an example for one:  vmd-agent vmd <action> --help",
               "Every result is JSON; long lists are shortened (add --full for everything).",
               "Each command saves the exact Tcl it ran: see `reproduce_script` in the result."]
@@ -205,8 +239,12 @@ def run(args, print_json: Callable) -> int:
     if not name:
         print(list_commands())
         return 0
-    skip = {"cmd", "vmd_cmd", "_tool", "full"}
+    skip = {"cmd", "vmd_cmd", "_tool", "full", "quiet"}
     kwargs = {k: v for k, v in vars(args).items() if k not in skip}
-    result = toolset.TOOLS[name](**kwargs)
+    if args.quiet:
+        result = toolset.TOOLS[name](**kwargs)
+    else:
+        with progress.listen(progress.terminal()):                       # progress goes to stderr; the result to stdout
+            result = toolset.TOOLS[name](**kwargs)
     print_json(result if args.full else brief(result))
     return 1 if isinstance(result, dict) and result.get("ok") is False else 0

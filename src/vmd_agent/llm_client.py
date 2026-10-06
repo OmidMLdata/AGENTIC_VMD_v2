@@ -14,7 +14,7 @@ import json
 import re
 import urllib.error
 import urllib.request
-from typing import Dict, List, Optional, Sequence
+from typing import Callable, Dict, List, Optional, Sequence
 
 import numpy as np
 
@@ -93,12 +93,70 @@ def _request(url: str, payload: Optional[dict], api_key: Optional[str],
                        f"{raw[:200]!r}") from e
 
 
+def _stream_request(url: str, payload: dict, api_key: Optional[str], timeout: float,
+                    on_token: Callable[[str], None]) -> dict:
+    """POST with ``stream: true`` and rebuild the ordinary (non-streaming) reply from the events, calling
+    ``on_token(text)`` for every piece of the answer as it arrives."""
+    data = json.dumps(payload, default=json_default).encode()
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+    content: List[str] = []
+    calls: Dict[int, dict] = {}
+    finish, usage = None, {}
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            for raw in resp:
+                line = raw.decode("utf-8", "replace").strip()
+                if not line.startswith("data:"):
+                    continue
+                body = line[5:].strip()
+                if body == "[DONE]":
+                    break
+                try:
+                    ev = json.loads(body)
+                except ValueError:
+                    continue
+                usage = ev.get("usage") or usage
+                for ch in ev.get("choices") or []:
+                    delta = ch.get("delta") or {}
+                    if delta.get("content"):
+                        content.append(delta["content"])
+                        try:
+                            on_token(delta["content"])
+                        except Exception:             # a broken display must not break the conversation
+                            pass
+                    for tc in delta.get("tool_calls") or []:
+                        cur = calls.setdefault(int(tc.get("index", len(calls))),
+                                               {"id": None, "function": {"name": "", "arguments": ""}})
+                        cur["id"] = tc.get("id") or cur["id"]
+                        fn = tc.get("function") or {}
+                        cur["function"]["name"] += fn.get("name") or ""
+                        args = fn.get("arguments")
+                        cur["function"]["arguments"] += args if isinstance(args, str) else (
+                            json.dumps(args) if args is not None else "")
+                    finish = ch.get("finish_reason") or finish
+    except urllib.error.HTTPError as e:
+        raise LLMError(f"the model server answered HTTP {e.code} for {url}: "
+                       f"{e.read()[:600].decode('utf-8', 'replace')}") from e
+    except (urllib.error.URLError, OSError) as e:
+        raise LLMError(f"cannot reach the model server at {url} ({getattr(e, 'reason', e)}). "
+                       "Is it running, and is the address right?") from e
+    msg: Dict[str, object] = {"role": "assistant", "content": "".join(content)}
+    if calls:
+        msg["tool_calls"] = [{"id": c["id"], "type": "function", "function": c["function"]}
+                             for _, c in sorted(calls.items())]
+    return {"choices": [{"message": msg, "finish_reason": finish}], "usage": usage}
+
+
 def chat_completion(base_url: str, model: str, messages: Sequence[dict],
                     tools: Optional[Sequence[dict]] = None,
                     api_key: Optional[str] = None, temperature: float = 0.0,
                     max_tokens: Optional[int] = None,
                     timeout: float = 900.0,
-                    tool_choice: Optional[str] = None) -> dict:
+                    tool_choice: Optional[str] = None,
+                    on_token: Optional[Callable[[str], None]] = None) -> dict:
     """One non-streaming chat completion; returns the server's JSON. ``tool_choice="required"`` makes the
     model call a tool instead of answering from memory."""
     payload: Dict[str, object] = {"model": model, "messages": list(messages),
@@ -109,8 +167,12 @@ def chat_completion(base_url: str, model: str, messages: Sequence[dict],
             payload["tool_choice"] = tool_choice
     if max_tokens:
         payload["max_tokens"] = max_tokens
-    return _request(base_url.rstrip("/") + "/chat/completions", payload,
-                    api_key, timeout)
+    url = base_url.rstrip("/") + "/chat/completions"
+    if on_token is not None:                                # stream: show the answer as it is written
+        payload["stream"] = True
+        payload["stream_options"] = {"include_usage": True}
+        return _stream_request(url, payload, api_key, timeout, on_token)
+    return _request(url, payload, api_key, timeout)
 
 
 def list_models(base_url: str, api_key: Optional[str] = None,

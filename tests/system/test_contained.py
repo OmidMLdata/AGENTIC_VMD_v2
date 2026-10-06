@@ -211,8 +211,8 @@ def test_models_command_prints_the_dated_table(capsys):
 
 
 def test_there_is_one_script_that_runs_everything_and_the_readme_names_it():
-    assert os.path.exists(os.path.join(ROOT, "scripts", "test.py"))
-    assert "python scripts/test.py" in open(os.path.join(ROOT, "README.md")).read()
+    assert os.path.exists(os.path.join(ROOT, "scripts", "dev.py"))
+    assert "python scripts/dev.py test" in open(os.path.join(ROOT, "README.md")).read()
 
 
 # ------------------------------------------------------------------ the VMD version policy

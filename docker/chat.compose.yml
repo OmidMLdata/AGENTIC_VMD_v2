@@ -1,5 +1,5 @@
-# The all-in-one stack behind ./start.sh: a local open-source model server (Ollama) and
-# the vmd-agent chat. Start it with ./start.sh rather than by hand.
+# The all-in-one stack behind `vmd-agent start` (Docker mode): a local open-source model server
+# (Ollama) and the vmd-agent chat. Start it with `vmd-agent start`; stop it with `vmd-agent start --down`.
 #
 #   MODEL        model to use (default granite4.1:8b)
 #   DATA_DIR     your files, mounted at /data (default ./data)

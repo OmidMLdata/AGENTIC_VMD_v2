@@ -603,7 +603,7 @@ older MCP generation, and cannot run the real-VMD tests (VMD is not installable 
 src/vmd_agent/   inputs | structure | dynamics | visual | evidence | bench (agent/) ; auto, cli, server, environment, security
 tests/           mirrors src/ ; data/ holds 4 real PDBs, a real 50-frame ubiquitin MD, and a labelled synthetic sample system
 docs/            PAPER (this file), TECHNICAL, PREREGISTRATION, history/
-docker/          Dockerfile, compose, bench.sh, install_vmd.sh, vmd-dist/
+docker/          Dockerfile, compose files, install_vmd.sh, vmd-dist/
 ```
 
 ---
@@ -654,7 +654,7 @@ vmd-agent bench agent-plan --suite suite --labels 6 --repeats 3 --price-in <USD/
 vmd-agent bench agent-run --suite suite --model anthropic:<id> --arms vmd_agent python_mdanalysis --allow-exec --repeats 3
 ```
 
-In a container with your VMD: `MODE=withvmd docker/bench.sh preflight|suite|plan|run ...`.
+In a container with your VMD: `vmd-agent bench docker preflight|suite|plan|run --mode withvmd ...`.
 
 ### Appendix B. Timeline of the work
 

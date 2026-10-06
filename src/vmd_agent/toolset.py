@@ -589,8 +589,8 @@ def tool_specs(names: Optional[List[str]] = None) -> List[dict]:
 #: the tools every front end had before VMD itself was wrapped (a smaller menu for small models)
 CORE_TOOLS = tuple(TOOLS)
 
-# The tools that drive VMD itself register themselves into TOOLS on import.
-from vmd_agent import vmd_tools  # noqa: F401
+# The tools that drive VMD itself, and the named workflows, register themselves into TOOLS on import.
+from vmd_agent import vmd_tools, workflows  # noqa: F401
 
 #: tool-set choices for the chat: all of them, only the original ones, or only those that drive VMD
 PROFILES = {"all": tuple(TOOLS), "core": CORE_TOOLS,

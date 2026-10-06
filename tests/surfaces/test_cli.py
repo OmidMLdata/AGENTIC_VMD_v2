@@ -155,16 +155,16 @@ def test_the_top_level_help_is_the_grouped_overview(capsys):
     with pytest.raises(SystemExit):
         cli.main(["--help"])
     out = capsys.readouterr().out
-    assert "Get started" in out and "Drive VMD itself" in out and "vmd-agent vmd" in out
+    assert "1. Set up" in out and "Drive VMD itself" in out and "vmd-agent vmd" in out
     assert out.count("\n") < 80                                  # one screen or two, not a wall of flags
 
 
 def test_every_vmd_tool_is_a_vmd_command_with_a_valid_example():
     import shlex
-    from vmd_agent import cli, toolset, vmd_cli
+    from vmd_agent import cli, vmd_cli
     p, _, _ = _all_commands()
-    names = [n for n in toolset.TOOLS if n not in toolset.CORE_TOOLS]
-    assert len(names) == 20
+    names = vmd_cli.VMD_TOOLS
+    assert len(names) == 24
     for n in names:
         example = vmd_cli.EXAMPLES[n]
         assert example.startswith("vmd-agent vmd " + vmd_cli.command_name(n)), n
@@ -251,8 +251,7 @@ def test_every_command_and_every_flag_the_readme_names_exists():
 
 def test_every_vmd_command_is_described_in_the_readme():
     import os
-    from vmd_agent import toolset, vmd_cli
+    from vmd_agent import vmd_cli
     readme = open(os.path.join(os.path.dirname(__file__), "..", "..", "README.md"), encoding="utf-8").read()
-    for n in toolset.TOOLS:
-        if n not in toolset.CORE_TOOLS:
-            assert f"vmd-agent vmd {vmd_cli.command_name(n)}" in readme, n
+    for n in vmd_cli.VMD_TOOLS:
+        assert f"vmd-agent vmd {vmd_cli.command_name(n)}" in readme, n

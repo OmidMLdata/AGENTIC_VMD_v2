@@ -4,6 +4,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 
 import pytest
 
@@ -24,7 +25,7 @@ SHOULD_BE_IGNORED = ["vmd_scripts/x.tcl", "data/a.pdb", "pdb_cache/a.pdb", ".env
                      "src/vmd_agent/__pycache__/x.pyc", ".DS_Store", "vmd_agent_output/a", "bench_out/a", ".hypothesis/a"]
 MUST_STAY_TRACKED = ["tests/data/1ubq.pdb", "tests/data/ubq_md/protein.dcd", "docker/vmd-dist/README.md",
                      "src/vmd_agent/structure/detect.py", "src/vmd_agent/vmdkit/build.py", "src/vmd_agent/inputs/volume.py",
-                     "README.md", "pyproject.toml", "scripts/test.py", "scripts/publish.sh"]
+                     "README.md", "pyproject.toml", "scripts/dev.py"]
 
 
 @pytest.fixture(scope="module")
@@ -73,14 +74,13 @@ def test_nothing_that_looks_like_a_secret_or_a_huge_file_would_be_committed(chec
         assert not pattern.search(text), f"{rel} looks like it holds a secret"
 
 
-def test_the_publish_script_parses_and_refuses_a_secret(checkout, tmp_path):
+def test_the_publish_command_refuses_a_secret(checkout, tmp_path):
     root, run = checkout
-    script = str(root / "scripts" / "publish.sh")          # the copy: the script works on the folder it sits in
-    assert subprocess.run(["sh", "-n", script]).returncode == 0
+    script = str(root / "scripts" / "dev.py")              # the copy: the script works on the folder it sits in
     fake_key = "sk-" + "ant-api03-" + "abcdefghijklmnopqrstuvwxyz"          # built here so this file does not itself look like a secret
     (root / "notes.json").write_text(json.dumps({"llm_" + "key": fake_key}))
     env = {**os.environ, **NO_REAL_REMOTE, "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t"}
-    r = subprocess.run(["sh", script, "--no-push"], cwd=root, capture_output=True, text=True, env=env)
+    r = subprocess.run([sys.executable, script, "publish", "--no-push"], cwd=root, capture_output=True, text=True, env=env)
     (root / "notes.json").unlink()
     assert r.returncode != 0 and "looks like a secret" in r.stderr and "notes.json" in r.stderr
 
@@ -116,15 +116,23 @@ def test_publishing_to_a_new_branch_starts_from_the_remote_main_and_never_overwr
     shutil.copytree(root, work, ignore=shutil.ignore_patterns(".git"))
     git(work, "init", "-q", "-b", "scratch")
     git(work, "remote", "add", "origin", str(remote))
-    r = subprocess.run(["sh", "scripts/publish.sh", "--branch", "v2"], cwd=work, capture_output=True, text=True, env=env)
+    r = subprocess.run([sys.executable, "scripts/dev.py", "publish", "--branch", "v2"], cwd=work, capture_output=True, text=True, env=env)
     assert r.returncode == 0, r.stdout + r.stderr
     assert git(remote, "rev-parse", "main").stdout.strip() == main_before                  # main is untouched
     assert git(remote, "rev-parse", "v2~1").stdout.strip() == main_before                  # v2 grows from main
     files = git(remote, "ls-tree", "-r", "--name-only", "v2").stdout.split()
     assert "README.md" in files and "src/vmd_agent/cli.py" in files and "OLD.txt" not in files
     assert ".github/workflows/ci.yml" in files                                              # normally the CI file goes too
-    again = subprocess.run(["sh", "scripts/publish.sh", "--branch", "v2"], cwd=work, capture_output=True, text=True, env=env)
-    assert again.returncode != 0 and "already has a branch" in again.stderr
+    again = subprocess.run([sys.executable, "scripts/dev.py", "publish", "--branch", "v2"], cwd=work, capture_output=True, text=True, env=env)
+    assert again.returncode == 0, again.stdout + again.stderr                               # same branch, nothing new: an update
+    assert git(remote, "rev-parse", "v2").stdout.strip() == git(work, "rev-parse", "HEAD").stdout.strip()
+    (work / "NEW.txt").write_text("a later change")
+    upd = subprocess.run([sys.executable, "scripts/dev.py", "publish", "--branch", "v2", "-m", "later"], cwd=work, capture_output=True, text=True, env=env)
+    assert upd.returncode == 0, upd.stdout + upd.stderr
+    assert "NEW.txt" in git(remote, "ls-tree", "-r", "--name-only", "v2").stdout.split()
+    assert git(remote, "rev-parse", "v2~1").stdout.strip() != main_before                  # a fast-forward: history kept
+    other = subprocess.run([sys.executable, "scripts/dev.py", "publish", "--branch", "main"], cwd=work, capture_output=True, text=True, env=env)
+    assert other.returncode != 0 and "already has a branch" in other.stderr                 # never overwrites a branch
 
 
 def test_skip_workflows_leaves_the_ci_file_out(checkout, tmp_path):
@@ -137,7 +145,7 @@ def test_skip_workflows_leaves_the_ci_file_out(checkout, tmp_path):
     shutil.copytree(root, work, ignore=shutil.ignore_patterns(".git"))
     subprocess.run(["git", "init", "-q", "-b", "scratch"], cwd=work, check=True, env=env)
     subprocess.run(["git", "remote", "add", "origin", str(remote)], cwd=work, check=True, env=env)
-    r = subprocess.run(["sh", "scripts/publish.sh", "--branch", "v3", "--skip-workflows"], cwd=work, capture_output=True, text=True, env=env)
+    r = subprocess.run([sys.executable, "scripts/dev.py", "publish", "--branch", "v3", "--skip-workflows"], cwd=work, capture_output=True, text=True, env=env)
     assert r.returncode == 0, r.stdout + r.stderr
     files = subprocess.run(["git", "ls-tree", "-r", "--name-only", "v3"], cwd=remote, capture_output=True, text=True).stdout.split()
     assert "README.md" in files and not [f for f in files if f.startswith(".github/workflows")]

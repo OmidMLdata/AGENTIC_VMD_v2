@@ -226,7 +226,7 @@ def advice(info: Dict[str, object]) -> List[str]:
     if info.get("in_container"):
         out.append("You are inside a container: VMD, if present, is the Linux build.")
     if not d.get("installed"):
-        out.append("Docker is not installed. That is fine: it is only needed for the optional `./start.sh` route "
+        out.append("Docker is not installed. That is fine: it is only needed for the optional Docker route (`vmd-agent start`) "
                    "(" + docker_install_url(str(s)) + ").")
     elif not d.get("running"):
         out.append("Docker is installed but not running: start Docker Desktop (or the docker service) to use it.")

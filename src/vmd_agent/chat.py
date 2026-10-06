@@ -17,9 +17,11 @@ from __future__ import annotations
 import os
 import re
 import sys
+import threading
+import time
 from typing import Callable, List, Optional
 
-from vmd_agent import models, ollama_local, security, toolset
+from vmd_agent import models, ollama_local, progress, security, toolset
 from vmd_agent.llm_client import (
     LLMError, assistant_message, chat_completion, list_models, parse_choice,
     render_result, to_openai_tools, tool_message)
@@ -51,7 +53,10 @@ facts with verify_claims and drop or correct anything it contradicts.
 (`reproduce_script` in the result): mention it when the user may want to repeat the \
 analysis in their own VMD, and offer export_vmd_session to hand over a scene as a \
 folder they can open. Never write or paraphrase Tcl yourself: give only the path from \
-`reproduce_script`. When the user asks what VMD can do, call vmd_capabilities."""
+`reproduce_script`. When the user asks what VMD can do, call vmd_capabilities.
+9. For a whole job (has a run settled, what interacts, compare two runs, prepare a simulation, fit a model into a map) call \
+list_workflows, then run_workflow: it runs the steps, grades the findings and writes a report. Quote its verdict and findings and \
+give the report path."""
 
 
 _DATA_WORDS = re.compile(
@@ -90,6 +95,24 @@ def unsupported_numbers(answer: str, tool_texts) -> List[str]:
         if s not in bad:
             bad.append(s)
     return bad
+
+
+#: questions that a named workflow answers better than one measurement (the model is pointed at it; it still makes the call)
+_ROUTES = [
+    ("equilibration_check", re.compile(r"\b(settled|equilibrat\w*|converg\w*|stabili[sz]ed|steady state)\b", re.I)),
+    ("compare_runs", re.compile(r"\bcompar\w*\b.*\b(runs?|trajector\w+|simulations?)\b", re.I)),
+    ("prepare_simulation", re.compile(r"\b(prepare|set ?up|get ready)\b.*\b(simulation|md|namd)\b|\bready (to|for) simulat\w*", re.I)),
+    ("cryoem_fit", re.compile(r"\bcryo-?em\b|\bfit\b.*\b(into|to)\b.*\bmap\b|\bdensity map\b", re.I)),
+    ("structure_overview", re.compile(r"\b(overview|sanity check|structure quality|check (this|the|my) structure)\b", re.I)),
+]
+
+
+def route(text: str) -> Optional[str]:
+    """The workflow that fits a question, if one clearly does."""
+    for name, pattern in _ROUTES:
+        if pattern.search(text):
+            return name
+    return None
 
 
 NUDGE = ("You answered without using any tool, so that answer is a guess. Use a tool on the data first "
@@ -153,8 +176,12 @@ class ChatSession:
             return render_result({"error": f"unknown tool '{name}'",
                                   "available": self.names})
         self.echo(f"  -> {name}({', '.join(f'{k}={_short(v)}' for k, v in args.items())})")
+        started = time.time()
         try:
-            result = fn(**args)
+            with progress.listen(lambda m, f=None: self.echo(f"     ... {m}")):
+                result = fn(**args)
+            if time.time() - started > 5:
+                self.echo(f"     done in {time.time() - started:.0f} s")
         except TypeError as e:
             expected = toolset.tool_schema(fn)["input_schema"]
             result = {"error": f"bad arguments for {name}: {e}",
@@ -177,21 +204,50 @@ class ChatSession:
                 m["content"] = "[older tool result omitted to save space]"
 
     # ---- one user turn
-    def ask(self, text: str) -> str:
-        self.messages.append({"role": "user", "content": text})
+    def ask(self, text: str, on_token: Optional[Callable[[str], None]] = None) -> str:
+        """One user turn. With ``on_token`` the answer is delivered piece by piece as the model writes it (an answer
+        that the guard is about to send back is held until it is known to be kept). The full text is returned either way;
+        ``self.streamed`` tells whether it was already delivered through ``on_token``."""
+        hint = route(text) if "run_workflow" in self.names else None
+        self.messages.append({"role": "user", "content": text + (
+            f"\n\n[hint from the toolkit: the workflow `{hint}` answers this question properly (several checks, graded findings, a report). "
+            f"Call run_workflow with name=\"{hint}\" and the file names from the question.]" if hint else "")})
+        if hint:
+            self.echo(f"  (the workflow '{hint}' fits this question)")
         used_tool = nudged = False
+        self.streamed = False
+        question_about_data = bool(_DATA_WORDS.search(text))
         for _ in range(self.max_turns):
             self._trim()
-            resp = chat_completion(self.base_url, self.model, self.messages,
-                                   tools=self.tools, api_key=self.api_key,
-                                   temperature=self.temperature,
-                                   timeout=self.timeout, max_tokens=self.max_tokens,
-                                   tool_choice="required" if nudged and not used_tool else None)
+            held: List[str] = []
+            live = bool(on_token) and (used_tool or not (self.guard and question_about_data))
+            first = {"seen": False}
+
+            def piece(tok: str) -> None:
+                first["seen"] = True
+                if live:
+                    on_token(tok)                                   # type: ignore[misc]
+                else:
+                    held.append(tok)
+            wait = None
+            if on_token:
+                wait = threading.Timer(3.0, lambda: None if first["seen"] else self.echo("  ... the model is thinking"))
+                wait.daemon = True
+                wait.start()
+            try:
+                resp = chat_completion(self.base_url, self.model, self.messages,
+                                       tools=self.tools, api_key=self.api_key,
+                                       temperature=self.temperature,
+                                       timeout=self.timeout, max_tokens=self.max_tokens,
+                                       tool_choice="required" if nudged and not used_tool else None,
+                                       on_token=piece if on_token else None)
+            finally:
+                if wait:
+                    wait.cancel()
             parsed = parse_choice(resp, self.names)
             for k in self.usage:
                 self.usage[k] += parsed["usage"][k]
-            if not parsed["tool_calls"] and self.guard and not used_tool and not nudged \
-                    and _DATA_WORDS.search(text):
+            if not parsed["tool_calls"] and self.guard and not used_tool and not nudged and question_about_data:
                 # a question about data answered from memory: send it back once, and require a tool call
                 self.echo("  (the model answered without a tool; asking it to use one)")
                 self.messages.append({"role": "user", "content": NUDGE})
@@ -199,6 +255,9 @@ class ChatSession:
                 continue
             self.messages.append(assistant_message(parsed))
             if not parsed["tool_calls"]:
+                if held and on_token:
+                    on_token("".join(held))                         # kept after all: show what was held back
+                self.streamed = bool(on_token) and (live or bool(held))
                 cut = " (cut off: the model went past its length limit)" if parsed.get("finish_reason") == "length" else ""
                 answer = (parsed["content"] or "") + cut
                 if used_tool and self.guard:
@@ -224,7 +283,7 @@ Ask in plain language, e.g. "what is in protein.pdb?" or "does the RMSD drift in
 def main(base_url: Optional[str] = None, model: Optional[str] = None,
          api_key: Optional[str] = None, roots: Optional[List[str]] = None,
          max_turns: int = 20, temperature: float = 0.0,
-         prompt: Optional[str] = None, check_model: bool = True, tools: str = "all",
+         prompt: Optional[str] = None, check_model: bool = True, tools: str = "all", stream: bool = True,
          out=None, input_fn: Callable[[str], str] = input) -> int:
     """Run the chat. With ``prompt`` it answers once and exits; otherwise it is
     an interactive session. Returns a process exit code."""
@@ -259,9 +318,30 @@ def main(base_url: Optional[str] = None, model: Optional[str] = None,
 
     session = ChatSession(base_url, model, api_key, max_turns, temperature,
                           echo=say, tools=tools)
+
+    def answer(question: str, lead: str = "") -> None:
+        """Ask and show the answer: piece by piece as it is written when streaming, else all at once."""
+        if not stream:
+            say(lead + session.ask(question))
+            return
+        shown: List[str] = []
+
+        def piece(tok: str) -> None:
+            if not shown and lead:
+                out.write(lead)
+            shown.append(tok)
+            out.write(tok)
+            out.flush()
+        full = session.ask(question, on_token=piece)
+        if session.streamed:
+            rest = full[len("".join(shown)):] if full.startswith("".join(shown)) else ""
+            out.write(rest + "\n")
+            out.flush()
+        else:
+            say(lead + full)
     try:
         if prompt:
-            say(session.ask(prompt))
+            answer(prompt)
             return 0
     except LLMError as e:
         say(f"vmd-agent chat: {e}")
@@ -295,7 +375,7 @@ def main(base_url: Optional[str] = None, model: Optional[str] = None,
             say(", ".join(session.names))
             continue
         try:
-            say("\nagent> " + session.ask(line))
+            answer(line, lead="\nagent> ")
         except LLMError as e:
             say(f"\n[model error] {e}")
         except KeyboardInterrupt:

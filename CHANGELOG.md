@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.18.0: fewer files, one flow
+
+* **Fewer files, nothing lost.** `start.sh` and `start.ps1` became `vmd-agent start` (and `vmd-agent start --down` stops the containers);
+  `docker/bench.sh` became `vmd-agent bench docker ACTION [--mode plain|hostvmd|withvmd]` (same actions, same exit codes, the macOS-binary refusal
+  is kept); `scripts/test.py` and `scripts/publish.sh` became one `scripts/dev.py` (`test`, `publish`; publishing now also fast-forwards a branch
+  you already published, and still never overwrites or forces); `requirements.txt` and `requirements-all.txt` were removed (`pyproject.toml` is the
+  one list; `pip install -e ".[all]"`). `install.sh` and `install.ps1` stay a pair: they run before Python exists, in two different shells.
+* **One flow.** The README follows the pipeline (set up, get a structure, look, measure, run a whole job, drive VMD, check and keep records);
+  `vmd-agent --help` and `vmd-agent vmd` list commands in that same order.
+
+## 0.17.0: whole jobs, reports, progress, more of VMD
+
+* **Workflows** (`workflows.py`, `vmd-agent workflow`): `structure_overview`, `equilibration_check`, `interaction_report`, `compare_runs`, `prepare_simulation`, `cryoem_fit`. Each runs
+  several tools in a fixed order, grades findings (ok / note / warning / problem) from the tools' own numbers and wording, gives a verdict and writes a report. In the chat the toolkit
+  points the model at the workflow that fits a question (a model left to itself answered "has my run settled?" with one RMSD and an invented criterion; routed, it ran the workflow).
+* **Reports** (`reporting.py`): `report.md` and `report.html` with findings, step table, figures, every caveat the tools raised, methods, SHA-256 of the inputs and the exact Tcl of each VMD step.
+* **Progress** (`progress.py`): long jobs say what they are doing (frames done, "adding a water box", "ray tracing 72 frames"); the commands print it to stderr, the chat shows it under the
+  tool call and how long it took. **Streaming**: the chat prints answers as they are written (`--no-stream` to turn off); an answer the guard is about to send back is held, not shown.
+* **More of VMD:** `vmd fit-to-map` (cryo-EM rigid-body fit, NumPy), `vmd map-arithmetic` (add, subtract, mask, smooth, threshold, normalise; replaces the VMD `volutil` binary that did not load),
+  `vmd prepare-namd` (NAMD input for a built system) and `vmd slurm-script` (cluster job). 24 `vmd` commands, 53 tools. **Never run:** the NAMD input in NAMD, the SLURM script on a cluster.
+* The progress, a streamed reply and the workflows were run against the real VMD and the real local model; the SSE parser is also tested against a local HTTP server speaking the format.
+
 ## 0.16.1: ready to publish
 
 * **`scripts/publish.sh`** (replaces the old `push_to_github.sh`): starts git if needed, refuses secrets and big files, commits, creates the repository and pushes (`--no-push` to try

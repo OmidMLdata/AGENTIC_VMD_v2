@@ -163,3 +163,33 @@ def test_numbers_that_no_tool_returned_are_flagged():
     bad = chat.unsupported_numbers("Rg was 53.2 and 11.93; the box is 128.5 wide", tools)
     assert bad == ["53.2", "128.5"]
     assert chat.unsupported_numbers("```\nvmd -first 1000 -dispdev\n```\nRg 11.93", tools) == []      # code blocks are not claims
+
+
+@pytest.mark.requires_llm
+def test_a_real_model_streams_its_answer_in_pieces(tmp_path, monkeypatch):
+    """Live: the answer arrives token by token, and the pieces add up to the answer that is returned."""
+    monkeypatch.setenv("VMD_AGENT_ALLOWED_ROOTS", str(tmp_path))
+    s = chat.ChatSession(os.environ.get("VMD_AGENT_LLM_URL", "http://localhost:11434/v1"),
+                         os.environ["VMD_AGENT_LIVE_LLM_MODEL"], os.environ.get("VMD_AGENT_LLM_KEY"), max_turns=3)
+    pieces = []
+    answer = s.ask("Say hello in five words.", on_token=pieces.append)
+    assert s.streamed and len(pieces) > 1 and "".join(pieces) == answer
+
+
+@pytest.mark.parametrize("text,workflow", [
+    ("Has my run settled? Use run.psf and run.dcd.", "equilibration_check"), ("Is the simulation equilibrated?", "equilibration_check"),
+    ("Compare these two runs of the same system", "compare_runs"), ("Please set up a simulation of 1ubq.pdb", "prepare_simulation"),
+    ("Fit my model into this cryo-EM map", "cryoem_fit"), ("Give me an overview of 1ubq.pdb", "structure_overview"),
+    ("Which salt bridges persist?", None), ("What is the radius of gyration?", None), ("hello", None)])
+def test_questions_a_workflow_answers_are_pointed_at_it(text, workflow):
+    assert chat.route(text) == workflow
+
+
+def test_the_hint_is_added_to_the_question_but_the_guard_still_sees_the_original(monkeypatch):
+    seen = {}
+    monkeypatch.setattr(chat, "chat_completion", lambda *a, **k: seen.setdefault("messages", list(a[2])) and
+                        {"choices": [{"message": {"role": "assistant", "content": "ok"}, "finish_reason": "stop"}]})
+    s = chat.ChatSession("http://127.0.0.1:1/v1", "m", guard=False)
+    s.ask("Has my run settled?")
+    last_user = [m for m in seen["messages"] if m["role"] == "user"][-1]["content"]
+    assert last_user.startswith("Has my run settled?") and "run_workflow" in last_user and "equilibration_check" in last_user

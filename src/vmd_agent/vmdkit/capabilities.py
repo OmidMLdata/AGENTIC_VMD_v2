@@ -37,7 +37,7 @@ COVERAGE: Dict[str, Tuple[str, str]] = {
     "heatmapper": (G, ""), "hesstrans": (N, "Hessian transforms"), "idatm": (N, "atom typing"),
     "ilstools": (N, "implicit ligand sampling"), "imdmenu": (G, "interactive MD"), "infobutton": (G, ""),
     "inorganicbuilder": (G, ""), "json": (L, ""), "libbiokit": (L, ""), "mafft": (X, "MAFFT"),
-    "mdff": (X, "NAMD flexible fitting"), "membrane": (W, "vmd_build_membrane"), "membranemixer": (G, ""),
+    "mdff": (X, "NAMD flexible fitting (vmd_fit_to_map does the rigid-body part without NAMD)"), "membrane": (W, "vmd_build_membrane"), "membranemixer": (G, ""),
     "mergestructs": (W, "vmd_merge_structures"), "modelmaker": (G, ""), "moltoptools": (N, "topology helpers"),
     "multimolanim": (G, ""), "multiplot": (G, ""), "multiseq": (X, "sequence/structure alignment (GUI, BLAST/STAMP)"),
     "multiseqdialog": (G, ""), "multitext": (G, ""), "mutator": (W, "vmd_mutate_residue"),
@@ -59,7 +59,7 @@ COVERAGE: Dict[str, Tuple[str, str]] = {
     "torsionplot": (W, "vmd_backbone_torsions"), "trunctraj": (W, "vmd_convert_trajectory"), "utilities": (L, ""),
     "vdna": (G, "DNA builder (needs Tk: it fails without a window)"), "viewchangerender": (G, ""), "viewmaster": (G, ""), "vmddebug": (L, ""),
     "vmdlite": (G, ""), "vmdmovie": (W, "render_movie"), "vmdprefs": (G, ""), "vmdtkcon": (G, ""), "vnd": (G, ""),
-    "volmapgui": (W, "vmd_volmap"), "volutil": (X, "volume arithmetic: runs its own helper binary (failed to load on the macOS build tested)"), "zoomseq": (G, ""),
+    "volmapgui": (W, "vmd_volmap"), "volutil": (W, "vmd_map_arithmetic (in NumPy: VMD's own volutil binary did not load on the macOS build tested)"), "zoomseq": (G, ""),
     "irspecgui": (N, "IR spectrum from dipole autocorrelation"), "molefacture": (G, "molecule editor"),
 }
 

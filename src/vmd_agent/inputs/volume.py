@@ -112,3 +112,21 @@ def summarize(vol: Dict[str, object]) -> dict:
             "mean": float(d.mean()), "std": float(d.std()), "integral": float(d.sum() * voxel),
             "suggested_isovalues": {"mean+1sd": float(d.mean() + d.std()), "mean+3sd": float(d.mean() + 3 * d.std()),
                                     "median_nonzero": float(np.median(nz))}}
+
+
+def write_dx(path: str, data, origin, delta, comment: str = "written by vmd-agent") -> None:
+    """Write a 3-D array as an OpenDX grid (x varies slowest, as VMD expects), the format every VMD map tool reads."""
+    d = np.asarray(data, dtype=float)
+    nx, ny, nz = d.shape
+    with open(path, "w") as fh:
+        fh.write(f"# {comment}\n")
+        fh.write(f"object 1 class gridpositions counts {nx} {ny} {nz}\n")
+        fh.write("origin %.6g %.6g %.6g\n" % tuple(origin))
+        fh.write("delta %.6g 0 0\ndelta 0 %.6g 0\ndelta 0 0 %.6g\n" % tuple(abs(x) for x in delta))
+        fh.write(f"object 2 class gridconnections counts {nx} {ny} {nz}\n")
+        fh.write(f"object 3 class array type double rank 0 items {nx * ny * nz} data follows\n")
+        flat = d.reshape(-1)
+        for i in range(0, flat.size, 3):
+            fh.write(" ".join("%.7g" % v for v in flat[i:i + 3]) + "\n")
+        fh.write('attribute "dep" string "positions"\nobject "regular positions regular connections" class field\n'
+                 'component "positions" value 1\ncomponent "connections" value 2\ncomponent "data" value 3\n')

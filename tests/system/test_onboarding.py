@@ -277,44 +277,7 @@ def test_the_one_line_installer_gives_the_setup_the_keyboard():
     assert "< /dev/tty" in s                              # the script itself arrives on a pipe
 
 
-def test_the_requirements_files_cover_what_the_package_needs():
-    import re
-    toml = open(os.path.join(ROOT, "pyproject.toml")).read()
-    block = toml[toml.index("dependencies = ["):].split("]")[0]
-    deps = {re.split(r"[<>=!~\s]", d.strip().strip('",'))[0].lower()
-            for d in block.splitlines()[1:] if d.strip().strip('",')}
-    req = {re.split(r"[<>=!~\s]", ln.strip())[0].lower()
-           for ln in open(os.path.join(ROOT, "requirements.txt"))
-           if ln.strip() and not ln.startswith("#")}
-    assert deps <= req, deps - req
-    assert "mcp" in open(os.path.join(ROOT, "requirements-all.txt")).read()
-
-
-# ---------------------------------------------------- the README tells the truth
-README_OPTIONS = {
-    "analyze": ["--do", "--sel2", "--unwrap", "--dt-ps"],
-    "visualize": ["--views", "--focus", "--rep", "--renderer", "--out-dir", "--traj"],
-    "show": ["--views", "--out-dir"],
-    "keyframes": ["-k", "--sel2", "--render"],
-    "chat": ["--model", "--base-url", "--roots", "--max-turns"],
-    "setup": ["--yes", "--check", "--use", "--model", "--data-dir", "--vmd"],
-    "mcp-config": ["--write", "--roots", "--vmd"],
-    "claims": [], "inspect": [], "doctor": [], "models": ["--check"], "tools": ["--group"], "tool": [],
-}
-
-
-@pytest.mark.parametrize("command", sorted(README_OPTIONS))
-def test_every_option_the_readme_names_exists(command):
-    r = subprocess.run([sys.executable, "-m", "vmd_agent.cli", command, "--help"],
-                       capture_output=True, text=True,
-                       env={**os.environ, "PYTHONWARNINGS": "ignore"})
-    assert r.returncode == 0, r.stderr[-300:]
-    for flag in README_OPTIONS[command]:
-        assert flag in r.stdout, f"{command} has no {flag}"
-
-
 def test_the_readme_install_lines_point_at_files_that_exist():
     readme = open(os.path.join(ROOT, "README.md")).read()
     for f in ("install.sh", "install.ps1"):
         assert f"main/{f}" in readme and os.path.exists(os.path.join(ROOT, f))
-    assert "requirements.txt" in readme and "requirements-all.txt" in readme

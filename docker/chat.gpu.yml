@@ -1,4 +1,4 @@
-# Added by ./start.sh when an NVIDIA GPU and the NVIDIA container toolkit are found.
+# Added by `vmd-agent start` when an NVIDIA GPU and the NVIDIA container toolkit are found.
 services:
   ollama:
     deploy:

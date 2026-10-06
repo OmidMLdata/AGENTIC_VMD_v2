@@ -40,6 +40,7 @@ def build_system(input_pdb: str, out_prefix: str, selection: str = "protein", so
         f"set td {_TOPDIR}",
         "topology [file join $td top_all36_prot.rtf]", "topology [file join $td toppar_water_ions_namd.str]",
         f"pdbalias residue HIS {histidine}", "pdbalias atom ILE CD1 CD",
+        'progress "reading the protein"',
         f"set prot [atomselect top {{({sel}) and protein}}]",
         f"set other [atomselect top {{not (({sel}) and protein)}}]",
         'emit EXCL [$other num] [join [lsort -unique [$other get resname]] ,]',
@@ -50,14 +51,15 @@ def build_system(input_pdb: str, out_prefix: str, selection: str = "protein", so
         f'  $c writepdb "{pre}_chain$i.pdb"',
         f'  segment P$i {{pdb "{pre}_chain$i.pdb"}}', f'  coordpdb "{pre}_chain$i.pdb" P$i',
         "  incr i", "}",
-        "guesscoord", f'writepsf "{pre}.psf"', f'writepdb "{pre}.pdb"',
+        'progress "placing missing atoms (psfgen)"', "guesscoord", f'writepsf "{pre}.psf"', f'writepdb "{pre}.pdb"',
         "emit CHAINS $i"]
     final = pre
     if solvate:
-        body += [f'solvate "{pre}.psf" "{pre}.pdb" -t {pad} -o "{pre}_wat"']
+        body += ['progress "adding a water box (solvate; this is the slow step)"',
+                 f'solvate "{pre}.psf" "{pre}.pdb" -t {pad} -o "{pre}_wat"']
         final = pre + "_wat"
         if ionize:
-            body += [f'autoionize -psf "{pre}_wat.psf" -pdb "{pre}_wat.pdb" -sc {conc} -o "{pre}_ion"']
+            body += ['progress "adding ions (autoionize)"', f'autoionize -psf "{pre}_wat.psf" -pdb "{pre}_wat.pdb" -sc {conc} -o "{pre}_ion"']
             final = pre + "_ion"
     body += [f'mol new "{final}.psf" type psf waitfor all', f'mol addfile "{final}.pdb" type pdb waitfor all',
              "set all [atomselect top all]", "set q [measure sumweights $all weight charge]",

@@ -28,11 +28,13 @@ VMD_EXPECTED = {
     "vmd_structure_check", "vmd_align_structures", "vmd_pbc_info", "vmd_convert_trajectory", "vmd_write_structure",
     "vmd_volmap", "vmd_volume_info", "vmd_build_system", "vmd_mutate_residue", "vmd_merge_structures",
     "vmd_render_scene", "export_vmd_session", "vmd_build_membrane", "vmd_build_nanotube", "vmd_render_turntable",
+    "vmd_fit_to_map", "vmd_map_arithmetic", "vmd_prepare_namd", "vmd_slurm_script",
 }
+WORKFLOW_EXPECTED = {"list_workflows", "run_workflow"}
 
 
 def test_the_registry_holds_every_tool():
-    assert set(toolset.TOOLS) == EXPECTED | VMD_EXPECTED and len(toolset.TOOLS) == 47
+    assert set(toolset.TOOLS) == EXPECTED | VMD_EXPECTED | WORKFLOW_EXPECTED and len(toolset.TOOLS) == 53
     assert set(toolset.CORE_TOOLS) == EXPECTED and len(toolset.CORE_TOOLS) == 27      # none of the original tools was lost
 
 
@@ -46,7 +48,7 @@ def test_the_tool_profiles_are_consistent():
 def test_importing_the_tools_does_not_need_the_mcp_sdk():
     code = ("import sys\n"
             "from vmd_agent import toolset\n"
-            "assert len(toolset.TOOLS) == 47\n"
+            "assert len(toolset.TOOLS) == 53\n"
             "assert 'mcp' not in sys.modules, 'toolset imported the MCP SDK'\n")
     r = subprocess.run([sys.executable, "-c", code], capture_output=True,
                        text=True, env={**os.environ, "PYTHONWARNINGS": "ignore"})

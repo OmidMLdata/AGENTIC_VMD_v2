@@ -7,7 +7,7 @@
 #   docker build -f docker/Dockerfile --target vmd-libs -t vmd-agent:hostvmd .  # + libs, mount your VMD
 #   docker build -f docker/Dockerfile --target with-vmd -t vmd-agent:vmd .      # build in YOUR tarball
 #
-# Benchmark runs with a real VMD: docker/bench.sh (see README.md (Docker section)).
+# Benchmark runs with a real VMD: `vmd-agent bench docker` (see the Docker section of README.md).
 # VMD is a Linux binary: it must match the image CPU architecture (see
 # VMD_PLATFORM in docker/docker-compose.yml).
 #
