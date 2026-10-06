@@ -1,0 +1,9 @@
+# The packages vmd-agent needs. You normally do not need this file: the installer
+# (install.sh / install.ps1) and `pip install .` fetch these automatically from pyproject.toml.
+# It is here for people who manage Python packages themselves:   pip install -r requirements.txt
+MDAnalysis>=2.7
+numpy>=1.23
+scipy>=1.9
+matplotlib>=3.6
+pillow>=9
+imageio-ffmpeg>=0.4.9      # a bundled ffmpeg for movies (no system install needed)

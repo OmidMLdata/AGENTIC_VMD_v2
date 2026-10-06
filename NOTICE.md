@@ -20,7 +20,7 @@ For these reasons **no VMD binary, source or derived code is shipped in this
 repository, in the Python package, or in the published Docker image.** The
 published image is the open-source "base" image; VMD users either mount their own
 installation or build the optional `with-vmd` image locally from a tarball they
-downloaded after accepting the license themselves (see `docs/TECHNICAL.md#docker`).
+downloaded after accepting the license themselves (see the Docker section of `README.md`).
 
 The Tachyon ray tracer bundled inside VMD distributions is covered by its own
 license; the same rule applies.

@@ -1,4 +1,6 @@
 """Video evidence: QC, source-frame mapping, validation semantics."""
+import os
+
 import pytest
 from vmd_agent.evidence import media
 
@@ -56,14 +58,44 @@ def test_ffmpeg_filter_has_no_bare_backslash_escape_warning():
         ast.parse(src)
 
 
-@pytest.mark.skipif(not __import__("shutil").which("ffmpeg"),
-                    reason="needs ffmpeg")
-def test_real_ffmpeg_exact_frame_extraction(tmp_path):
+def _make_mp4(tmp_path):
+    """A real 64x48, 10 fps, 3 s (30 frames) H.264 video made by the real ffmpeg."""
     import subprocess
+    from vmd_agent.environment import find_ffmpeg
     mp4 = tmp_path / "v.mp4"
-    subprocess.run(["ffmpeg", "-y", "-f", "lavfi", "-i",
+    subprocess.run([find_ffmpeg(), "-y", "-f", "lavfi", "-i",
                     "testsrc=size=64x48:rate=10:duration=3", "-pix_fmt",
                     "yuv420p", str(mp4)], capture_output=True, check=True)
+    return mp4
+
+
+@pytest.mark.requires_ffmpeg
+def test_probe_reads_a_real_video_with_ffmpeg_alone(tmp_path, monkeypatch):
+    """The bundled ffmpeg has no ffprobe; the probe must work without one."""
+    mp4 = _make_mp4(tmp_path)
+    real_which = media.shutil.which
+    monkeypatch.setattr(media.shutil, "which", lambda n, *a, **k: None if n == "ffprobe" else real_which(n, *a, **k))
+    info = media.probe_video(str(mp4), count_frames=True)
+    assert info["ok"], info
+    assert (info["width"], info["height"]) == (64, 48)
+    assert info["codec"] == "h264" and info["pix_fmt"] == "yuv420p"
+    assert abs(info["fps"] - 10) < 0.01 and abs(info["duration_s"] - 3) < 0.2
+    assert info["n_frames"] == 30 and info["n_frames_exact"] is True
+    assert "mp4" in info["container"] and info["size_bytes"] == os.path.getsize(mp4)
+    assert info["decode_check"]["decodes"] is True
+
+
+@pytest.mark.requires_ffmpeg
+def test_find_ffmpeg_finds_one_without_a_system_install(monkeypatch):
+    from vmd_agent import environment
+    monkeypatch.setenv("PATH", "")
+    exe = environment.find_ffmpeg()
+    assert exe and os.path.isfile(exe)          # the copy bundled with imageio-ffmpeg
+
+
+@pytest.mark.requires_ffmpeg
+def test_real_ffmpeg_exact_frame_extraction(tmp_path):
+    mp4 = _make_mp4(tmp_path)
     pkg = media.interpret_video(str(mp4), n_frames=5, out_dir=str(tmp_path / "o"))
     assert pkg["ok"] and len(pkg["frames"]) == 5
     assert pkg["frames"][-1]["video_frame"] == 29

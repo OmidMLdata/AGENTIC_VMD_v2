@@ -444,13 +444,13 @@ class MatplotlibRenderer(Renderer):
     def render_views(self, *args, **kwargs):
         try:
             return self._render_views(*args, **kwargs)
-        except Exception as e:                        # noqa: BLE001
+        except Exception as e:
             return {"ok": False, "error": f"{type(e).__name__}: {e}",
                     "renderer": self.name}
 
     def render_frames(self, *args, **kwargs):
         try:
             return self._render_frames(*args, **kwargs)
-        except Exception as e:                        # noqa: BLE001
+        except Exception as e:
             return {"ok": False, "error": f"{type(e).__name__}: {e}",
                     "renderer": self.name}

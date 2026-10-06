@@ -4,26 +4,37 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vmd-agent"
-version = "0.9.4"
-description = "Agentic molecular-visualization toolkit: grounded interpretation, statistically principled trajectory analysis, event-aware keyframes, claim verification and a benchmark, exposed as MCP tools. VMD optional (not bundled)."
+version = "0.16.1"
+description = "Ask questions about molecular structures and simulations in plain language; VMD does the measuring and drawing. A command line, a built-in chat for open-source models, and an MCP server over the same 47 tools."
 readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
 authors = [{ name = "vmd-agent contributors" }]
+maintainers = [{ name = "OmidMLdata" }]
 keywords = ["molecular dynamics", "VMD", "MCP", "visualization", "LLM agents", "benchmark"]
 classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: Microsoft :: Windows",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "License :: OSI Approved :: MIT License",
     "Topic :: Scientific/Engineering :: Bio-Informatics",
     "Topic :: Scientific/Engineering :: Chemistry",
 ]
-# Core deps only. Everything except the MCP *server* works with these.
+# Core deps only (imageio-ffmpeg supplies a bundled ffmpeg for movies, so nothing is installed system-wide). Everything except the MCP *server* works with these.
 dependencies = [
     "MDAnalysis>=2.7",
-    "numpy",
-    "scipy",
-    "matplotlib",
-    "pillow",
+    "numpy>=1.23",
+    "scipy>=1.9",
+    "matplotlib>=3.6",
+    "pillow>=9",
+    "imageio-ffmpeg>=0.4.9",
 ]
 
 [project.optional-dependencies]
@@ -32,8 +43,14 @@ server = ["mcp>=1.2.0"]
 sasa = ["freesasa"]
 dssp = ["mdtraj"]            # only to cross-check the built-in DSSP (vmd-agent validate-dssp)
 bench = ["anthropic"]
-dev = ["pytest>=7", "hypothesis", "pyyaml"]
-all = ["mcp>=1.2.0", "freesasa", "mdtraj", "anthropic", "pytest>=7", "hypothesis", "pyyaml"]
+# what `python scripts/test.py` needs: the tests, a linter and a dead-code finder
+dev = ["pytest>=7", "hypothesis", "pyyaml", "ruff", "vulture"]
+all = ["mcp>=1.2.0", "freesasa", "mdtraj", "anthropic", "pytest>=7", "hypothesis", "pyyaml", "ruff", "vulture"]
+
+[project.urls]
+Homepage = "https://github.com/OmidMLdata/AGENTIC_VMD_v2"
+Issues = "https://github.com/OmidMLdata/AGENTIC_VMD_v2/issues"
+Changelog = "https://github.com/OmidMLdata/AGENTIC_VMD_v2/blob/main/CHANGELOG.md"
 
 [project.scripts]
 vmd-agent = "vmd_agent.cli:main"
@@ -42,6 +59,13 @@ vmd-agent-server = "vmd_agent.server:main"
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.ruff.lint]
+select = ["F", "E9"]               # real errors and unused names; the layout is not policed
+
+[tool.vulture]
+min_confidence = 80
+paths = ["src"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = [
@@ -49,6 +73,7 @@ markers = [
     "requires_ffmpeg: needs a real ffmpeg; skipped otherwise",
     "requires_mcp: needs the real MCP SDK (Python >= 3.10); skipped otherwise",
     "requires_api: calls the real model API (VMD_AGENT_LIVE_TESTS=1 + ANTHROPIC_API_KEY); skipped otherwise",
+    "requires_llm: needs a running OpenAI-style model server and VMD_AGENT_LIVE_LLM_MODEL; skipped otherwise",
     "requires_network: needs the real network (rcsb.org); skipped when unreachable",
 ]
 filterwarnings = [

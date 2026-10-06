@@ -18,6 +18,7 @@ import sys
 import tempfile
 from typing import List, Optional, Sequence
 
+from vmd_agent import platform_info
 from vmd_agent.bench.agent.tools import (
     ARMS, NEEDS_EXEC, PYTHON_TIMEOUT_S, sanitized_env)
 
@@ -38,14 +39,7 @@ def _c(name, status, detail, needed_for=()):
 
 def in_container() -> bool:
     """Best-effort: Docker, Podman or a cgroup that names a container runtime."""
-    if os.path.exists("/.dockerenv") or os.path.exists("/run/.containerenv"):
-        return True
-    try:
-        with open("/proc/1/cgroup") as fh:
-            t = fh.read()
-        return any(k in t for k in ("docker", "containerd", "kubepods", "lxc"))
-    except OSError:
-        return False
+    return platform_info.in_container()
 
 
 def _vmd_checks(vmd_path: Optional[str], tmp: str) -> List[dict]:
@@ -55,8 +49,12 @@ def _vmd_checks(vmd_path: Optional[str], tmp: str) -> List[dict]:
     if not vmd:
         hint = ("set VMD_BIN to the vmd launcher or its install directory, or "
                 "pass --vmd")
-        if platform.system() == "Darwin":
+        sysname = platform_info.system()
+        if sysname == platform_info.MACOS:
             hint += (" (macOS: look inside /Applications/VMD*.app/Contents/vmd"
+                     "; a Linux container needs the Linux VMD tarball instead)")
+        elif sysname == platform_info.WINDOWS:
+            hint += (" (Windows: usually C:\\Program Files\\University of Illinois\\VMD"
                      "; a Linux container needs the Linux VMD tarball instead)")
         return [_c("vmd_found", "fail", "VMD not found; " + hint,
                    ["vmd_plain"]),
@@ -94,7 +92,7 @@ def _vmd_checks(vmd_path: Optional[str], tmp: str) -> List[dict]:
                       "VMD evaluates a selection to 0-based indices"
                       if got == {0, 1, 2} else f"unexpected result {sorted(got)}",
                       ["vmd_plain"]))
-    except Exception as e:                              # noqa: BLE001
+    except Exception as e:
         out.append(_c("vmd_selection", "fail",
                       f"{type(e).__name__}: {e}"[:200], ["vmd_plain"]))
     tga = os.path.join(tmp, "pf.tga")
@@ -125,7 +123,8 @@ def preflight(arms: Sequence[str] = ("vmd_agent",),
               vmd_path: Optional[str] = None, allow_exec: bool = False,
               suite_dir: Optional[str] = None, out_dir: Optional[str] = None,
               model: Optional[str] = None, live_api: bool = False,
-              require_container: bool = True) -> dict:
+              require_container: bool = True, provider: str = "anthropic",
+              base_url: Optional[str] = None) -> dict:
     """Run the checks relevant to ``arms``; see the module docstring."""
     unknown = [a for a in arms if a not in ARMS]
     if unknown:
@@ -137,7 +136,7 @@ def preflight(arms: Sequence[str] = ("vmd_agent",),
     for mod in ("MDAnalysis", "numpy", "scipy", "matplotlib", "PIL"):
         try:
             __import__(mod)
-        except Exception:                               # noqa: BLE001
+        except Exception:
             libs.append(mod)
     checks.append(_c("libraries", "fail" if libs else "ok",
                      "missing: " + ", ".join(libs) if libs
@@ -145,10 +144,10 @@ def preflight(arms: Sequence[str] = ("vmd_agent",),
                      list(ARMS)))
     with tempfile.TemporaryDirectory(prefix="vmd_agent_pf_") as tmp:
         checks += _vmd_checks(vmd_path, tmp)
-    from vmd_agent.environment import _which
-    checks.append(_c("ffmpeg", "ok" if _which("ffmpeg") else "warn",
-                     _which("ffmpeg") or "not found (only movies need it)",
-                     []))
+    from vmd_agent.environment import find_ffmpeg
+    ffmpeg = find_ffmpeg()
+    checks.append(_c("ffmpeg", "ok" if ffmpeg else "warn",
+                     ffmpeg or "not found (only movies need it)", []))
 
     exec_arms = [a for a in arms if set(ARMS[a]) & NEEDS_EXEC]
     if exec_arms:
@@ -183,7 +182,36 @@ def preflight(arms: Sequence[str] = ("vmd_agent",),
                          "variables" if not leaked else
                          "would expose: " + ", ".join(leaked), exec_arms))
 
-    if model:
+    if model and provider == "openai":
+        from vmd_agent.llm_client import LLMError, chat_completion, list_models
+        url = base_url or "http://localhost:11434/v1"
+        key = os.environ.get("VMD_AGENT_LLM_KEY")
+        try:
+            have = list_models(url, key)
+            listed = (not have) or model in have
+            checks.append(_c(
+                "llm_server", "ok" if listed else "fail",
+                f"{url} is reachable" + ("" if listed else
+                f", but it does not list '{model}' (has: {', '.join(have[:8])})"),
+                ["model"]))
+            reachable = True
+        except LLMError as e:
+            reachable = False
+            checks.append(_c("llm_server", "fail", str(e)[:240], ["model"]))
+        if live_api and reachable:
+            try:
+                chat_completion(url, model, [{"role": "user", "content": "ping"}],
+                                api_key=key, max_tokens=8, timeout=300)
+                checks.append(_c("api_call", "ok",
+                                 f"model '{model}' answered a 1-line ping",
+                                 ["model"]))
+            except LLMError as e:
+                checks.append(_c("api_call", "fail", str(e)[:200], ["model"]))
+        else:
+            checks.append(_c("api_call", "skip",
+                             "not called (pass --live-api to send one short "
+                             "message)", ["model"]))
+    elif model:
         key = bool(os.environ.get("ANTHROPIC_API_KEY"))
         checks.append(_c("api_key", "ok" if key else "fail",
                          "ANTHROPIC_API_KEY is set" if key else
@@ -204,7 +232,7 @@ def preflight(arms: Sequence[str] = ("vmd_agent",),
                 checks.append(_c("api_call", "ok",
                                  f"model '{model}' answered a 1-line ping",
                                  ["model"]))
-            except Exception as e:                      # noqa: BLE001
+            except Exception as e:
                 checks.append(_c("api_call", "fail",
                                  f"{type(e).__name__}: {e}"[:200], ["model"]))
         else:

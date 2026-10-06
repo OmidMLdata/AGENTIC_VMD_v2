@@ -1,13 +1,13 @@
 # syntax=docker/dockerfile:1
 #
 # vmd-agent container images.   VMD IS NOT INCLUDED (UIUC license), see
-# docs/TECHNICAL.md#docker and ../NOTICE.md.
+# README.md (Docker section) and ../NOTICE.md.
 #
 #   docker build -f docker/Dockerfile -t vmd-agent .                           # default: open-source
 #   docker build -f docker/Dockerfile --target vmd-libs -t vmd-agent:hostvmd .  # + libs, mount your VMD
 #   docker build -f docker/Dockerfile --target with-vmd -t vmd-agent:vmd .      # build in YOUR tarball
 #
-# Benchmark runs with a real VMD: docker/bench.sh (see docs/TECHNICAL.md#docker).
+# Benchmark runs with a real VMD: docker/bench.sh (see README.md (Docker section)).
 # VMD is a Linux binary: it must match the image CPU architecture (see
 # VMD_PLATFORM in docker/docker-compose.yml).
 #

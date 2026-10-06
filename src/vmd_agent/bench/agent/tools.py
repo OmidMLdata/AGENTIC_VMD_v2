@@ -17,7 +17,7 @@ Safety. File arguments are confined to the task's workspace. ``run_python``
 runs model-written code in a subprocess with a timeout; that is **not a
 sandbox**. Enable it (``allow_exec=True``) only inside a container or VM.
 ``run_vmd_tcl`` goes through the toolkit's Tcl screen, which is an accident
-guard, not a boundary (see ``docs/TECHNICAL.md#security``), and needs a real VMD.
+guard, not a boundary (see ``README.md#security``), and needs a real VMD.
 """
 from __future__ import annotations
 
@@ -29,7 +29,9 @@ import tempfile
 import time
 from typing import Callable, Dict, List, Optional
 
-import numpy as np
+from vmd_agent import security
+from vmd_agent.llm_client import compact, render_result  # noqa: F401
+
 
 COMMON = ("list_files", "read_text_file", "submit_answer")
 ARMS: Dict[str, tuple] = {
@@ -47,7 +49,6 @@ ARMS: Dict[str, tuple] = {
     "vmd_plain": COMMON + ("run_vmd_tcl",),
 }
 NEEDS_EXEC = {"run_python", "run_vmd_tcl"}
-OUTPUT_CAP = 6000
 PYTHON_TIMEOUT_S = 120
 VMD_TIMEOUT_S = 300
 
@@ -58,7 +59,12 @@ _ENV_ALLOW = ("PATH", "HOME", "USER", "LANG", "TZ", "TMPDIR", "TERM",
               "PYTHONPATH", "PYTHONHOME", "VIRTUAL_ENV", "MPLCONFIGDIR",
               "MPLBACKEND", "DISPLAY", "TCL_LIBRARY", "TK_LIBRARY",
               "LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH", "DYLD_FALLBACK_LIBRARY_PATH",
-              "VMD_AGENT_ALLOWED_ROOTS")
+              "VMD_AGENT_ALLOWED_ROOTS",
+              # Windows: programs fail to start or find system DLLs without these
+              "SYSTEMROOT", "SYSTEMDRIVE", "WINDIR", "COMSPEC", "PATHEXT", "TEMP",
+              "TMP", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "PROGRAMDATA",
+              "PROGRAMFILES", "PROGRAMFILES(X86)", "COMMONPROGRAMFILES",
+              "NUMBER_OF_PROCESSORS", "PROCESSOR_ARCHITECTURE")
 _ENV_ALLOW_PREFIX = ("LC_", "VMD")
 
 
@@ -77,45 +83,8 @@ class StepLimit(Exception):
     pass
 
 
-# ------------------------------------------------------------ serialising
-def _default(o):
-    if isinstance(o, (np.integer,)):
-        return int(o)
-    if isinstance(o, (np.floating,)):
-        return float(o)
-    if isinstance(o, np.ndarray):
-        return o.tolist()
-    if isinstance(o, (set, tuple)):
-        return list(o)
-    return str(o)
-
-
-def compact(obj, max_list: int = 24, max_str: int = 600):
-    """Shrink a result for a model: long numeric lists become a summary,
-    long strings are cut. The tool's real return value is not changed."""
-    if isinstance(obj, dict):
-        return {k: compact(v, max_list, max_str) for k, v in obj.items()}
-    if isinstance(obj, (list, tuple)):
-        if len(obj) > max_list:
-            nums = [x for x in obj if isinstance(x, (int, float))
-                    and not isinstance(x, bool)]
-            if len(nums) == len(obj):
-                a = np.asarray(nums, dtype=float)
-                fin = a[np.isfinite(a)]
-                return {"_list": len(obj), "first": obj[:3], "last": obj[-3:],
-                        "min": float(fin.min()) if len(fin) else None,
-                        "max": float(fin.max()) if len(fin) else None}
-            return [compact(x, max_list, max_str) for x in obj[:max_list]] + \
-                   [f"... {len(obj) - max_list} more"]
-        return [compact(x, max_list, max_str) for x in obj]
-    if isinstance(obj, str) and len(obj) > max_str:
-        return obj[:max_str] + f"... [{len(obj) - max_str} more chars]"
-    return obj
-
-
-def render_result(obj, cap: int = OUTPUT_CAP) -> str:
-    text = json.dumps(compact(obj), default=_default)
-    return text if len(text) <= cap else text[:cap] + "...[truncated]"
+# compact() and render_result() live in vmd_agent.llm_client (shared with the chat
+# command) and are re-exported here.
 
 
 # ------------------------------------------------------------ environment
@@ -150,7 +119,7 @@ class Environment:
             raise ValueError("a path string is required")
         full = p if os.path.isabs(p) else os.path.join(self.workdir, p)
         real = os.path.realpath(full)
-        if real != self.workdir and not real.startswith(self.workdir + os.sep):
+        if not security.is_within(real, self.workdir):
             raise PermissionError(
                 f"'{p}' is outside the task workspace ({self.workdir})")
         return real
@@ -175,7 +144,7 @@ class Environment:
                 res = {"error": str(e), "blocked": True}
             except TypeError as e:
                 res = {"error": f"bad arguments for {name}: {e}"}
-            except Exception as e:                    # noqa: BLE001
+            except Exception as e:
                 res = {"error": f"{type(e).__name__}: {e}"}
         failed = isinstance(res, dict) and bool(res.get("error"))
         if failed and not res.get("blocked"):

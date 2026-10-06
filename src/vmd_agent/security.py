@@ -35,10 +35,24 @@ class InvalidInput(ValueError):
 
 
 def allowed_roots() -> Optional[List[str]]:
+    """The sandbox roots: ``VMD_AGENT_ALLOWED_ROOTS`` if set, otherwise the data folder
+    chosen in ``vmd-agent setup``, otherwise ``None`` (no sandbox)."""
     raw = os.environ.get(ENV_ROOTS, "").strip()
+    if not raw:
+        from vmd_agent import settings
+        raw = str(settings.get("data_dir", "") or "").strip()
     if not raw:
         return None
     return [os.path.realpath(p) for p in raw.split(os.pathsep) if p.strip()]
+
+
+def is_within(path: str, root: str, norm=os.path.normcase,
+              sep: str = os.sep) -> bool:
+    """Is ``path`` equal to ``root`` or inside it? Compared the way this OS compares
+    paths (case-insensitively on Windows). Both must already be absolute, resolved
+    paths. ``norm`` and ``sep`` are parameters so Windows rules can be tested anywhere."""
+    p, r = norm(path), norm(root)
+    return p == r or p.startswith(r.rstrip(sep) + sep)
 
 
 def check_path(path: Optional[str]) -> Optional[str]:
@@ -66,7 +80,7 @@ def check_path(path: Optional[str]) -> Optional[str]:
         path = expanded = os.path.join(roots[0], expanded)
     real = os.path.realpath(expanded)
     for r in roots:
-        if real == r or real.startswith(r.rstrip(os.sep) + os.sep):
+        if is_within(real, r):
             return path
     raise SecurityError(
         f"path '{path}' is outside the allowed roots "
@@ -135,9 +149,17 @@ _WORD_OK = re.compile(r"^[A-Za-z][A-Za-z0-9_ ]{0,39}\Z")
 _RESNAME_OK = re.compile(r"^[A-Za-z0-9_+\-']{1,8}\Z")
 
 
-def tcl_path(path: str) -> str:
-    """Absolute path that is safe inside Tcl braces (``{...}``)."""
-    p = os.path.abspath(str(path))
+def tcl_path(path: str, windows: Optional[bool] = None) -> str:
+    """Absolute path that is safe inside Tcl braces (``{...}``).
+
+    On Windows, backslashes are the path separator, and Tcl (so VMD) accepts forward
+    slashes there, so ``C:\\Users\\me\\a.pdb`` becomes ``C:/Users/me/a.pdb`` before
+    the check. Elsewhere a backslash in a path is refused, because it could escape
+    the brace quoting. ``windows`` forces the rules for testing."""
+    import ntpath
+    win = (os.name == "nt") if windows is None else windows
+    p = ntpath.abspath(str(path)).replace("\\", "/") if win \
+        else os.path.abspath(str(path))
     if _PATH_BAD.search(p):
         raise SecurityError(
             "path contains a brace, backslash or control character, which "

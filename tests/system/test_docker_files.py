@@ -97,3 +97,60 @@ def test_bench_script_rejects_unknown_mode_and_command():
                            env={**os.environ, **env}, capture_output=True,
                            text=True)
         assert r.returncode == 2
+
+
+# ------------------------------------------------ the all-in-one chat stack
+ROOT_DIR = os.path.abspath(ROOT)
+
+
+@pytest.mark.skipif(SH is None, reason="no sh")
+def test_start_script_parses():
+    assert subprocess.run([SH, "-n", os.path.join(ROOT_DIR, "start.sh")]
+                          ).returncode == 0
+
+
+@pytest.mark.skipif(SH is None, reason="no sh")
+def test_start_script_without_docker_says_what_to_install_and_does_nothing_else():
+    r = subprocess.run([SH, os.path.join(ROOT_DIR, "start.sh")],
+                       env={**os.environ, "DOCKER": "no-such-docker-binary"},
+                       capture_output=True, text=True)
+    assert r.returncode == 1
+    assert "Docker is not installed" in r.stderr and "docs.docker.com" in r.stderr
+
+
+def test_chat_compose_wires_the_model_server_to_the_chat_and_confines_it():
+    yaml = pytest.importorskip("yaml")
+    with open(os.path.join(DOCKER, "chat.compose.yml")) as fh:
+        c = yaml.safe_load(fh)
+    s = c["services"]
+    assert s["ollama"]["image"].startswith("ollama/ollama")
+    assert "ollama:/root/.ollama" in s["ollama"]["volumes"]        # models persist
+    assert s["ollama"]["healthcheck"]["test"][-1] == "list"
+    chat = s["vmd-agent"]
+    assert chat["depends_on"]["ollama"]["condition"] == "service_healthy"
+    env = chat["environment"]
+    assert env["VMD_AGENT_LLM_URL"] == "http://ollama:11434/v1"
+    assert env["VMD_AGENT_ALLOWED_ROOTS"] == "/data"               # sandbox on
+    assert chat["command"] == ["chat"] and chat["tty"] and chat["stdin_open"]
+    assert chat["read_only"] and chat["cap_drop"] == ["ALL"]
+    assert any(v.endswith(":/data") for v in chat["volumes"])
+    assert "${VMD_TARGET" in chat["build"]["target"]               # VMD optional
+    assert "ollama" in c["volumes"]
+    raw = open(os.path.join(DOCKER, "chat.compose.yml")).read()
+    assert "sk-" not in raw and "API_KEY" not in raw               # no keys needed
+
+
+def test_gpu_override_only_touches_the_model_server():
+    yaml = pytest.importorskip("yaml")
+    with open(os.path.join(DOCKER, "chat.gpu.yml")) as fh:
+        g = yaml.safe_load(fh)
+    assert list(g["services"]) == ["ollama"]
+    dev = g["services"]["ollama"]["deploy"]["resources"]["reservations"]["devices"][0]
+    assert dev["driver"] == "nvidia" and "gpu" in dev["capabilities"]
+
+
+def test_start_script_says_vmd_is_optional_and_never_downloads_it():
+    s = open(os.path.join(ROOT_DIR, "start.sh")).read()
+    assert "NEVER RUN" in s                      # honest about its status
+    assert "curl" not in s and "wget" not in s   # VMD's licence: the user downloads it
+    assert "docker/vmd-dist" in s and "Linux build" in s.replace("LINUX", "Linux")

@@ -1,4 +1,6 @@
 """Command-line interface smoke tests."""
+import json
+
 import pytest
 from conftest import UBQ_MD_DIR
 
@@ -131,3 +133,126 @@ def test_annotate_panel_side_left_puts_the_panel_on_the_left(tmp_path):
     assert tuple(L[h, -5]) == (255, 0, 0)
     bad = annotate_image(str(src), panel_side="top")
     assert not bad["ok"] and "panel_side" in bad["error"]
+
+
+# ------------------------------------------------------------------ the command line is organised and documented
+def _all_commands():
+    from vmd_agent import cli
+    p, sub = cli.build_parser()
+    return p, sub, set(sub.choices)
+
+
+def test_every_command_is_in_exactly_one_group_of_the_help():
+    from vmd_agent import cli
+    _, _, cmds = _all_commands()
+    listed = [c for _, group in cli.GROUPS for c in group]
+    assert sorted(listed) == sorted(cmds), (set(cmds) ^ set(listed))
+    assert len(listed) == len(set(listed))
+
+
+def test_the_top_level_help_is_the_grouped_overview(capsys):
+    from vmd_agent import cli
+    with pytest.raises(SystemExit):
+        cli.main(["--help"])
+    out = capsys.readouterr().out
+    assert "Get started" in out and "Drive VMD itself" in out and "vmd-agent vmd" in out
+    assert out.count("\n") < 80                                  # one screen or two, not a wall of flags
+
+
+def test_every_vmd_tool_is_a_vmd_command_with_a_valid_example():
+    import shlex
+    from vmd_agent import cli, toolset, vmd_cli
+    p, _, _ = _all_commands()
+    names = [n for n in toolset.TOOLS if n not in toolset.CORE_TOOLS]
+    assert len(names) == 20
+    for n in names:
+        example = vmd_cli.EXAMPLES[n]
+        assert example.startswith("vmd-agent vmd " + vmd_cli.command_name(n)), n
+        assert vmd_cli.SUMMARY[n]
+        argv = shlex.split(example)[1:]
+        argv = [a if a != "scene.json" else '{"reps": [{}]}' for a in argv]          # a file name stands for JSON here
+        args = p.parse_args(argv)                                                      # the documented example parses
+        assert args._tool == n
+    assert cli.main(["vmd"]) == 0
+
+
+def test_vmd_command_flags_come_from_the_tool_signatures():
+    p, _, _ = _all_commands()
+    a = p.parse_args(["vmd", "measure", "a.pdb", "a.dcd", "--kind", "rmsd", "--selection", "name CA", "--no-align",
+                      "--step", "5"])
+    assert (a.topology, a.trajectory, a.kind, a.selection, a.align, a.step) == ("a.pdb", "a.dcd", "rmsd", "name CA", False, 5)
+    b = p.parse_args(["vmd", "convert-trajectory", "a.pdb", "--out", "x.dcd", "--wrap"])
+    assert b.trajectory is None and b.out_path == "x.dcd" and b.wrap is True
+    c = p.parse_args(["vmd", "mutate-residue", "a.psf", "a.pdb", "P0", "6", "ALA", "--out", "m"])
+    assert (c.segid, c.resid, c.new_resname, c.out_prefix) == ("P0", 6, "ALA", "m")
+    with pytest.raises(SystemExit):
+        p.parse_args(["vmd", "measure", "a.pdb", "--kind", "bogus"])           # choices are enforced
+    with pytest.raises(SystemExit):
+        p.parse_args(["vmd", "convert-trajectory", "a.pdb"])                   # --out is required
+
+
+def test_a_vmd_command_gives_the_same_answer_as_the_tool(tmp_path, capsys, monkeypatch):
+    from vmd_agent import cli
+    monkeypatch.setenv("VMD_AGENT_ALLOWED_ROOTS", str(tmp_path))
+    dx = tmp_path / "m.dx"
+    dx.write_text("object 1 class gridpositions counts 2 2 2\norigin 0 0 0\ndelta 1 0 0\ndelta 0 1 0\ndelta 0 0 1\n"
+                  "object 2 class gridconnections counts 2 2 2\nobject 3 class array type double rank 0 items 8 data follows\n"
+                  "1 2 3\n4 5 6\n7 8\n")
+    assert cli.main(["vmd", "volume-info", str(dx)]) == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out["shape"] == [2, 2, 2] and out["integral"] == 36
+    assert cli.main(["vmd", "volume-info", str(tmp_path / "missing.mrc")]) == 1
+
+
+def test_old_flag_spellings_still_work_and_new_aliases_exist():
+    from vmd_agent import cli
+    p, _, _ = _all_commands()
+    assert p.parse_args(["detect", "a.pdb", "--traj", "a.dcd"]).traj == "a.dcd"
+    assert p.parse_args(["detect", "a.pdb", "--trajectory", "a.dcd"]).traj == "a.dcd"
+    assert p.parse_args(["analyze", "a.pdb", "a.dcd", "--selection", "name CA", "--selection2", "resname LIG"]).sel2 == "resname LIG"
+    assert cli is not None
+
+
+def _flags_of(sub, command):
+    parser = sub.choices[command]
+    flags = {o for a in parser._actions for o in a.option_strings}
+    nested = getattr(parser, "_subparsers", None)
+    if nested is not None:                                # `vmd` has its own sub-commands
+        for sp in nested._group_actions[0].choices.values():
+            flags |= {o for a in sp._actions for o in a.option_strings}
+    return flags
+
+
+def test_every_command_and_every_flag_the_readme_names_exists():
+    """The README tables are the user's manual: a command or flag that is not real fails here."""
+    import os
+    import re
+    readme = open(os.path.join(os.path.dirname(__file__), "..", "..", "README.md"), encoding="utf-8").read()
+    _, sub, cmds = _all_commands()
+    seen = set()
+    for line in readme.splitlines():
+        m = re.match(r"\| `vmd-agent( [^`]*)?`", line)
+        if not m:
+            continue
+        cells = line.split("|")
+        first = cells[1]
+        words = [w for w in re.findall(r"vmd-agent (\w[\w-]*)", first) if w in cmds]
+        if not words:
+            continue
+        seen.update(words)
+        have = set()
+        for w in words:
+            have |= _flags_of(sub, w)
+        for flag in re.findall(r"(?<![\w-])(--[a-z0-9][a-z0-9-]*|-[a-z](?=[ `,)·]))", " ".join(cells[2:])):
+            assert flag in have, f"README says `{words[0]}` has {flag}, which it does not"
+    missing = cmds - seen - {"vmd", "menu", "bench"}
+    assert not missing, f"commands the README's tables do not describe: {sorted(missing)}"
+
+
+def test_every_vmd_command_is_described_in_the_readme():
+    import os
+    from vmd_agent import toolset, vmd_cli
+    readme = open(os.path.join(os.path.dirname(__file__), "..", "..", "README.md"), encoding="utf-8").read()
+    for n in toolset.TOOLS:
+        if n not in toolset.CORE_TOOLS:
+            assert f"vmd-agent vmd {vmd_cli.command_name(n)}" in readme, n

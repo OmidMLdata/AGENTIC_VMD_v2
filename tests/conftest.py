@@ -11,15 +11,18 @@ did not run, not a test that passed.
 * real MCP SDK:        Python >= 3.10 and ``pip install mcp``; ``requires_mcp``
 * real model API:      ``VMD_AGENT_LIVE_TESTS=1`` and ``ANTHROPIC_API_KEY``
                        (spends a few cents); ``requires_api``
+* real local model:    a running OpenAI-style server (e.g. Ollama) and
+                       ``VMD_AGENT_LIVE_LLM_MODEL=<name>``; ``requires_llm``
 * real network:        reachable rcsb.org; ``requires_network``
 """
 import os
-import shutil
 import sys
 import warnings
 
 import numpy as np
 import pytest
+
+from vmd_agent.environment import find_ffmpeg
 
 warnings.filterwarnings("ignore")
 
@@ -145,14 +148,38 @@ def have_network() -> bool:
     return _NET["ok"]
 
 
+_LLM = {}
+
+
+def have_llm() -> bool:
+    """A real model server is reachable and a model is named for live tests:
+    VMD_AGENT_LIVE_LLM_MODEL (and VMD_AGENT_LLM_URL unless it is Ollama's default)."""
+    if "ok" not in _LLM:
+        _LLM["ok"] = False
+        model = os.environ.get("VMD_AGENT_LIVE_LLM_MODEL")
+        if model:
+            try:
+                from vmd_agent.llm_client import list_models
+                url = os.environ.get("VMD_AGENT_LLM_URL",
+                                     "http://localhost:11434/v1")
+                have = list_models(url, os.environ.get("VMD_AGENT_LLM_KEY"),
+                                   timeout=4)
+                _LLM["ok"] = (not have) or model in have
+            except Exception:
+                _LLM["ok"] = False
+    return _LLM["ok"]
+
+
 def pytest_report_header(config):
     from vmd_agent.environment import find_tachyon
     return [
         f"real VMD:     {REAL_VMD or 'NOT FOUND (requires_vmd tests will be skipped)'}",
         f"real Tachyon: {(find_tachyon(REAL_VMD) if REAL_VMD else None) or 'not found'}",
-        f"real ffmpeg:  {shutil.which('ffmpeg') or 'NOT FOUND (requires_ffmpeg tests will be skipped)'}",
+        f"real ffmpeg:  {find_ffmpeg() or 'NOT FOUND (requires_ffmpeg tests will be skipped)'}",
         f"real MCP SDK: {'yes' if _have_mcp() else 'NOT AVAILABLE (requires_mcp tests will be skipped)'}",
         f"real network: {'reachable' if have_network() else 'UNREACHABLE (requires_network tests will be skipped)'}",
+        "live local-model tests: " + ("ON" if have_llm() else
+                                      "off (set VMD_AGENT_LIVE_LLM_MODEL and run a model server)"),
         "live model API tests: " + ("ON" if os.environ.get("VMD_AGENT_LIVE_TESTS") == "1"
                                     and os.environ.get("ANTHROPIC_API_KEY") else "off"),
     ]
@@ -162,9 +189,12 @@ def pytest_collection_modifyitems(config, items):
     """Apply the gates for the markers, so a test says what it needs once."""
     skips = {
         "requires_vmd": (REAL_VMD is None, "no real VMD found (set VMD_BIN)"),
-        "requires_ffmpeg": (shutil.which("ffmpeg") is None, "no real ffmpeg"),
+        "requires_ffmpeg": (find_ffmpeg() is None, "no real ffmpeg (not on PATH and imageio-ffmpeg missing)"),
         "requires_network": (not have_network(),
                              "cannot reach files.rcsb.org / alphafold.ebi.ac.uk"),
+        "requires_llm": (not have_llm(),
+                         "no reachable model server with VMD_AGENT_LIVE_LLM_MODEL set "
+                         "(e.g. `ollama serve` and `ollama pull <model>`)"),
         "requires_mcp": (not _have_mcp(), "real MCP SDK not importable "
                          "(needs Python >= 3.10 and `pip install mcp`)"),
         "requires_api": (not (os.environ.get("VMD_AGENT_LIVE_TESTS") == "1"
@@ -191,6 +221,12 @@ def real_tachyon(real_vmd):
     if not t:
         pytest.skip("VMD found but no Tachyon ray tracer next to it")
     return t
+
+
+@pytest.fixture(autouse=True)
+def _isolated_settings(tmp_path, monkeypatch):
+    """Never read or write the developer's real vmd-agent settings."""
+    monkeypatch.setenv("VMD_AGENT_CONFIG_DIR", str(tmp_path / "_vmd_agent_config"))
 
 
 @pytest.fixture(autouse=True)

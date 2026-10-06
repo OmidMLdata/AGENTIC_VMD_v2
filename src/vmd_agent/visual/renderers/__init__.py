@@ -21,6 +21,7 @@ it. Install VMD yourself and point ``$VMD_BIN`` (or ``vmd_path``) at it.
 """
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from typing import Optional, Sequence
 
 from vmd_agent.visual import render as _render
@@ -30,25 +31,27 @@ NAMES = ("auto", "vmd", "matplotlib")
 
 
 # ------------------------------------------------------------- the interface
-class Renderer:
+class Renderer(ABC):
     """Abstract drawing backend."""
 
     name = "base"
     #: short description of known visual differences from VMD output
     caveats: Sequence[str] = ()
 
-    def available(self) -> bool:                              # pragma: no cover
-        raise NotImplementedError
+    @abstractmethod
+    def available(self) -> bool:
+        """Can this backend draw on this computer?"""
 
     def info(self) -> dict:
         return {"name": self.name, "available": self.available(),
                 "caveats": list(self.caveats)}
 
+    @abstractmethod
     def protein_reps(self, detection: dict, plddt_coloring: bool = False,
                      focus: str = "overview") -> list:
         """``[(style, colour_method, comment)]`` actually drawn for protein."""
-        raise NotImplementedError
 
+    @abstractmethod
     def render_views(self, topology: str, trajectory: Optional[str] = None,
                      frame: int = -1, detection: Optional[dict] = None,
                      recipe_path: Optional[str] = None,
@@ -56,14 +59,15 @@ class Renderer:
                      out_dir: Optional[str] = None,
                      width: int = 1400, height: int = 1050,
                      background: str = "white", **kw) -> dict:
-        raise NotImplementedError
+        """Draw the structure from several angles; returns the saved image paths."""
 
+    @abstractmethod
     def render_frames(self, topology: str, trajectory: Optional[str],
                       frames: Sequence[int], detection: Optional[dict] = None,
                       out_dir: Optional[str] = None,
                       width: int = 1280, height: int = 720,
                       background: str = "white", **kw) -> dict:
-        raise NotImplementedError
+        """Draw the given trajectory frames; returns the saved image paths."""
 
 
 # ------------------------------------------- VMD + Tachyon (reference renderer)
@@ -108,7 +112,7 @@ class VMDRenderer(Renderer):
 
 
 # Imported after Renderer exists: the Matplotlib backend subclasses it.
-from vmd_agent.visual.renderers.mpl import MatplotlibRenderer  # noqa: E402
+from vmd_agent.visual.renderers.mpl import MatplotlibRenderer
 
 
 def get_renderer(name: str = "auto", vmd_path: Optional[str] = None) -> Renderer:

@@ -1,0 +1,49 @@
+# The all-in-one stack behind ./start.sh: a local open-source model server (Ollama) and
+# the vmd-agent chat. Start it with ./start.sh rather than by hand.
+#
+#   MODEL        model to use (default granite4.1:8b)
+#   DATA_DIR     your files, mounted at /data (default ./data)
+#   VMD_TARGET   runtime (no VMD, built-in renderer) or with-vmd (VMD built from the
+#                Linux tarball you put in docker/vmd-dist/; never push that image)
+name: vmd-agent
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    volumes:
+      - ollama:/root/.ollama            # downloaded models live here, between runs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+
+  vmd-agent:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+      target: ${VMD_TARGET:-runtime}
+    image: vmd-agent:chat-${VMD_TARGET:-runtime}
+    depends_on:
+      ollama:
+        condition: service_healthy
+    stdin_open: true
+    tty: true
+    command: ["chat"]
+    working_dir: /data
+    environment:
+      VMD_AGENT_LLM_URL: http://ollama:11434/v1
+      VMD_AGENT_LLM_MODEL: ${MODEL:-granite4.1:8b}
+      VMD_AGENT_ALLOWED_ROOTS: /data
+    volumes:
+      - "${DATA_DIR:-../data}:/data"
+    # The agent can only touch /data; nothing else on the machine.
+    read_only: true
+    tmpfs: ["/tmp", "/home/vmdagent"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 256
+
+volumes:
+  ollama: {}

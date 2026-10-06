@@ -118,12 +118,20 @@ def _bench_agent(args):
             args.arms or ["vmd_agent"], vmd_path=args.vmd,
             allow_exec=args.allow_exec, suite_dir=args.suite,
             out_dir=args.out_dir,
-            model=(args.model.split(":", 1)[1] if args.model else None),
-            live_api=args.live_api,
+            model=(args.model.partition(":")[2] if args.model else None),
+            provider=(args.model.partition(":")[0]
+                      if args.model and ":" in args.model else "anthropic"),
+            base_url=args.base_url, live_api=args.live_api,
             require_container=not args.no_require_container)
         print(preflight.report_text(res))
         if not res["ready"]:
             raise SystemExit(2)
+    elif args.bench_cmd == "agent-compare":
+        from vmd_agent.bench.agent import scoring
+        with open(args.records) as fh:
+            recs = [json.loads(ln) for ln in fh if ln.strip()]
+        _print(scoring.paired_arms(recs, args.a, args.b, metric=args.metric,
+                                   family=args.family, alpha=args.alpha))
     elif args.bench_cmd == "agent-plan":
         _print(runner.plan_agent_run(
             args.suite, args.labels, repeats=args.repeats,
@@ -136,18 +144,28 @@ def _bench_agent(args):
                  "reference": agents.ReferenceAgent}
         runs = [{"label": n, "agent": known[n](), "arm": "vmd_agent"}
                 for n in args.baselines or []]
+        provider = mid = None
         if args.model:
-            if not args.model.startswith("anthropic:"):
-                raise SystemExit("--model must look like anthropic:<model-id>")
-            try:
-                import anthropic
-            except ImportError as e:
-                raise SystemExit("pip install anthropic to run a model") from e
-            mid = args.model.split(":", 1)[1]
+            provider, _, mid = args.model.partition(":")
+            if provider not in ("anthropic", "openai") or not mid:
+                raise SystemExit("--model must look like anthropic:<model-id> "
+                                 "or openai:<model-id> (any OpenAI-compatible "
+                                 "server, e.g. Ollama; set --base-url)")
+            base_url = args.base_url or os.environ.get(
+                "VMD_AGENT_LLM_URL") or "http://localhost:11434/v1"
             for arm in args.arms or ["vmd_agent"]:
-                runs.append({"label": f"{mid}@{arm}", "arm": arm,
-                             "agent": agents.LLMAgent(anthropic.Anthropic(),
-                                                      mid)})
+                if provider == "anthropic":
+                    try:
+                        import anthropic
+                    except ImportError as e:
+                        raise SystemExit(
+                            "pip install anthropic to run a model") from e
+                    agent = agents.LLMAgent(anthropic.Anthropic(), mid)
+                else:
+                    agent = agents.OpenAICompatAgent(
+                        base_url, mid, os.environ.get("VMD_AGENT_LLM_KEY"))
+                runs.append({"label": f"{provider}:{mid}@{arm}", "arm": arm,
+                             "agent": agent})
         if not runs:
             raise SystemExit("nothing to run: pass --baselines and/or --model")
         if not args.skip_preflight:
@@ -155,8 +173,8 @@ def _bench_agent(args):
             res = preflight.preflight(
                 sorted({r["arm"] for r in runs}), vmd_path=args.vmd,
                 allow_exec=args.allow_exec, suite_dir=args.suite,
-                out_dir=args.out_dir,
-                model=(args.model.split(":", 1)[1] if args.model else None),
+                out_dir=args.out_dir, model=mid, provider=provider or "anthropic",
+                base_url=base_url if provider == "openai" else None,
                 require_container=not args.no_require_container)
             if not res["ready"]:
                 print(preflight.report_text(res))
@@ -228,39 +246,84 @@ def _bench(args):
                                               args.key_json))
 
 
-def main(argv=None):
-    p = argparse.ArgumentParser(prog="vmd-agent",
-                                description="Agentic VMD toolkit")
-    sub = p.add_subparsers(dest="cmd", required=True)
+#: the commands, grouped the way a person would look for them (every command must appear exactly once: a test checks)
+GROUPS = [
+    ("Get started", ["setup", "menu", "chat", "doctor", "models"]),
+    ("Look at a structure", ["show", "visualize", "inspect", "detect", "stats", "render", "recipe", "reps", "annotate"]),
+    ("Measure a simulation", ["analyze", "keyframes", "claims"]),
+    ("Drive VMD itself (needs VMD)", ["vmd"]),
+    ("Get structures", ["fetch", "search"]),
+    ("Videos, reports, records", ["probe-video", "interpret-video", "report", "provenance"]),
+    ("Connect other programs", ["mcp-config", "mcp-check", "tools", "tool"]),
+    ("This computer, and advanced", ["probe", "renderers", "start", "validate", "validate-dssp", "bench"]),
+]
 
-    sp = sub.add_parser("probe"); sp.add_argument("--vmd")
-    sp = sub.add_parser("inspect"); sp.add_argument("paths", nargs="+")
-    sp = sub.add_parser("detect")
-    sp.add_argument("topology"); sp.add_argument("--traj")
-    sp = sub.add_parser("recipe")
-    sp.add_argument("topology"); sp.add_argument("--traj")
+INTRO = """vmd-agent: ask questions about molecular structures and simulations in plain language, and get answers
+worked out from real measurements (VMD does the measuring and drawing).
+
+Just type  vmd-agent  for a numbered menu. First time? run  vmd-agent setup.
+"""
+
+
+def _grouped_help(sub) -> str:
+    """The overview shown by ``vmd-agent --help``: every command, grouped, one line each."""
+    said = {a.dest: a.help for a in sub._choices_actions}
+    lines = [INTRO.rstrip(), ""]
+    for title, cmds in GROUPS:
+        lines.append(title)
+        for c in cmds:
+            lines.append(f"  {c:<16} {(said.get(c) or '').split(' (', 1)[0]}")
+        lines.append("")
+    lines += ["More on one command:      vmd-agent <command> --help        (for example: vmd-agent analyze --help)",
+              "All the VMD-driving ones:  vmd-agent vmd",
+              "Everything the AI can use: vmd-agent tools"]
+    return "\n".join(lines) + "\n"
+
+
+def build_parser():
+    """The whole command-line parser (also used by the tests, to check that every command is documented)."""
+    p = argparse.ArgumentParser(prog="vmd-agent", formatter_class=argparse.RawDescriptionHelpFormatter)
+    sub = p.add_subparsers(dest="cmd", required=True, metavar="command")
+    p.format_help = lambda: _grouped_help(sub)                 # the overview is grouped, not one flat list of 38
+    sp = sub.add_parser("setup", help="first-time setup: finds VMD, picks your files folder, sets up the AI")
+    sp.add_argument("--yes", action="store_true", help="accept the defaults without asking")
+    sp.add_argument("--check", action="store_true", help="only show the settings and whether they work")
+    sp.add_argument("--data-dir", help="the folder with your files (the AI can only see this folder)")
+    sp.add_argument("--vmd", help="where VMD is installed (default: found automatically)")
+    sp.add_argument("--use", choices=["local", "online", "app", "skip"],
+                    help="local = free model on this computer; online = an online model service; "
+                         "app = Claude Desktop/Code; skip")
+    sp.add_argument("--model", help="the local model to use (default: you are asked)")
+    sub.add_parser("menu", help="the friendly menu (also what plain `vmd-agent` opens)")
+
+    sp = sub.add_parser("probe", help="what this computer can do: VMD, drawing, libraries"); sp.add_argument("--vmd")
+    sp = sub.add_parser("inspect", help="say what kind of files these are and what is missing (e.g. a trajectory without its structure)"); sp.add_argument("paths", nargs="+")
+    sp = sub.add_parser("detect", help="find what is in a system: protein, ligand, water, lipids ...")
+    sp.add_argument("topology"); sp.add_argument("--traj", "--trajectory")
+    sp = sub.add_parser("recipe", help="write a VMD script that draws this system sensibly")
+    sp.add_argument("topology"); sp.add_argument("--traj", "--trajectory")
     sp.add_argument("--style", default="publication")
     sp.add_argument("--bg", default="white"); sp.add_argument("-o", "--out")
     sp.add_argument("--water", action="store_true")
-    sp = sub.add_parser("analyze")
+    sp = sub.add_parser("analyze", help="measure a simulation: RMSD, flexibility, size, contacts, hydrogen bonds ...")
     sp.add_argument("topology"); sp.add_argument("trajectory")
     sp.add_argument("--do", nargs="+", default=["rmsd", "rgyr"])
-    sp.add_argument("--sel", default="protein"); sp.add_argument("--sel2")
+    sp.add_argument("--sel", "--selection", default="protein"); sp.add_argument("--sel2", "--selection2")
     sp.add_argument("--cutoff", type=float, default=4.0)
     sp.add_argument("--step", type=int, default=1); sp.add_argument("--out-dir")
     sp.add_argument("--unwrap", action="store_true",
                     help="make the selection whole across periodic boundaries")
     sp.add_argument("--dt-ps", type=float,
                     help="real time between saved frames (overrides the header)")
-    sp = sub.add_parser("render")
-    sp.add_argument("topology"); sp.add_argument("--traj")
+    sp = sub.add_parser("render", help="draw one image or a movie with VMD")
+    sp.add_argument("topology"); sp.add_argument("--traj", "--trajectory")
     sp.add_argument("-o", "--out", default="vmd_render.png")
     sp.add_argument("--frame", type=int, default=-1); sp.add_argument("--vmd")
     sp = sub.add_parser("stats", help="bond/link counts and colour key for a structure")
-    sp.add_argument("topology"); sp.add_argument("--traj")
+    sp.add_argument("topology"); sp.add_argument("--traj", "--trajectory")
     sp.add_argument("--json", action="store_true")
     sp = sub.add_parser("annotate", help="draw colour key + stats onto an image")
-    sp.add_argument("image"); sp.add_argument("--topology"); sp.add_argument("--traj")
+    sp.add_argument("image"); sp.add_argument("--topology"); sp.add_argument("--traj", "--trajectory")
     sp.add_argument("--title", default=""); sp.add_argument("-o", "--out")
     sp.add_argument("--panel-side", choices=["right", "left"], default="right")
     sp = sub.add_parser("reps", help="list VMD representations and when to use them")
@@ -292,8 +355,8 @@ def main(argv=None):
     sp.add_argument("--rep", help="force a representation, e.g. QuickSurf")
     sp.add_argument("--renderer", default="auto",
                     choices=["auto", "vmd", "matplotlib"])
-    sp = sub.add_parser("visualize")
-    sp.add_argument("topology"); sp.add_argument("--traj")
+    sp = sub.add_parser("visualize", help="draw your file from several angles and describe it")
+    sp.add_argument("topology"); sp.add_argument("--traj", "--trajectory")
     sp.add_argument("--out-dir", default="vmd_agent_output")
     sp.add_argument("--views", nargs="+", default=["front", "side", "top"])
     sp.add_argument("--style", default="publication"); sp.add_argument("--bg", default="white")
@@ -304,7 +367,7 @@ def main(argv=None):
     sp.add_argument("--rep", help="force a representation, e.g. QuickSurf")
     sp.add_argument("--renderer", default="auto",
                     choices=["auto", "vmd", "matplotlib"])
-    sp = sub.add_parser("report")
+    sp = sub.add_parser("report", help="assemble a written report from a finished session")
     sp.add_argument("session_dir"); sp.add_argument("--out")
     sp.add_argument("--title", default="VMD-Agent Analysis Report")
 
@@ -332,7 +395,7 @@ def main(argv=None):
                         help="pick event-aware keyframes from a trajectory")
     sp.add_argument("topology"); sp.add_argument("trajectory")
     sp.add_argument("-k", type=int, default=9)
-    sp.add_argument("--sel", default="protein"); sp.add_argument("--sel2")
+    sp.add_argument("--sel", "--selection", default="protein"); sp.add_argument("--sel2", "--selection2")
     sp.add_argument("--step", type=int, default=1)
     sp.add_argument("--z-min", type=float, default=6.0)
     sp.add_argument("--out-dir"); sp.add_argument("--render", action="store_true")
@@ -342,23 +405,68 @@ def main(argv=None):
     sp = sub.add_parser("claims",
                         help="verify statements against measurements")
     sp.add_argument("topology"); sp.add_argument("claims", nargs="+")
-    sp.add_argument("--traj"); sp.add_argument("--step", type=int, default=1)
+    sp.add_argument("--traj", "--trajectory"); sp.add_argument("--step", type=int, default=1)
 
     sp = sub.add_parser("validate",
                         help="cross-check analysis against independent NumPy")
     sp.add_argument("topology"); sp.add_argument("trajectory")
-    sp.add_argument("--sel", default="protein"); sp.add_argument("--sel2")
+    sp.add_argument("--sel", "--selection", default="protein"); sp.add_argument("--sel2", "--selection2")
     sp.add_argument("--cutoff", type=float, default=4.5)
 
     sp = sub.add_parser("validate-dssp",
                         help="compare DSSP with PDB HELIX/SHEET records")
     sp.add_argument("ids", nargs="+", help="PDB IDs (downloaded) or .pdb files")
     sp.add_argument("--cache", default="pdb_cache")
+    sp.add_argument("--mdtraj", action="store_true",
+                    help="also compare with MDTraj's independent DSSP (needs `pip install mdtraj`; .pdb files only)")
 
     sp = sub.add_parser("provenance",
                         help="re-hash recorded inputs/outputs of a run")
     sp.add_argument("path")
 
+    sp = sub.add_parser("start", help="start the chat the right way for this computer "
+                        "(detects Linux/macOS/Windows, Docker, GPU, VMD)")
+    sp.add_argument("prompt", nargs="*", help="ask once and exit")
+    sp.add_argument("--mode", choices=["auto", "docker", "native"], default="auto")
+    sp.add_argument("--model", help="model name (default granite4.1:8b)")
+    sp.add_argument("--data-dir", help="your files (the agent can only see this folder; default: the one chosen in setup)")
+    sp.add_argument("--base-url", help="native mode: the model server (default Ollama on localhost)")
+    sp.add_argument("--print-plan", action="store_true",
+                    help="show what would be run on this computer, and run nothing")
+    from vmd_agent import vmd_cli
+    vmd_cli.add_commands(sub)
+    sp = sub.add_parser("tools", help="list every tool (the chat's and the MCP server's), with what it does")
+    sp.add_argument("--group", choices=["all", "core", "vmd"], default="all")
+    sp = sub.add_parser("tool", help="run any single tool once, with its arguments as JSON",
+                        epilog='example:  vmd-agent tool vmd_measure \'{"topology": "a.pdb", "trajectory": "a.dcd", "kind": "rgyr"}\'')
+    sp.add_argument("name", help="tool name (see `vmd-agent tools`)")
+    sp.add_argument("arguments", nargs="?", default="{}", help="the arguments as a JSON object")
+    sp = sub.add_parser("models", help="the suggested open-source models for the chat, with the date they were checked")
+    sp.add_argument("--check", action="store_true", help="ask the Ollama library now whether each still exists")
+    sp = sub.add_parser("doctor", help="report this computer's OS, Docker, GPU, VMD and what to do next")
+    sp.add_argument("--json", action="store_true")
+    sp = sub.add_parser("mcp-config", help="print the MCP client configuration for this computer "
+                        "(detects the OS and VMD)")
+    sp.add_argument("--roots", nargs="+", help="data folder(s) the agent may use (set this)")
+    sp.add_argument("--vmd", help="VMD launcher or install folder (default: detected)")
+    sp.add_argument("--write", action="store_true",
+                    help="merge it into Claude Desktop's config file (keeps a backup)")
+    sp = sub.add_parser("chat", help="talk to the toolkit with a language model "
+                        "(an open-source one on your machine, or hosted); no MCP client needed")
+    sp.add_argument("prompt", nargs="*", help="ask once and exit (omit for an interactive session)")
+    sp.add_argument("--base-url", help="OpenAI-style API address "
+                    "(default $VMD_AGENT_LLM_URL or Ollama at http://localhost:11434/v1)")
+    sp.add_argument("--model", help="model name (default $VMD_AGENT_LLM_MODEL or granite4.1:8b)")
+    sp.add_argument("--api-key", help="API key if the server needs one (default $VMD_AGENT_LLM_KEY)")
+    sp.add_argument("--roots", nargs="+", help="directories the agent may use "
+                    "(default: $VMD_AGENT_ALLOWED_ROOTS, else the current directory)")
+    sp.add_argument("--max-turns", type=int, default=20)
+    sp.add_argument("--temperature", type=float, default=0.0)
+    sp.add_argument("--no-check", action="store_true",
+                    help="do not check that the server lists the model")
+    sp.add_argument("--tools", choices=["all", "core", "vmd"], default="all",
+                    help="which tools the model gets: all (47), core (the original 27) or vmd (the ones that drive "
+                         "VMD itself); fewer tools suit small models better")
     sp = sub.add_parser("mcp-check", help="check an MCP server install the way a "
                         "real client uses it (needs the mcp SDK, Python >= 3.10)")
     sp.add_argument("--roots", nargs="+", help="allowed root directories to give the server")
@@ -437,7 +545,9 @@ def main(argv=None):
     b.add_argument("--baselines", nargs="*",
                    choices=["oracle", "sloppy", "reference"],
                    help="scripted agents (no model, no network)")
-    b.add_argument("--model", help="anthropic:<model-id>")
+    b.add_argument("--model", help="anthropic:<model-id> or openai:<model-id>")
+    b.add_argument("--base-url", help="for openai:<id>: the server address "
+                   "(default $VMD_AGENT_LLM_URL, else Ollama on localhost)")
     b.add_argument("--arms", nargs="+", choices=sorted(
         __import__("vmd_agent.bench.agent.tools", fromlist=["x"]).ARMS))
     b.add_argument("--repeats", type=int, default=1)
@@ -459,10 +569,19 @@ def main(argv=None):
     b.add_argument("--allow-exec", action="store_true")
     b.add_argument("--suite")
     b.add_argument("--out-dir")
-    b.add_argument("--model", help="anthropic:<model-id>")
+    b.add_argument("--model", help="anthropic:<model-id> or openai:<model-id>")
+    b.add_argument("--base-url", help="for openai:<id>: the server address")
     b.add_argument("--live-api", action="store_true",
                    help="make one tiny API call to prove the key and model work")
     b.add_argument("--no-require-container", action="store_true")
+    b = bsub.add_parser("agent-compare", help="mean per-task difference between two runs "
+                        "(label A minus label B) with a cluster-bootstrap interval")
+    b.add_argument("records", help="records.jsonl written by agent-run")
+    b.add_argument("--a", required=True, help="label of the first run")
+    b.add_argument("--b", required=True, help="label of the second run")
+    b.add_argument("--metric", default="success", choices=["success", "silent_error", "abstained", "no_answer"])
+    b.add_argument("--family", help="only tasks of this family")
+    b.add_argument("--alpha", type=float, default=0.05, help="interval is 1 - alpha (use 0.05/3 for 3 hypotheses)")
     b = bsub.add_parser("agent-plan", help="estimate calls, tokens, cost")
     b.add_argument("--suite", required=True)
     b.add_argument("--labels", type=int, default=1,
@@ -478,10 +597,107 @@ def main(argv=None):
     b.add_argument("--vmd")
     b = bsub.add_parser("rating-summary", help="unblind and analyse ratings")
     b.add_argument("ratings_csv"); b.add_argument("key_json")
+    return p, sub
 
+
+def main(argv=None):
+    p, sub = build_parser()
+    if not (sys.argv[1:] if argv is None else argv):
+        from vmd_agent import platform_info, wizard
+        platform_info.console_safe()
+        try:
+            return wizard.menu()
+        except SystemExit as e:                  # Ctrl-C or end of input at a prompt
+            return int(e.code or 0) if isinstance(e.code, int) else 1
     args = p.parse_args(argv)
+    from vmd_agent import platform_info
+    platform_info.console_safe()
     try:
+        if args.cmd == "setup":
+            from vmd_agent import wizard
+            return wizard.setup(assume_yes=args.yes, check_only=args.check,
+                                data_dir=args.data_dir, vmd=args.vmd, model=args.model,
+                                model_choice={"local": 1, "online": 2, "app": 3,
+                                              "skip": 4}.get(args.use))
+        if args.cmd == "menu":
+            from vmd_agent import wizard
+            return wizard.menu()
 
+        if args.cmd == "start":
+            from vmd_agent import launcher
+            return launcher.start(model=args.model, data_dir=args.data_dir, mode=args.mode,
+                                  base_url=args.base_url,
+                                  prompt=" ".join(args.prompt) or None,
+                                  print_plan=args.print_plan)
+        if args.cmd == "vmd":
+            from vmd_agent import vmd_cli
+            return vmd_cli.run(args, _print)
+        if args.cmd == "tools":
+            from vmd_agent import toolset
+            for spec in toolset.tool_specs(list(toolset.PROFILES[args.group])):
+                print(f"{spec['name']:<28} {spec['description'][:110]}")
+            return 0
+        if args.cmd == "tool":
+            from vmd_agent import toolset
+            if args.name not in toolset.TOOLS:
+                print(f"unknown tool '{args.name}'; run `vmd-agent tools`", file=sys.stderr)
+                return 2
+            try:
+                kwargs = json.loads(args.arguments)
+                if not isinstance(kwargs, dict):
+                    raise ValueError("not an object")
+            except ValueError as e:
+                print(f"the arguments must be a JSON object ({e})", file=sys.stderr)
+                return 2
+            try:
+                result = toolset.TOOLS[args.name](**kwargs)
+            except TypeError as e:
+                print(f"bad arguments: {e}\nparameters: "
+                      f"{list(toolset.tool_schema(toolset.TOOLS[args.name])['input_schema']['properties'])}", file=sys.stderr)
+                return 2
+            _print(result)
+            return 0 if not (isinstance(result, dict) and result.get("ok") is False) else 1
+        if args.cmd == "models":
+            from vmd_agent import models
+            print(models.table())
+            if args.check:
+                print("\nAsking the Ollama library now:")
+                for m in models.CATALOGUE:
+                    r = models.check(m.tag)
+                    state = {True: "exists", False: "NOT FOUND (renamed or removed)",
+                             None: "could not check (" + str(r["error"]) + ")"}[r["exists"]]
+                    print(f"  {m.tag:<16} {state}" + (f", {r['gb']} GB" if r["gb"] else ""))
+            return 0
+        if args.cmd == "doctor":
+            from vmd_agent import launcher
+            info = launcher.doctor()
+            print(json.dumps(info, indent=2, default=str) if args.json
+                  else launcher.doctor_text(info))
+            return 0
+        if args.cmd == "mcp-config":
+            from vmd_agent import mcp_check
+            cfg = mcp_check.build_mcp_config(roots=args.roots, vmd=args.vmd)
+            print(json.dumps(cfg["config"], indent=2))
+            print("\nClaude Code (same machine): " + " ".join(cfg["claude_code_command"]))
+            print("Claude Desktop config file: " + str(cfg["claude_desktop_config"] or
+                  "(no official Claude Desktop build for this OS; use Claude Code or run the server over SSH)"))
+            for n in cfg["notes"]:
+                print("note: " + n)
+            if args.write:
+                if not cfg["claude_desktop_config"]:
+                    print("--write: no Claude Desktop config location on this OS.", file=sys.stderr)
+                    return 2
+                bak = mcp_check.write_claude_desktop_config(cfg["claude_desktop_config"], cfg["config"])
+                print(f"written to {cfg['claude_desktop_config']}" + (f" (backup: {bak})" if bak else ""))
+            return 0
+        if args.cmd == "chat":
+            from vmd_agent import chat as chat_mod
+            return chat_mod.main(
+                base_url=args.base_url, model=args.model, api_key=args.api_key,
+                roots=args.roots, max_turns=args.max_turns,
+                temperature=args.temperature,
+                prompt=" ".join(args.prompt) or None,
+                check_model=not args.no_check, tools=args.tools)
         if args.cmd == "mcp-check":
             from vmd_agent import mcp_check
             res = mcp_check.check_mcp_server(
@@ -628,7 +844,9 @@ def main(argv=None):
         elif args.cmd == "validate-dssp":
             from vmd_agent.evidence import validation
             files = [i for i in args.ids if i.lower().endswith(".pdb")]
-            if files and len(files) == len(args.ids):
+            if args.mdtraj and files and len(files) == len(args.ids):
+                _print([validation.dssp_vs_mdtraj(f) for f in files])
+            elif files and len(files) == len(args.ids):
                 _print([validation.dssp_vs_records(f) for f in files])
             else:
                 _print(validation.dssp_benchmark(args.ids, args.cache))
@@ -652,7 +870,7 @@ def main(argv=None):
     except KeyboardInterrupt:
         print("vmd-agent: interrupted", file=sys.stderr)
         return 130
-    except Exception as e:                        # noqa: BLE001
+    except Exception as e:
         # A bad path or argument is a user error, not a crash: say so
         # briefly. VMD_AGENT_DEBUG=1 re-raises for the full traceback.
         if os.environ.get("VMD_AGENT_DEBUG"):

@@ -1,14 +1,41 @@
+# ---- Python and tooling
 __pycache__/
-*.pyc
+*.py[cod]
 *.egg-info/
-.pytest_cache/
+.eggs/
 build/
 dist/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.hypothesis/
+.coverage
+htmlcov/
+
+# ---- operating system and editors
 .DS_Store
-# VMD must never be committed (UIUC license)
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# ---- what vmd-agent writes while it runs (never commit a user's data or results)
+/data/
+/pdb_cache/
+/structures/
+/vmd_agent_output/
+/bench_out/
+/agent_bench_out/
+vmd_scripts/
+
+# ---- anything that could hold a secret
+.env
+.env.*
+/config/
+settings.json
+
+# ---- VMD itself must never be committed (UIUC licence); only the drop-folder's README is kept
 docker/vmd-dist/*
 !docker/vmd-dist/README.md
-# local scratch
-data/
-pdb_cache/
-bench_out/

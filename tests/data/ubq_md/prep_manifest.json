@@ -1,0 +1,16 @@
+{
+  "source_topology": "<original run>/prod/structure.psf",
+  "source_trajectory": "<original run>/prod/prod.dcd",
+  "source_frames": 2000,
+  "source_time_per_frame_ps": 10.0,
+  "source_total_ns": 20.0,
+  "originals_modified": false,
+  "transformations": [
+    "select 'protein' (1240 of 17215 atoms; water/ions dropped for clarity)",
+    "unwrap protein across periodic boundaries (make molecule whole)",
+    "center protein in box (no re-wrap)",
+    "fit_rot_trans onto frame 0 (removes global translation+rotation)",
+    "stride 40 -> 50 frames, 400 ps apart, spanning 0-20 ns"
+  ],
+  "subset_time_per_frame_ps": 400.0
+}

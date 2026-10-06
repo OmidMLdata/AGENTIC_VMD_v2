@@ -31,10 +31,10 @@ import numpy as np
 
 import matplotlib
 matplotlib.use("Agg")
-import matplotlib.pyplot as plt  # noqa: E402
+import matplotlib.pyplot as plt
 
-from vmd_agent.dynamics import timeseries as tsm  # noqa: E402
-from vmd_agent.inputs.molio import load_universe  # noqa: E402
+from vmd_agent.dynamics import timeseries as tsm
+from vmd_agent.inputs.molio import load_universe
 
 # Readers whose ``ts.time`` comes from the file rather than being invented
 # from a default timestep.

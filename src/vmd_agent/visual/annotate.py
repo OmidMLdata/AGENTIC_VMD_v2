@@ -30,10 +30,18 @@ def _hex_to_rgb(h: str):
 
 def _font(size: int):
     from PIL import ImageFont
-    for path in ("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    candidates = []
+    try:                                   # matplotlib bundles DejaVu on every OS
+        import matplotlib
+        candidates.append(os.path.join(matplotlib.get_data_path(), "fonts",
+                                       "ttf", "DejaVuSans.ttf"))
+    except Exception:
+        pass
+    for path in candidates + [
+                 "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
                  "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
                  "/System/Library/Fonts/Helvetica.ttc",
-                 "C:/Windows/Fonts/arial.ttf"):
+                 "C:/Windows/Fonts/arial.ttf"]:
         if os.path.exists(path):
             try:
                 return ImageFont.truetype(path, size)

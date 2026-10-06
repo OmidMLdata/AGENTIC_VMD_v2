@@ -7,7 +7,8 @@
 # Docker or a VMD tarball. It follows VMD's documented binary install
 # (./configure; cd src; make install) but VMD's configure script layout varies
 # between releases. It fails loudly instead of guessing; if it fails, use the
-# `vmd-libs` image and mount a VMD you installed on the host (docs/TECHNICAL.md#docker).
+# `vmd-libs` image and mount a VMD you installed on the host (README.md, Docker section).
+# VERSION: written for the VMD 1.9.x series; tested only with 1.9.4a57 on macOS arm64, never on Linux (see README, "Which VMD version?").
 set -eu
 SRC="${1:-/tmp/vmd-dist}"
 DEST="${2:-/opt/vmd}"
@@ -32,7 +33,7 @@ cd "$dir"
 mkdir -p "$DEST/bin" "$DEST/lib"
 if ! grep -q 'install_bin_dir' configure; then
   echo "ERROR: this VMD release's configure script has no install_bin_dir;" >&2
-  echo "install VMD on the host and mount it instead (docs/TECHNICAL.md#docker)." >&2
+  echo "install VMD on the host and mount it instead (README.md, Docker section)." >&2
   exit 1
 fi
 sed -i.bak -E "s|^(\\\$?install_bin_dir)[[:space:]]*=.*|\\1=\"$DEST/bin\";|" configure

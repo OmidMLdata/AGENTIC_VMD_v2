@@ -21,7 +21,8 @@ from __future__ import annotations
 
 import os
 import re
-from typing import Dict, List
+from abc import ABC, abstractmethod
+from typing import Dict, List, Optional
 
 import numpy as np
 
@@ -41,7 +42,7 @@ def _ok(r) -> bool:
     return isinstance(r, dict) and not r.get("error")
 
 
-class _Scripted:
+class _Scripted(ABC):
     scripted = True
 
     def run(self, task: dict, env: Environment) -> dict:
@@ -57,8 +58,9 @@ class _Scripted:
             env.call("submit_answer", {"answer": ans})
         return {"tokens_in": 0, "tokens_out": 0}
 
-    def solve(self, task, env):                      # pragma: no cover
-        raise NotImplementedError
+    @abstractmethod
+    def solve(self, task, env):
+        """Return the answer object for ``task`` (or None to submit nothing)."""
 
 
 # ------------------------------------------------------------------ oracle
@@ -371,3 +373,59 @@ class LLMAgent:
             if env.submitted is not None or len(env.log) >= env.max_steps:
                 break
         return {"tokens_in": t_in, "tokens_out": t_out}
+
+
+class OpenAICompatAgent:
+    """A model driven through the OpenAI-style chat API with tool calling.
+
+    Covers open-source models served by Ollama, llama.cpp, vLLM or LM Studio, and
+    hosted services with that API, through :mod:`vmd_agent.llm_client`. The model
+    must finish by calling the ``submit_answer`` tool, exactly as for the Anthropic
+    agent; a reply that never submits is scored as no answer. Its only test is a
+    live one (``requires_llm``), which the author has never run: no model server was
+    available.
+    """
+    scripted = False
+
+    def __init__(self, base_url: str, model: str, api_key: Optional[str] = None,
+                 max_turns: int = 30, temperature: float = 0.0,
+                 system: str = SYSTEM_PROMPT, timeout: float = 900.0):
+        self.base_url, self.model, self.api_key = base_url, model, api_key
+        self.max_turns, self.temperature = max_turns, temperature
+        self.system, self.timeout = system, timeout
+        self.name = f"openai:{model}"
+
+    def run(self, task: dict, env: Environment) -> dict:
+        from vmd_agent.llm_client import (
+            assistant_message, chat_completion, parse_choice, render_result,
+            to_openai_tools, tool_message)
+        specs = env.tool_specs()
+        tools, names = to_openai_tools(specs), [s["name"] for s in specs]
+        msgs = [{"role": "system", "content": self.system},
+                {"role": "user", "content": task["prompt"]}]
+        t_in = t_out = 0
+        for _ in range(self.max_turns):
+            resp = chat_completion(self.base_url, self.model, msgs, tools=tools,
+                                   api_key=self.api_key,
+                                   temperature=self.temperature,
+                                   timeout=self.timeout)
+            parsed = parse_choice(resp, names)
+            t_in += parsed["usage"]["input_tokens"]
+            t_out += parsed["usage"]["output_tokens"]
+            msgs.append(assistant_message(parsed))
+            if not parsed["tool_calls"]:
+                break
+            for c in parsed["tool_calls"]:
+                if c["arguments_error"]:
+                    out = {"error": c["arguments_error"]}
+                else:
+                    try:
+                        out = env.call(c["name"], c["arguments"])
+                    except StepLimit as e:
+                        out = {"error": str(e)}
+                msgs.append(tool_message(c["id"], c["name"],
+                                         render_result(out)))
+            if env.submitted is not None or len(env.log) >= env.max_steps:
+                break
+        return {"tokens_in": t_in, "tokens_out": t_out}
+

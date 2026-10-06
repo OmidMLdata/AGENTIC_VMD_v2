@@ -28,17 +28,17 @@ Design contract
   time axis) and what they cannot show.
 """
 
-__version__ = "0.9.4"
+__version__ = "0.16.1"
 
-from vmd_agent.inputs.inspection import inspect_files  # noqa: E402
-from vmd_agent.structure.detect import detect_system  # noqa: E402
-from vmd_agent.visual.recipes import generate_visualization_recipe  # noqa: E402
-from vmd_agent.dynamics.analysis import analyze_trajectory  # noqa: E402
-from vmd_agent.auto import (visualize_and_interpret, fetch_and_visualize,  # noqa: E402
+from vmd_agent.inputs.inspection import inspect_files
+from vmd_agent.structure.detect import detect_system
+from vmd_agent.visual.recipes import generate_visualization_recipe
+from vmd_agent.dynamics.analysis import analyze_trajectory
+from vmd_agent.auto import (visualize_and_interpret, fetch_and_visualize,
                             probe_environment, select_keyframes)
-from vmd_agent.inputs.fetch import fetch_structure, search_pdb  # noqa: E402
-from vmd_agent.evidence.claims import verify_claims  # noqa: E402
-from vmd_agent.visual.renderers import get_renderer  # noqa: E402
+from vmd_agent.inputs.fetch import fetch_structure, search_pdb
+from vmd_agent.evidence.claims import verify_claims
+from vmd_agent.visual.renderers import get_renderer
 
 __all__ = [
     "__version__",

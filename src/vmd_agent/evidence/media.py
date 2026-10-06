@@ -22,11 +22,14 @@ from __future__ import annotations
 import glob
 import json
 import os
+import re
 import shutil
 import subprocess
 import tempfile
 import time
 from typing import Optional, Sequence
+
+from vmd_agent.environment import find_ffmpeg
 
 # Containers we treat as rendered evidence rather than loadable coordinates.
 _VIDEO_EXT = {".mp4", ".avi", ".mkv", ".mov", ".webm", ".gif", ".m4v",
@@ -79,7 +82,7 @@ def validate_decode(path: str, timeout: int = 300) -> dict:
     Metadata can look perfectly healthy on a truncated or corrupt file, so a
     real decode pass is the only honest proof the video plays end to end.
     """
-    ffmpeg = shutil.which("ffmpeg")
+    ffmpeg = find_ffmpeg()
     if not ffmpeg:
         return {"checked": False, "reason": "ffmpeg not found"}
     try:
@@ -106,19 +109,21 @@ def probe_video(path: str, count_frames: bool = False,
         return {"ok": False, "path": path, "exists": False,
                 "error": f"video not found: {path}"}
     ffprobe = shutil.which("ffprobe")
-    if not ffprobe:
-        return {"ok": False, "path": path, "exists": True,
-                "error": "ffprobe not found; cannot read video metadata."}
-
-    try:
-        proc = subprocess.run(
-            [ffprobe, "-v", "error", "-print_format", "json",
-             "-show_format", "-show_streams", path],
-            capture_output=True, text=True, timeout=120)
-        meta = json.loads(proc.stdout or "{}")
-    except Exception as e:
-        return {"ok": False, "path": path, "exists": True,
-                "error": f"ffprobe failed: {e}"}
+    if ffprobe:
+        try:
+            proc = subprocess.run(
+                [ffprobe, "-v", "error", "-print_format", "json",
+                 "-show_format", "-show_streams", path],
+                capture_output=True, text=True, timeout=120)
+            meta = json.loads(proc.stdout or "{}")
+        except Exception as e:
+            return {"ok": False, "path": path, "exists": True,
+                    "error": f"ffprobe failed: {e}"}
+    else:                       # the bundled ffmpeg has no ffprobe; read the same facts from ffmpeg
+        meta = _probe_with_ffmpeg(path)
+        if meta is None:
+            return {"ok": False, "path": path, "exists": True,
+                    "error": "neither ffprobe nor ffmpeg is available; cannot read video metadata."}
 
     streams = meta.get("streams") or []
     vs = next((s for s in streams if s.get("codec_type") == "video"), None)
@@ -162,11 +167,64 @@ def probe_video(path: str, count_frames: bool = False,
     return info
 
 
+def _probe_with_ffmpeg(path: str) -> Optional[dict]:
+    """The facts ``ffprobe -show_format -show_streams`` would give, read from what
+    ``ffmpeg -i`` prints, in the same shape. ``None`` if there is no ffmpeg."""
+    ffmpeg = find_ffmpeg()
+    if not ffmpeg:
+        return None
+    try:
+        text = subprocess.run([ffmpeg, "-hide_banner", "-i", path], capture_output=True,
+                              text=True, timeout=120).stderr or ""
+    except Exception:
+        return None
+    streams: list = []
+    fmt: dict = {"size": str(os.path.getsize(path))}
+    m = re.search(r"Input #0, ([^,]+(?:,[^,]+)*), from", text)
+    if m:
+        fmt["format_name"] = m.group(1).strip()
+    m = re.search(r"Duration: (\d+):(\d+):(\d+(?:\.\d+)?)", text)
+    if m:
+        fmt["duration"] = str(int(m.group(1)) * 3600 + int(m.group(2)) * 60 + float(m.group(3)))
+    m = re.search(r"bitrate: (\d+) kb/s", text)
+    if m:
+        fmt["bit_rate"] = str(int(m.group(1)) * 1000)
+    for line in text.splitlines():
+        m = re.search(r"Stream #\d+:\d+.*?: (Video|Audio): ([\w-]+)(?: \(([^)]*)\))?", line)
+        if not m:
+            continue
+        kind, codec, profile = m.group(1).lower(), m.group(2), m.group(3)
+        s: dict = {"codec_type": kind, "codec_name": codec}
+        if kind == "video":
+            if profile and "/" not in profile:
+                s["profile"] = profile
+            dims = re.search(r"[, ](\d{2,5})x(\d{2,5})\b", line)
+            if dims:
+                s["width"], s["height"] = dims.group(1), dims.group(2)
+            pix = re.search(r", (yuv\w+|rgb\w*|gray\w*|pal8|bgr\w*|gbr\w*)", line)
+            if pix:
+                s["pix_fmt"] = pix.group(1)
+            fps = re.search(r"([\d.]+) fps", line) or re.search(r"([\d.]+) tbr", line)
+            if fps:
+                s["avg_frame_rate"] = fps.group(1)
+        streams.append(s)
+    return {"streams": streams, "format": fmt}
+
+
 def _count_frames(path: str, timeout: int = 600) -> Optional[int]:
     """Exact frame count by decoding. Only used when the container is vague."""
     ffprobe = shutil.which("ffprobe")
-    if not ffprobe:
-        return None
+    if not ffprobe:                                   # decode with ffmpeg and read its last progress line
+        ffmpeg = find_ffmpeg()
+        if not ffmpeg:
+            return None
+        try:
+            err = subprocess.run([ffmpeg, "-hide_banner", "-i", path, "-map", "0:v:0", "-f", "null", "-"],
+                                 capture_output=True, text=True, timeout=timeout).stderr or ""
+        except Exception:
+            return None
+        got = re.findall(r"frame=\s*(\d+)", err.replace("\r", "\n"))
+        return int(got[-1]) if got else None
     try:
         proc = subprocess.run(
             [ffprobe, "-v", "error", "-count_frames", "-select_streams", "v:0",
@@ -350,7 +408,7 @@ def sample_frames(video: str, n: int = 9, out_dir: Optional[str] = None,
     frames, so the beginning and end are always inspected (the spec's
     begin/middle/end rule). Pass ``timestamps`` to target specific events.
     """
-    ffmpeg = shutil.which("ffmpeg")
+    ffmpeg = find_ffmpeg()
     if not ffmpeg:
         return {"ok": False, "error": "ffmpeg not found."}
     if not os.path.exists(video):
@@ -680,8 +738,7 @@ def interpret_video(video: str, n_frames: int = 9,
         "verification": verification,
         "outputs": {"out_dir": out_dir,
                     "frames": [f["path"] for f in frames]},
-        "software": {"ffmpeg": shutil.which("ffmpeg"),
-                     "ffprobe": shutil.which("ffprobe")},
+        "software": {"ffmpeg": find_ffmpeg(), "ffprobe": shutil.which("ffprobe")},
     }
     package["manifest_path"] = write_manifest(
         manifest_path or os.path.join(out_dir, "video_manifest.json"), manifest)

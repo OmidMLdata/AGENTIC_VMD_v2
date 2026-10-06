@@ -1,0 +1,6 @@
+# Shell scripts and Dockerfiles must keep Unix line endings even when checked out on
+# Windows (git's autocrlf would break them inside Docker and WSL).
+*.sh     text eol=lf
+Dockerfile text eol=lf
+*.yml    text eol=lf
+*.ps1    text eol=crlf

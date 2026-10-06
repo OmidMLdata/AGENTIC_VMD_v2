@@ -57,7 +57,8 @@ def _int(v) -> Optional[int]:
 def _inside(workdir: str, path: str) -> bool:
     root = os.path.realpath(workdir)
     real = os.path.realpath(path)
-    return real == root or real.startswith(root + os.sep)
+    from vmd_agent import security
+    return security.is_within(real, root)
 
 
 # -------------------------------------------------------- family scorers

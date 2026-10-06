@@ -1,273 +1,163 @@
 # Changelog
 
-## 0.9.4: MCP on a Linux machine, end to end
+## 0.16.1: ready to publish
 
-* **`vmd-agent mcp-check`**: launches the server and talks to it over stdio with the real MCP client, giving the server only
-  the environment you pass it. Reports connection, the tool list, analysis libraries, VMD, Tachyon and ffmpeg, the sandbox
-  (outside paths refused, relative paths resolved inside the first root), whether raw Tcl is disabled, and with `--render`
-  a real render. Exit code 2 on any failure. Works with both MCP SDK generations.
-* **Sandbox fix:** with `VMD_AGENT_ALLOWED_ROOTS` set, a relative path is now taken relative to the **first root**. Before,
-  it was relative to the server's working directory, which is normally outside the sandbox, so the default output
-  directory `vmd_agent_output` was refused on almost every call.
-* **Warning when the sandbox is off:** the server prints to stderr (never stdout) if `VMD_AGENT_ALLOWED_ROOTS` is unset.
-* **README:** a complete MCP section for a Linux machine with VMD (requirements, verification, four ways to connect a
-  client including SSH and Docker, server behaviour, troubleshooting). The SSH route, the `claude mcp add` flags, the
-  Docker route and VMD's headless library list have not been tested against a real VMD or client.
+* **`scripts/publish.sh`** (replaces the old `push_to_github.sh`): starts git if needed, refuses secrets and big files, commits, creates the repository and pushes (`--no-push` to try
+  it locally). Tried in a scratch copy: 151 files tracked, a planted API key and a 6 MB file were both refused, running it again did nothing.
+* `publish.sh --branch NAME` publishes to a new branch that grows from the remote's `main` (never overwriting a branch), and `--skip-workflows` leaves `.github/workflows` out when the token
+  lacks GitHub's `workflow` scope. Tests run it against a real local remote, with `gh` hidden so no test can reach GitHub. Test data no longer carries a collaborator's home path.
+* **`.gitignore` rewritten** (root-anchored runtime folders, secrets, editor and OS files) and checked path by path with `git check-ignore`; a test keeps it that way.
+* **Clean-room install tested:** the installer fed through a pipe, from a GitHub-style zip, into a folder whose path contains a space, with no existing Python: it downloaded uv and
+  CPython 3.12 into that folder, installed 53 packages, `doctor`, `vmd` commands and the real MCP server (47 tools) worked, and nothing was written outside the folder.
+  The tests also pass from a fresh `git clone`.
+* **Fix found there:** an MCP server started by a client could not see the settings saved by `setup` (the contained folder, the VMD found, the files folder). `mcp-config` and
+  `mcp-check` now pass `VMD_AGENT_HOME`, default the sandbox to the folder chosen in setup, and find VMD the same way the CLI does.
+* `pyproject.toml`: lower bounds on dependencies, project URLs, classifiers, `ruff` and `vulture` settings, `dev` extra includes them.
 
-## 0.9.3: no recorded results
+## 0.16.0: a command line that is organised and documented
 
-* **Removed every recorded result.** `docs/results/` (four JSON files of validation and baseline outputs) is deleted, and
-  no measured number from running the validation or the benchmark appears in the README, `PAPER`, `TECHNICAL`,
-  `PREREGISTRATION`, `CHANGELOG` or the history document. Test outcomes, scores, agreement figures, power tables and
-  mutation scores are gone; thresholds, tolerances and counts of tools or task families (design parameters) remain.
-* **README:** a "How to run" section (install, tests, using the toolkit, reproducing each validation check, running the
-  benchmark natively and in Docker with your VMD, the grounding study, and what to do before a confirmatory run).
-* **PAPER:** now a design-and-protocol paper. "Results" became an evaluation protocol (each evaluation, its command, what is
-  compared); "What building it found" became the audit methods; the appendices record no outcomes.
-* **PREREGISTRATION:** the power tables are replaced by a script to compute power from your own assumptions.
+No behaviour changed; everything that worked before still works with the same flags.
 
-## 0.9.2: leaner
+* **`vmd-agent --help` is grouped** (Get started, Look at a structure, Measure a simulation, Drive VMD itself, Get structures, Videos/reports, Connect other programs,
+  Advanced) instead of one flat list of 38; a test checks every command is in exactly one group.
+* **`vmd-agent vmd <action>`**: the 20 tools that drive VMD are ordinary commands with ordinary flags, generated from the tools' signatures (`vmd_cli.py`): structure files are
+  positional, outputs are `--out`, options are `--kebab-case` flags, `--no-<name>` turns a default-on option off, `--scene file.json` takes a scene, `--full` prints everything.
+  `vmd-agent vmd` lists them; `vmd-agent vmd <action> --help` has an example. They need only VMD (no model, no chat).
+* New spellings added beside the old ones: `--trajectory` (for `--traj`), `--selection` / `--selection2` (for `--sel` / `--sel2`).
+* **Sweep for stale code:** removed `push_to_github.sh` (it assumed a git history that does not exist), the unused `ollama_context` setting, an unused test helper and
+  stale `noqa` comments; fixed unused loop variables, a README path and leftover references to documents that were merged; CI now runs `scripts/test.py`.
+  A test runs all twenty `vmd` commands from the command line against a real VMD.
+* **README**: "Every command" lists all commands with their useful flags, grouped as in `--help`, plus a table of flags that mean the same everywhere. Tests check that every
+  command and every flag the README names exists, and that every `vmd` command is documented with an example that parses.
 
-* **Docs:** `docs/RESEARCH.md` folded into `docs/PAPER.md` (its question map, grounding-study specification and
-  verification record are Appendices D to F; the rest duplicated the paper). Docs are now `PAPER`, `TECHNICAL`,
-  `PREREGISTRATION`, `history/`.
-* **Source:** `visual/renderers/base.py` and `vmd.py` merged into `renderers/__init__.py` (interface, VMD backend and
-  registry together; `mpl.py` stays separate). Imports from `vmd_agent.visual.renderers` are unchanged.
-* **Tests:** `test_chain_counting` merged into `test_stats_detect`; `test_validation_numpy` and `test_validation_dssp`
-  merged into `test_validation`. No test was removed or changed.
+## 0.15.0: run for real, with a real model; one README
 
-## 0.9.1: nothing fake
+First run of the installer, the private Ollama and a real chat (macOS, Apple Silicon, 2026-10-06). Everything below that is a *fix* was found by that run.
 
-Removed every stand-in for another program. The fake `vmd`, `tachyon` and `ffmpeg` executables, the stub MCP SDK, the
-fake model clients, the mocked network and a fake evidence object are gone. In their place:
+* **Ran:** `install.sh` end to end from a local copy; `vmd-agent setup` downloaded Ollama's standalone build (checksum-verified), started it on the private port
+  and pulled `granite4.1:8b`; the chat called the tools. `granite4.1:3b` was also tried.
+* **Fixes from the real model:**
+  * Ollama's default 4096-token context silently cut off the model's instructions and tools, so it answered from memory. The private server now runs with 16384
+    (`OLLAMA_CONTEXT_LENGTH`; set it in the environment to change it).
+  * A data question answered without a tool is sent back once with `tool_choice=required` (`chat.NUDGE`); tool descriptions say "local file" vs "download".
+  * Every number in the final answer is checked against the tool results; unreturned numbers are listed under the answer (a 3B model's invented values showed up this way).
+  * Models are no longer shown `vmd_path` (they invented `/usr/local/vmd`); `null` for `first`/`last`/`step` means the default; answers are capped at 3000 tokens (an unbounded
+    generation once ran for minutes).
+  * No VMD tool writes over a file the same call reads (a model passed `protein.pdb` as the output prefix and destroyed the input); a trajectory that does not match its
+    topology is now an error ("no frames were read"), not an empty result or a `KeyError`.
+  * `vmd_capabilities` returns a short form by default (the long one made the model write for three minutes).
+  * `doctor` knows about the private Ollama, shows the chat model and whether it is downloaded, and no longer nags about Docker when Docker is absent.
+  * `install.sh` tested for a usable terminal (`/dev/tty` can be readable and still fail).
+* **One README.** `docs/TECHNICAL`, `DEVELOPMENT`, `MCP` and `VMD` are sections of `README.md` (user guide first, a Reference part after); the paper, preregistration and comparison
+  with the original project are `docs/RESEARCH.md`. CHANGELOG condensed. Layering and architecture text updated for `models`, `ollama_local`, `vmdkit`, `vmd_tools`.
 
-* Tests that need a real VMD/Tachyon, ffmpeg, the MCP SDK, the network or a live model are marked (`requires_vmd`,
-  `requires_ffmpeg`, `requires_mcp`, `requires_network`, `requires_api`) and **skipped with the reason shown** where
-  the real thing is missing. `pytest -rs` lists them; the test header says what real tools were found. A skip is "not
-  verified here", not a pass. The real-VMD tests have never been run by the author.
-* Generated Tcl is now built by pure functions (`_image_lines`, `_views_lines`, `_frames_lines`) and checked as text;
-  hostile input is refused before VMD is searched for, so the answer no longer depends on what is installed.
-* Network behaviour is tested against the **real** RCSB, AlphaFold and search APIs (including mmCIF fallback on the real
-  entry 9NFN, which has no PDB file) and a **real local web server** serving exact bytes for size caps, gzip bombs and
-  HTML rejection. The MCP server is tested through the **real SDK**, both generations, on Python 3.12.
-* The oracle baseline renders real images with the real matplotlib renderer instead of writing random pixels.
+## 0.14.0: a much fuller wrapper around VMD itself
 
-Real defects this exposed (all invisible with stand-ins), fixed:
+* **20 new tools that run VMD** (`vmd_agent/vmdkit/`, `vmd_tools.py`): VMD's `measure` family (rgyr, sasa, center, minmax, inertia, rmsd with fit, rmsf,
+  distance, angle, dihedral, contacts, hbonds, gofr, cluster); hydrogen bonds / salt bridges / contacts as persistence; secondary structure over time (STRIDE);
+  backbone torsions; the structurecheck plugin; superposition; pbctools; trajectory conversion/trimming/wrapping/fitting; structure writing; `volmap` and `pmepot`
+  maps plus a native reader for OpenDX/CCP4/MRC/cube/Situs; psfgen + solvate + autoionize system building; mutator; topotools merge; scene rendering with
+  isosurfaces; session export; and `vmd_capabilities`, which classifies every plugin of the installed VMD (wrapped / library / GUI-only / needs another program / not wrapped).
+* **Reproducibility.** Every VMD tool saves the exact Tcl it ran (`reproduce_script`); `export_vmd_session` writes a relocatable folder a VMD user opens with
+  `vmd -e session.tcl` (inputs copied, SHA-256 manifest, round-trip check in a real VMD). Tests re-run the saved script and the exported folder in plain VMD.
+* 47 tools in total; the original 27 are untouched (`toolset.CORE_TOOLS`). `vmd-agent chat --tools all|core|vmd` picks the menu (small models do better with fewer),
+  `vmd-agent tools` lists them, `vmd-agent tool NAME '{json}'` runs one.
+* Found while testing against real VMD: `volmap` has no frame range; VMD cannot write xtc/netcdf; its multi-frame PDB is not read as frames by MDAnalysis (rewritten
+  with MODEL/ENDMDL); the LAMMPS/GROMACS topotools writers produced empty files; the nanotube builder cannot build zigzag (m=0) tubes; SASA *decreases* with probe radius for a compact protein (a wrong test assumption of mine).
+* New tests: `tests/vmdkit/`, each VMD number checked against MDAnalysis/NumPy/SciPy where an independent implementation exists. Only run against VMD 1.9.4a57, macOS arm64.
 
-* **The MCP server did not import with mcp 2.x**, which is what `pip install '.[server]'` now installs (`FastMCP` was
-  renamed `MCPServer`). Both generations are supported and tested; CI covers `mcp<2` too.
-* `check_path` raised `ValueError` instead of a policy error on a NUL byte under Python 3.12.
-* The **synthetic structure generator is not reproducible across machines**: one seed gave different structures on
-  Python 3.9/NumPy 1.26 and Python 3.12/NumPy 2.5 (floating-point differences flip discrete choices), and ligand-burial
-  agreement with the design differed between them. `design.json` and the task suite now record SHA-256 hashes, and the runner
-  refuses a suite whose files changed. The seed is documented as not sufficient.
-* Replaced a fake evidence object with a pure function (`_secondary_structure_verdict`) tested at its boundaries.
-* Test environment: `VMD_BIN` is no longer cleared, so a real VMD stays discoverable.
+## 0.13.1: first run against a real VMD
 
-Still synthetic, by design and labelled as such: the generated protein-ligand-water test system
-(`tests/data/sample`), the novel-structure generator, and injected events on real trajectories.
+* Real VMD 1.9.4a57 (macOS Apple Silicon, from its disk image) is now available here. 26 of the 27 `requires_vmd` tests passed (the 27th needs ffmpeg and skipped) and a real
+  Tachyon render was inspected by eye. `VMD_VERSIONS_TESTED` now lists it; the README says Linux/Windows builds, other versions,
+  ffmpeg and Docker remain untested. Dead-code sweep: nothing removed (every flagged name is a registered tool or is used by a test or a documented analysis).
+* **ffmpeg is now part of the install.** `imageio-ffmpeg` is a core dependency (a bundled ffmpeg inside the same private environment);
+  `environment.find_ffmpeg` prefers a system one, else the bundled one, and every movie/video path uses it. The bundled build has no
+  ffprobe, so video probing and exact frame counts fall back to reading `ffmpeg -i` output (tested on a real H.264 video). The movie
+  tests that were skipped for lack of ffmpeg now run, with real VMD.
+* **Cleanup.** Removed the duplicate key `n_hydrogen_bonds_geometric` and a redundant alias; abstract bases (`Renderer`, `_Scripted`) are real
+  ABCs, not `NotImplementedError` stubs; `dssp_vs_mdtraj` and `scoring.paired_arms` (documented in the study plan but unreachable) now have CLI
+  entry points (`validate-dssp --mdtraj`, `bench agent-compare`). README rewritten for a non-programmer; developer, MCP and benchmark material folded into one README (the paper, preregistration and comparison with the original are `docs/RESEARCH.md`); a test checks that every Markdown link resolves.
+* `scripts/test.py`: one command (`python scripts/test.py`) that runs lint, dead-code check and the whole suite, with every skip reason listed; works on every OS.
 
-## 0.9.0: bring-your-own-VMD benchmark runs
+## 0.13.0: contained install, checked model list, VMD self-test
 
-* **`bench agent-preflight`**: checks VMD (found, headless load, selection evaluation, built-in ray tracer), code
-  execution only inside a container, scrubbed secrets, API key and SDK, suite and output paths. `--live-api` makes one
-  tiny call. `agent-run` re-runs it and refuses to start if a blocking check fails (`--skip-preflight` to bypass).
-* **Plain-VMD arm made real**: runs in the task workspace, with VMD-syntax selections scored by a real VMD
-  (selection strings restricted to a Tcl-free character set), and a tool description with the basics VMD needs.
-* **Security**: model-written Python and Tcl run with a **whitelisted environment**, so they cannot read
-  `ANTHROPIC_API_KEY`. Previously the child process inherited it.
-* **Docker**: `bench` / `bench-hostvmd` / `bench-withvmd` compose services (key passed by name, pids and memory limits,
-  writable tmpfs home), the image now includes the Anthropic SDK, and `docker/bench.sh` wraps preflight, suite, plan and run
-  and refuses a macOS VMD for a Linux container.
-* **Fixed (found by the property tests)**: the selection, word and residue-name validators accepted a trailing newline
-  (`$` matches before one). Now anchored with `\Z`; regression tests added.
-* **macOS**: the app's `vmd_MACOSX*` binary is discovered and `VMDDIR` is set when unset. `manifest.json` per run.
-* **Untested against real VMD and Docker** (neither available here). Tested: shell syntax, compose structure,
-  guards, scrubbing, scoring path and preflight logic (at the time, against a fake VMD, since removed).
+* **Everything in one folder.** The installers put uv, Python, vmd-agent, its settings and (optionally) Ollama with its models under
+  one folder (`~/vmd-agent`, or `$VMD_AGENT_HOME`) by pointing uv's own variables there; no sudo, no PATH or shell-file edits,
+  uninstall = delete the folder. A launcher `bin/vmd-agent` sets the folder. New `settings.home_dir`, `ollama_mode`, `ollama_port`.
+* **Private Ollama (`ollama_local.py`).** Downloads Ollama's standalone archive for this OS and CPU into the folder, refuses to
+  install it unless its SHA-256 matches the release's `sha256sum.txt`, refuses archive paths that escape, runs it on a private port
+  with `OLLAMA_MODELS` inside the folder. The brew / winget / `curl | sh` installs are gone (the Linux one needed sudo).
+  **Never run**: no Ollama binary was downloaded where this was written.
+* **Checked model list (`models.py`).** Replaced the `qwen2.5` suggestions (and an unverified `qwen2.5:14b`) with models checked on
+  2026-10-06 against the Ollama registry (existence, size, licence) and library pages (tool-calling badge). `vmd-agent models
+  [--check]` and the setup re-check the registry before downloading. The README leads with the dated table. None was run with this
+  toolkit.
+* **VMD self-test.** `environment.vmd_self_test` starts VMD headless and runs a one-line script; `doctor` and setup step 1 report
+  working or failing with the likely cause (tcsh, shared libraries, permissions, wrong CPU).
+* **VMD version policy.** The version is read and recorded but was never checked or stated. Now: README section "Which VMD version?",
+  `environment.vmd_version_note` (shown by `doctor` and setup), an empty `VMD_VERSIONS_TESTED` that grows only after the real-VMD tests pass.
+* Tests: `tests/system/test_contained.py` (real archives, a real local HTTP server, the live registry under `requires_network`).
 
-## 0.8.2: documentation consolidated
+## 0.12.0: install in one line, set up by answering questions
 
-Eight documents became three, plus the history. Content is unchanged except for one new section.
+For someone who knows VMD but not code, Git, Docker or AI apps.
 
-* `docs/PAPER.md`: **new "Research questions" section** (eight questions with motivation, test, evidence, open
-  items and what a negative answer would be), then the automation benchmark, the grounding study and the validation
-  evidence (formerly `AUTOMATION_BENCH`, `BENCHMARK`, `VALIDATION`).
-* `docs/TECHNICAL.md`: architecture, methods, security, Docker (formerly four files).
-* `docs/PREREGISTRATION.md`: the agent-study plan, with the grounding-study plan as an appendix.
-* All links and anchors updated and checked.
+* **One-line installers** (`install.sh` for Mac/Linux, `install.ps1` for Windows): install `uv` (its official installer), then vmd-agent
+  from GitHub's zip (no Git needed) into a private folder, then start the setup. No administrator rights. **Never run.**
+* **`vmd-agent setup`** (guided, plain words): finds VMD (or asks where it is), makes a files folder, and sets up who answers
+  (a free local model through Ollama with a choice of sizes, an online OpenAI-compatible service, Claude Desktop/Code, or none).
+  Installs nothing without asking and prints the exact command first. `--yes`, `--check`, `--use`, `--model`, `--data-dir`, `--vmd` for scripts.
+* **A friendly menu**: plain `vmd-agent` opens it (chat, look at a structure, analyse a simulation, check a statement, connect Claude,
+  check settings), runs the real commands, and never shows a traceback.
+* **`settings.py`**: the answers are remembered (per-OS location, private file) and used as defaults everywhere: the chat's model, VMD for
+  every renderer and the MCP server, and the files folder as the **default sandbox** for the chat and the MCP server.
+* Plain-language `--help` for every command with examples, and README rewritten for a non-technical newcomer (install, what can I do,
+  options per feature, troubleshooting, update/uninstall). `requirements.txt` and `requirements-all.txt` for people who manage packages themselves.
+* Tests drive the setup and menu with typed answers and run the real tools; the installers are checked statically only.
 
-## 0.8.1: retention audit
+## 0.11.0: OS-aware
 
-Compared against the original package, signature by signature and output by output
-(`docs/history/CHANGES_FROM_ORIGINAL.md`, section 15). Nothing functional was missing from the original's tool
-surface, but five things removed in earlier rounds are **restored**:
+The code now works out what kind of computer it is on and runs accordingly.
 
-* `structure_stats(hbond_cutoff=)`: had been swallowed by a `**kwargs`; now a real parameter (unknown options raise).
-* `annotate_image(panel_side="left"|"right")` (also MCP tool and CLI `--panel-side`), `representations.params_for`.
-* `probe_environment` again reports mdtraj, networkx and pandas; the `[dssp]` (mdtraj) install extra is back.
-* Removed a stray `.bak` file from the tests.
+* **`platform_info.py`**: OS, CPU, WSL, container, Docker (installed / running / Compose / NVIDIA runtime), NVIDIA GPU, Ollama; per-OS
+  VMD locations and file names; Claude Desktop config path; Docker platform; plain-language advice per OS. Never raises.
+* **`vmd-agent start`**: detects the machine and picks native or Docker (`--print-plan` shows the decision and commands without running).
+  **`vmd-agent doctor`** reports the machine and next steps. **`vmd-agent mcp-config`** prints the MCP client config for this OS with VMD
+  filled in, and `--write` merges it into Claude Desktop's config (with a backup; refuses a broken file).
+* **Windows defects fixed** (found by auditing the code for OS assumptions; the Windows fixes are tested as rules, never run on Windows):
+  every path was refused for VMD scripts because backslashes were rejected (now converted to forward slashes on Windows); the VMD version
+  check used the stdin device file (not on Windows); VMD was never found (no `vmd.exe`, no Windows install folders); the sandbox compared paths
+  case-sensitively; child processes lost the Windows system variables; a console that cannot show a character (an angstrom sign) could crash
+  printing. Fonts now come from matplotlib on every OS. `.gitattributes` keeps shell scripts LF on Windows checkouts.
+* Verified on macOS only.
 
-## 0.8.0: automation benchmark
+## 0.10.0: no AI client required
 
-Reframed the research as an end-to-end **VMD-automation benchmark** with the toolkit as one entrant.
+The toolkit now stands on its own: a local open-source model (or a hosted one) can use the tools directly.
 
-* New `vmd_agent.bench.agent`: task suite with independently known answers (6 families: measure, event, diagnosis,
-  selection, keyframes, report), tool environment with arms (plain Python, plain VMD, toolkit, two ablations) confined to
-  the task workspace, scorers including **silent-error** accounting, runner with fresh workspaces per run, cost planner,
-  an Anthropic tool-use agent adapter (tested with a fake client only), and scripted oracle / sloppy / reference agents.
-* CLI: `bench agent-suite | agent-run | agent-plan`.
-* `docs/PAPER.md#5-the-automation-benchmark`; `docs/PREREGISTRATION.md` rewritten for the agent study (the vision-only draft is kept as
-  `PREREGISTRATION.md#appendix-grounding-study-draft`); `docs/PAPER.md#appendix-e-grounding-study-specification` re-labelled as the secondary component study.
-* **Fixed (found by building the benchmark):** `analyze_trajectory` silently dropped frames with NaN coordinates and
-  reported a smaller `n`; it now says so in `notes`.
-* Added `paired_difference(keys=, alpha=)` to the grounding scorer.
-* Removed dead code (`security.check_paths`, `validation.dssp_cross_benchmark`, an unused test constant); corrected stale
-  module paths in strings.
-* Mutation-checked the new scorers, tools, suite and runner (two scorer gaps needed an extra test).
-* Honest findings recorded, not fixed (to avoid tuning the toolkit to its own benchmark): the toolkit's distance
-  analysis is centre-of-mass, and its change-point detector misses slow transitions (a silent failure).
+* **`vmd-agent chat`**: an interactive or one-shot chat in which any OpenAI-compatible model (Ollama, llama.cpp, vLLM, LM Studio,
+  hosted services) calls the toolkit's tools. Confined to a data folder by default; raw Tcl stays disabled; a model that
+  misuses a tool is told how to call it; long histories are trimmed. No MCP client needed.
+* **`toolset.py`**: the 27 tools as plain functions with generated JSON schemas, independent of MCP. `server.py` is now a thin
+  registration layer over it (the MCP server is unchanged for clients, and still tested against the real SDK, both generations).
+* **`llm_client.py`**: a stdlib client for the OpenAI-style API with tool calling; also accepts tool calls that a model writes
+  as JSON text, only for known tool names.
+* **One-script start:** `start.sh` / `start.ps1` + `docker/chat.compose.yml` (+ `chat.gpu.yml`): Docker starts a local model
+  server and the chat; VMD is optional (Linux tarball you supply). **Never run** (no Docker, model server or VMD available);
+  the model quality is unknown.
+* **Benchmark for open models:** `--model openai:<id> --base-url ...` runs the automation benchmark on any OpenAI-compatible
+  model (`OpenAICompatAgent`); preflight checks the model server.
+* Live tests for a real local model are opt-in (`requires_llm`, `VMD_AGENT_LIVE_LLM_MODEL`) and have not been run.
 
-## 0.7.2: second audit
+## 0.9.4 and earlier (condensed)
 
-* **`run_vmd_tcl` (MCP) is disabled by default** (`VMD_AGENT_ENABLE_TCL=1` to enable). The 0.7.1 deny-list fixes closed specific
-  strings, but obfuscated Tcl (names built at run time, `catch $built`, `rename exec`) passes the screen; confirmed with a real
-  `tclsh` (several obfuscated forms created files). Filtering cannot make arbitrary Tcl safe, so the tool no longer runs unless enabled.
+* **0.9.x:** MCP on Linux checked end to end with the real MCP SDK; every recorded result removed from the repository (instructions only);
+  fake VMD/Tachyon/ffmpeg and mocked network removed (tests that need the real thing are marked `requires_*` and skip with a reason);
+  bring-your-own-VMD benchmark runs.
+* **0.8.x:** the automation benchmark (task families with answers known by construction, tool arms, silent-error metric, cluster
+  bootstrap); a retention audit showed no function of the original project was lost.
+* **0.7.x:** adversarial audits (path sandbox, input validation, hypothesis property tests), repository restructure into
+  `inputs / structure / dynamics / visual / evidence / bench`, event-aware keyframes, claim verification, validation procedures.
+* **0.6.0:** the consolidated starting point of this copy of the original project (see the comparison in `docs/RESEARCH.md`, Part III).
 
-* Fixed: statistics overflowed to NaN for values near 1e154 (found by property tests); the CLI printed tracebacks (now a
-  one-line error, `VMD_AGENT_DEBUG=1` restores them); `detect_system` / `structure_stats` / recipes crashed on topologies
-  without atom names; provenance reported false tampering after a file was legitimately re-rendered; `dt_ps`, `k`, image
-  size and unknown views were accepted silently; `install_vmd.sh` used GNU-only `sed -i`; Pillow `getdata()` deprecation.
-* Added `docs/PREREGISTRATION.md` (draft analysis plan) and `paired_difference(keys=, alpha=)`.
-* Added property tests and tests for every fix above, and mutation-checked the fixes.
-
-## 0.7.1: adversarial audit
-
-An audit (static analysis, targeted probes, a fuzz pass, mutation testing) found and fixed the following. Each fix has
-a regression test, and each was checked by mutation (reverting the fix makes a test fail).
-
-**Security (high)**
-* The Tcl deny-list could be bypassed several ways (`catch "exec …"`, `open … w` + `source`, `play`,
-  `render … "cmd"`, arbitrary file read). Closed; `mol urlload` also denied.
-* **Tcl injection into scripts the toolkit generates** (never screened): a hostile path, `--representation`, colour
-  method, `background`, or a **residue name inside a crafted mmCIF** could close a brace and run commands when rendered with
-  VMD. All interpolated values are now validated; hostile residue names are dropped with a warning.
-
-**Correctness (medium)**
-* `contacts` / `distance` without `sel2` silently compared the selection with itself; now an error.
-* The benchmark response parser mis-scored `{"answer": true} (note: {x})` as `0.9` and accepted `true` as a number.
-* Paired contrasts silently used only the last repeat when `n_repeats > 1`; now averaged.
-* The claim parser reduced qualified sentences ("water bridges the ligand and Asp 52", "membrane is intact", "stable for
-  40 ns") to a weaker claim and marked them *supported*; it now refuses sentences that say more than can be checked, and
-  stalled 11 s on a 50 000-character input (now capped at 400 characters).
-* `analyze_trajectory` had no memory guard (all atoms of all frames copied into RAM); it now refuses with the `step` that fits.
-* `VMD_BIN` pointing at an install directory was documented but ignored.
-* NaN coordinates crashed the matplotlib renderer; they are now flagged by `detect_system` and skipped.
-
-**Test-suite gaps closed** (found by mutation testing): DSSP parallel-bridge convention, ECE under-confidence, the 30 %
-"mostly helical" floor, invalid-box handling, `source` rule, server wrapper branch.
-
-**Not changed:** the Tcl screen is still a deny-list, not a sandbox; the claim parser is still template-based;
-`analyze_trajectory` still copies whole-system coordinates (guarded, not reduced).
-
-## 0.7.0 (continued): repository restructure
-
-**Breaking for deep imports** (the top-level `from vmd_agent import ...` API is unchanged).
-
-* **`src/` layout, flat repo root.** The doubled `vmd-agent/vmd-agent/vmd_agent/` nesting is gone:
-  `src/vmd_agent/`, `tests/`, `docs/`, `docker/`, `.github/`.
-* **Role-based subpackages** replace 25 flat modules:
-
-  | was | now |
-  |---|---|
-  | `molio`, `fetch`, `inspection` | `vmd_agent.inputs.*` |
-  | `detect`, `stats`, `dssp` | `vmd_agent.structure.*` |
-  | `analysis`, `timeseries`, `keyframes` | `vmd_agent.dynamics.*` |
-  | `recipes`, `representations`, `colorkey`, `annotate`, `render`, `renderers` | `vmd_agent.visual.*` |
-  | `media`, `claims`, `validation`, `provenance`, `report` | `vmd_agent.evidence.*` |
-  | `auto`, `environment`, `security`, `cli`, `server`, `bench` | unchanged |
-
-* **Layering fixed and enforced.** `dynamics.keyframes` no longer imports `visual` and `environment` no longer imports
-  `visual` (a lazy cycle). `probe_environment` (with the renderer inventory) and `select_keyframes(render=...)` now live
-  in `vmd_agent.auto`; `environment.probe_environment` reports host facts only; `dynamics.keyframes.select_keyframes`
-  is selection only. `tests/system/test_layering.py` checks every import and fails on a back-edge or a cycle
-  (mutation-tested).
-* **Tests mirror the package** (`inputs/ structure/ dynamics/ visual/ evidence/ bench/ surfaces/ system/`), mixed files
-  split, data paths centralised in `conftest.py`; sample system moved to `tests/data/sample/`. no tests added or removed.
-* **Docker files grouped in `docker/`**; build with `docker build -f docker/Dockerfile .`; `docs/TECHNICAL.md#architecture` and
-  `docs/history/` hold the guide and the change history; unused imports pruned across `src/` and `tests/`.
-
-## 0.7.0, research evidence + leaner repo
-
-### Research additions (reproduce with the commands in the README)
-* **DSSP validation** against PDB annotations and MDTraj (`validation.dssp_vs_records`, `dssp_cross_benchmark`;
-  `vmd-agent validate-dssp`).
-* **Real-noise event study** (`bench/events`): injected events on a real 20 ns ubiquitin trajectory, uniform vs
-  event-aware frames, plus a negative control (`vmd-agent bench events`).
-* **Contamination-free structures** (`bench/synth`): procedural folds with measured truth and a generator
-  self-check; `bench synth`.
-* **Real-vs-novel gap with a difficulty-adjusted contamination estimate** (difference of differences, cluster
-  bootstrap) and structure groups in the runner.
-* **Cost planner** (`bench run --dry-run`): counts calls/tokens without calling a model; prices are caller-supplied.
-* `analyze_trajectory(dt_ps=...)`; DCD header times are now flagged.
-
-### Defects found by the new evidence (fixed)
-* DCD header time trusted blindly (real trajectory: 1 ps reported, 400 ps actual).
-* Stats caption counted ligand/water chain IDs as protein chains (`n_protein_chains`, `n_chains_all`).
-
-### Leaner repository
-* Removed 126 MB of legacy PNG renders (`examples/`): the original folder still has them. Kept the real 20 ns ubiquitin
-  MD as `tests/data/ubq_md/` because the real-data tests need it.
-* Removed never-imported dependencies (`networkx`, `pandas`) and dead code (`params_for`, `panel_side`, unused imports).
-* **Removed the PyMOL backend**: it was never run and could not render frame sets. Renderers: `vmd`, `matplotlib`.
-* `DIFF_FROM_ORIGINAL.md` moved to `docs/history/CHANGES_FROM_ORIGINAL.md`; test helper now reuses the package's
-  NeRF builder instead of a duplicate copy.
-
-## 0.6.0, consolidated release (this copy)
-
-Everything below was done on a **copy** of the original project; the original folder is untouched.
-
-### Packaging, licensing, containers
-* One package: the duplicate `vmd-agent/` tree, the stale root `fetch.py`, a stray `render.dat` and
-  `README_1.md` were removed; past run outputs moved to `examples/`.
-* `LICENSE` (MIT) and `NOTICE.md` (VMD/Tachyon not bundled; **MDAnalysis is GPL**, review before publishing an image).
-* **Bring-your-own-VMD Docker setup**: `runtime` (open-source, default), `vmd-libs`, `with-vmd` targets;
-  hardened compose file; entrypoint; CI workflow. *Not built here (no Docker available).*
-* `pyproject.toml` now lists the new subpackages (they would otherwise be missing from installs), adds Pillow.
-
-### Bugs fixed (present in the original)
-* **mmCIF fallback was unusable**: `fetch` downloaded mmCIF for large entries but MDAnalysis cannot read it. Native reader added.
-* **Secondary structure silently never worked** on MDAnalysis < 2.8 (bare `except`): replaced by a built-in DSSP.
-* **Partial `CONECT` bonds reported as the full count** (a handful of bonds reported for lysozyme): detected and supplemented.
-* H-bond count ignored geometry: now angle-based when hydrogens exist; heavy-atom fallback is labelled.
-* All plots said "time (ps)" even when x was a strided frame index: honest axis labels.
-* RMSF plotted per atom while documented per residue; duplicate "most flexible" residues.
-* RMSF's in-memory alignment could corrupt later analyses in the same batch.
-* `render_movie` launched VMD once per frame and reset the camera each frame; now one session, one camera.
-* Scratch directories leaked ~5 MB per render call.
-* Colour key listed water swatches for water that was hidden; claimed STRIDE for the matplotlib backend.
-* `representations_added` ignored focus / pLDDT / explicit representation.
-* "Material" detection fired on ≥ 50 sulfur / iron / zinc atoms; split into unambiguous vs bio-relevant elements.
-* `-vsync` / `eq(n\,k)` ffmpeg usage fragile across versions; invalid-escape warning removed.
-* `Session` could be truncated by an interrupted write or crash on a corrupt file; report crashed on missing numbers.
-* Hard-coded `/home/akshay/...` paths removed from docs and messages.
-* `run_vmd_tcl` accepted arbitrary Tcl (including `exec`); `fetch` accepted `file://` and internal URLs.
-
-### Statistics replaced fixed thresholds
-* "Stable if std < 0.5 Å", "collapse if ΔRg > 1 Å", etc. → autocorrelation-aware verdicts
-  (`timeseries`): N_eff, Mann-Kendall + Theil-Sen, half-vs-half, equilibration detection, `insufficient_data` gate.
-* PBC diagnostics (per-atom half-box jumps) and optional `unwrap`.
-* `convergence` analysis.
-
-### New features
-* Renderer abstraction: **matplotlib** (open source, VMD palette), VMD, PyMOL (experimental).
-* **Event-aware keyframe selection** + evaluation metrics + closed-form uniform-sampling analysis.
-* **Claim verification** (`verify_claims`), with Shrake-Rupley ligand burial.
-* **Grounded-interpretation benchmark** (ground truth, questions, 8-condition ladder, scorer with cluster bootstrap,
-  runner, Anthropic adapter, sampling study, blinded rating-study instrument).
-* **Provenance** records and verification.
-* `vmd-agent validate` (cross-check vs independent NumPy).
-* Server: path sandbox, Tcl screening, URL policy, 3 new tools (27 total).
-* Tests added (the old "test" had no assertions).
-
-### Known gaps
-See "Honest limitations" in `vmd-agent/README.md` and `docs/PAPER.md#appendix-f-what-the-test-suite-checks-and-what-is-not-verified`.

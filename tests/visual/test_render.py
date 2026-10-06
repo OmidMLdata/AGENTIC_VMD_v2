@@ -272,8 +272,7 @@ def test_movie_is_one_vmd_session_not_one_per_frame(
 @pytest.mark.requires_vmd
 def test_movie_without_ffmpeg_keeps_the_rendered_frames(
         real_vmd, real_tachyon, sample, tmp_path, monkeypatch):
-    if shutil.which("ffmpeg") is not None:
-        monkeypatch.setenv("PATH", "")          # really hide the real ffmpeg
+    monkeypatch.setattr(render, "find_ffmpeg", lambda: None)     # as if there were no ffmpeg at all
     pdb, dcd = sample
     out = render.render_movie(pdb, dcd, detection=detect_system(pdb, dcd),
                               out_mp4=str(tmp_path / "m.mp4"), width=160,

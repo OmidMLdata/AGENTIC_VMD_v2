@@ -8,7 +8,7 @@
 
 Every import is checked, including those inside functions, so a lazy import
 cannot smuggle in a back-edge. If this fails, either fix the dependency or
-update docs/TECHNICAL.md#architecture and this table together.
+update the Architecture section of the README and this table together.
 """
 import ast
 import os
@@ -16,8 +16,11 @@ import os
 import pytest
 
 SRC = os.path.join(os.path.dirname(__file__), "..", "..", "src", "vmd_agent")
-FOUNDATION = ("environment", "security")
-COMPOSERS = ("auto", "cli", "server", "mcp_check", "__init__")
+FOUNDATION = ("environment", "security", "llm_client", "platform_info", "settings",
+              "models", "ollama_local")
+
+COMPOSERS = ("auto", "cli", "server", "mcp_check", "toolset", "chat",
+             "launcher", "wizard", "vmd_tools", "vmd_cli", "__init__")
 
 ALLOWED = {
     "inputs": set(),
@@ -25,10 +28,16 @@ ALLOWED = {
     "dynamics": {"inputs", "structure"},
     "visual": {"inputs", "structure", "environment", "security"},
     "evidence": {"inputs", "structure", "dynamics", "environment", "security"},
+    "vmdkit": {"inputs", "structure", "visual", "environment", "security"},
     "bench": {"inputs", "structure", "dynamics", "visual", "evidence", "auto",
-              "environment", "security"},
-    "environment": set(),
-    "security": set(),
+              "environment", "security", "llm_client", "platform_info", "settings"},
+    "environment": {"platform_info", "settings"},
+    "security": {"settings"},
+    "llm_client": set(),
+    "platform_info": set(),
+    "settings": set(),
+    "models": set(),
+    "ollama_local": {"platform_info", "settings"},
 }
 
 
@@ -97,7 +106,9 @@ def test_no_import_cycles_between_units():
             visit(u, [])
 
 
-def test_foundation_modules_import_nothing_from_the_package():
+def test_foundation_modules_import_only_other_foundations():
+    """environment may use platform_info (what OS is this); nothing else."""
     edges = _edges()
     for u in FOUNDATION:
-        assert not edges.get(u), (u, edges.get(u))
+        used = {target for target, _src in (edges.get(u) or set())}
+        assert used <= set(FOUNDATION), (u, used)

@@ -1,7 +1,7 @@
 """Benchmarks.
 
 ``bench.agent`` is the primary study: end-to-end VMD-automation tasks for LLM
-agents (see ``docs/PAPER.md#5-the-automation-benchmark``). The modules below implement the
+agents (see ``docs/RESEARCH.md#5-the-automation-benchmark``). The modules below implement the
 secondary grounded-interpretation component study.
 
 Research question: does structured grounding (a visual legend, colour keys and

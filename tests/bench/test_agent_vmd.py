@@ -277,3 +277,17 @@ def test_cli_preflight_exit_codes(capsys):
     with pytest.raises(SystemExit) as e:
         cli.main(["bench", "agent-preflight", "--arms", "python_mdanalysis"])
     assert e.value.code == 2
+
+
+def test_preflight_for_an_open_model_names_an_unreachable_server_clearly():
+    import socket
+    sock = socket.socket()
+    sock.bind(("127.0.0.1", 0))
+    port = sock.getsockname()[1]
+    sock.close()
+    r = pf.preflight(["vmd_agent"], model="some-model", provider="openai",
+                     base_url=f"http://127.0.0.1:{port}/v1")
+    assert not r["ready"] and "llm_server" in r["blocking"]
+    by = {c["name"]: c for c in r["checks"]}
+    assert "cannot reach the model server" in by["llm_server"]["detail"]
+    assert "api_key" not in by                  # a local model needs no key

@@ -44,9 +44,8 @@ from vmd_agent.visual.representations import (
 )
 
 # Parameters come from the representation catalogue so there is a single
-# source of truth; a few legacy aliases are kept for backwards compatibility.
+# source of truth.
 _REP_PARAMS = {name: rep["params"] for name, rep in REPRESENTATIONS.items()}
-_REP_PARAMS.setdefault("Surf", "1.400000 0.000000")
 
 
 def _auto_protein_reps(detection: dict, plddt_coloring: bool = False,
