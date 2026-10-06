@@ -210,11 +210,6 @@ def test_models_command_prints_the_dated_table(capsys):
     assert models.MODELS_CHECKED in out and models.DEFAULT_MODEL in out
 
 
-def test_there_is_one_script_that_runs_everything_and_the_readme_names_it():
-    assert os.path.exists(os.path.join(ROOT, "scripts", "dev.py"))
-    assert "python scripts/dev.py test" in open(os.path.join(ROOT, "README.md")).read()
-
-
 # ------------------------------------------------------------------ the VMD version policy
 def test_no_version_is_claimed_tested_without_evidence():
     # a version is listed only after the real-VMD tests passed against it (1.9.4a57, 2026-10-06)

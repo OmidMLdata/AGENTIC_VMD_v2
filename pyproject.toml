@@ -43,7 +43,7 @@ server = ["mcp>=1.2.0"]
 sasa = ["freesasa"]
 dssp = ["mdtraj"]            # only to cross-check the built-in DSSP (vmd-agent validate-dssp)
 bench = ["anthropic"]
-# what `python scripts/dev.py test` needs: the tests, a linter and a dead-code finder
+# what the checks in the README's Development section need: the tests, a linter and a dead-code finder
 dev = ["pytest>=7", "hypothesis", "pyyaml", "ruff", "vulture"]
 all = ["mcp>=1.2.0", "freesasa", "mdtraj", "anthropic", "pytest>=7", "hypothesis", "pyyaml", "ruff", "vulture"]
 

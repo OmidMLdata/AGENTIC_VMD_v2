@@ -11,8 +11,8 @@ jobs:
       matrix:
         python: ["3.9", "3.12"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python }}
       - name: System packages
@@ -28,7 +28,7 @@ jobs:
       # are SKIPPED on CI (VMD cannot be installed from a public package); -rs
       # prints every skip with its reason. Run them on a machine that has VMD.
       - name: Lint, dead-code check and the whole test suite
-        run: pip install ruff vulture && python scripts/dev.py test
+        run: pip install ruff vulture && ruff check src tests && vulture && pytest -q -rs
       - name: Cross-validation against independent NumPy
         run: vmd-agent validate tests/data/sample/sample.pdb tests/data/sample/sample.dcd --sel2 "resname LIG" --cutoff 6
 
@@ -36,8 +36,8 @@ jobs:
     # The server supports both MCP SDK generations; test the older one for real.
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.12"
       - run: pip install -e ".[dev]" "mcp<2"
@@ -47,7 +47,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: test
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Build the open-source image (no VMD)
         run: docker build -f docker/Dockerfile -t vmd-agent:ci .
       - name: Smoke test

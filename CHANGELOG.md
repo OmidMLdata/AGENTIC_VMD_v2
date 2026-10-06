@@ -4,9 +4,8 @@
 
 * **Fewer files, nothing lost.** `start.sh` and `start.ps1` became `vmd-agent start` (and `vmd-agent start --down` stops the containers);
   `docker/bench.sh` became `vmd-agent bench docker ACTION [--mode plain|hostvmd|withvmd]` (same actions, same exit codes, the macOS-binary refusal
-  is kept); `scripts/test.py` and `scripts/publish.sh` became one `scripts/dev.py` (`test`, `publish`; publishing now also fast-forwards a branch
-  you already published, and still never overwrites or forces); `requirements.txt` and `requirements-all.txt` were removed (`pyproject.toml` is the
-  one list; `pip install -e ".[all]"`). `install.sh` and `install.ps1` stay a pair: they run before Python exists, in two different shells.
+  is kept); the checks are plain `ruff check src tests`, `vulture` and `pytest -rs` (no helper scripts ship in the repository); `requirements.txt` and `requirements-all.txt` were removed (`pyproject.toml` is the
+  one list; `pip install -e ".[all]"`). CI actions bumped to checkout v7 and setup-python v7. `install.sh` and `install.ps1` stay a pair: they run before Python exists, in two different shells.
 * **One flow.** The README follows the pipeline (set up, get a structure, look, measure, run a whole job, drive VMD, check and keep records);
   `vmd-agent --help` and `vmd-agent vmd` list commands in that same order.
 

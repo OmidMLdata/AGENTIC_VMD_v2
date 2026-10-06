@@ -117,7 +117,7 @@ VMD's licence requires you to accept it yourself).
 * The version is **not enforced**. It is read (`vmdinfo version`), shown by `vmd-agent doctor` and setup, recorded in every
   provenance record, and flagged when it is not a tested version or is outside 1.9.x (2.0, 1.8, a dev build), where VMD's scripting
   may behave differently. The tested list is `VMD_VERSIONS_TESTED` in `environment.py`; to add yours, run
-  `python scripts/dev.py test` with VMD installed and tell the author what passed.
+  `pytest -rs` with VMD installed and tell the author what passed.
 * VMD's own pages list 1.9.3 and 1.9.4 as of 2026-10-06; which one is the current stable release was not confirmed.
 
 **How VMD is handled:** the toolkit finds VMD on your OS, proves it starts (and says why if not: missing `tcsh`, missing libraries,
@@ -460,7 +460,7 @@ installed VMD has a plugin the table does not know, so the table cannot silently
 | **Results** | **none are included.** This repository ships no measured results, benchmark scores or model evaluations; everything is produced by running the commands on your own data. |
 
 Tests that need something the machine lacks are **skipped with the reason shown, never counted as passed**. Run everything with
-`python scripts/dev.py test` (lint, dead-code check, the whole suite, every skip listed).
+`ruff check src tests`, `vulture` and `pytest -rs` (lint, dead-code check, the whole suite, every skip listed).
 
 The repository also holds a **benchmark** (*can an LLM agent carry out VMD analysis and visualization workflows correctly, and say so
 when it cannot?*): six task families with answers known by construction, scored on success and **silent errors**. `vmd-agent` is one
@@ -644,10 +644,7 @@ Every other command is in [Every command](#ways-to-work). The benchmark ones (`v
 ### Contributing and publishing
 
 * **Set up for development:** `pip install -e ".[dev]"` (the `dev` extra is pytest, hypothesis, pyyaml, ruff and vulture; `".[all]"` adds the optional parts).
-* **Check everything:** `python scripts/dev.py test` runs lint, the dead-code check and the whole suite (CI runs the same command).
-* **Publish to GitHub:** `python scripts/dev.py publish` (`--no-push` for a local commit only; `--branch NAME`; `GITHUB_REPO=owner/name` to publish elsewhere; `--skip-workflows` if your token lacks the `workflow` scope). It starts a git
-  repository if there is none, starts a new branch from the remote's main or fast-forwards a branch you already published (it never overwrites or forces), refuses to commit anything that looks like a secret (an API key, a private key, a saved `llm_key`) or any file over 5 MB
-  outside `tests/data`, shows what it will commit, then pushes with the GitHub CLI or tells you the two commands to run by hand.
+* **Check everything:** `ruff check src tests`, `vulture` and `pytest -q -rs` (lint, dead-code check, the whole suite with every skip listed; CI runs the same three).
 * **`.gitignore`** keeps out caches and build output, editor files, everything vmd-agent writes while running (`vmd_scripts/`, `vmd_agent_output/`,
   `pdb_cache/`, `/data/`), anything that could hold a key (`.env`, `settings.json`, `/config/`), and VMD itself (`docker/vmd-dist/*`, which UIUC's
   licence forbids committing). A test checks that these stay ignored and that the test data stay tracked.
@@ -674,8 +671,8 @@ build has no `ffprobe`, so video metadata and frame counts are then read with `f
 #### 2. Run the tests
 
 ```bash
-python scripts/dev.py test    # lint + dead-code check + the whole suite, skip reasons listed; works on every OS
-pytest -rs                    # or just the tests
+ruff check src tests && vulture   # lint + dead-code check (settings are in pyproject.toml)
+pytest -q -rs                      # the whole suite; every skip is listed with its reason
 ```
 
 Tests that need something the machine lacks are skipped with the reason shown (`requires_vmd`, `requires_ffmpeg`,
@@ -890,7 +887,7 @@ ones; no cycles):
 ### Tests
 
 `tests/` mirrors `src/vmd_agent/` (`inputs/ structure/ dynamics/ visual/ evidence/ bench/`) plus `surfaces/`
-(the server through the real MCP SDK, CLI) and `system/` (security, environment). About 700 tests, a few minutes; `python scripts/dev.py test` runs everything.
+(the server through the real MCP SDK, CLI) and `system/` (security, environment). About 700 tests, a few minutes; `pytest -rs` runs everything.
 Real data in `tests/data/`. **Nothing stands in for another program.** Tests that need a real VMD/Tachyon, ffmpeg, the MCP SDK
 (Python >= 3.10), the network or a live model are marked `requires_vmd`, `requires_ffmpeg`, `requires_mcp`,
 `requires_network`, `requires_api` and are **skipped, with the reason shown**, where that is missing: run `pytest -rs`
