@@ -70,5 +70,6 @@ else
   printf 'Installed. Now run:  %s setup\n' "$RUN"
 fi
 
-printf '\nDone. Next time run:  %s\n' "$RUN"
+printf '\nDone. The web page (your files, the chat, whole jobs):  %s ui\n' "$RUN"
+printf 'The numbered menu, any time:  %s\n' "$RUN"
 printf 'To remove everything, just delete this folder: %s\n' "$VMD_AGENT_HOME"

@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import os
 import re
+import time
 from abc import ABC, abstractmethod
 from typing import Dict, List, Optional
 
@@ -348,11 +349,15 @@ class LLMAgent:
         from vmd_agent.bench.agent.tools import render_result
         msgs = [{"role": "user", "content": task["prompt"]}]
         t_in = t_out = 0
+        model_s, model_calls = 0.0, 0
         for _ in range(self.max_turns):
+            t0 = time.time()
             resp = self.client.messages.create(
                 model=self.model, max_tokens=self.max_tokens,
                 temperature=self.temperature, system=self.system,
                 tools=env.tool_specs(), messages=msgs)
+            model_s += time.time() - t0
+            model_calls += 1
             use = getattr(resp, "usage", None)
             t_in += getattr(use, "input_tokens", 0) or 0
             t_out += getattr(use, "output_tokens", 0) or 0
@@ -372,7 +377,7 @@ class LLMAgent:
             msgs.append({"role": "user", "content": results})
             if env.submitted is not None or len(env.log) >= env.max_steps:
                 break
-        return {"tokens_in": t_in, "tokens_out": t_out}
+        return {"tokens_in": t_in, "tokens_out": t_out, "model_s": round(model_s, 2), "model_calls": model_calls}
 
 
 class OpenAICompatAgent:
@@ -404,11 +409,15 @@ class OpenAICompatAgent:
         msgs = [{"role": "system", "content": self.system},
                 {"role": "user", "content": task["prompt"]}]
         t_in = t_out = 0
+        model_s, model_calls = 0.0, 0
         for _ in range(self.max_turns):
+            t0 = time.time()
             resp = chat_completion(self.base_url, self.model, msgs, tools=tools,
                                    api_key=self.api_key,
                                    temperature=self.temperature,
                                    timeout=self.timeout)
+            model_s += time.time() - t0
+            model_calls += 1
             parsed = parse_choice(resp, names)
             t_in += parsed["usage"]["input_tokens"]
             t_out += parsed["usage"]["output_tokens"]
@@ -427,5 +436,5 @@ class OpenAICompatAgent:
                                          render_result(out)))
             if env.submitted is not None or len(env.log) >= env.max_steps:
                 break
-        return {"tokens_in": t_in, "tokens_out": t_out}
+        return {"tokens_in": t_in, "tokens_out": t_out, "model_s": round(model_s, 2), "model_calls": model_calls}
 

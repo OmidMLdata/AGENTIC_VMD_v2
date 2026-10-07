@@ -177,7 +177,7 @@ def vmd_build_system(input_pdb: str, out_prefix: str, selection: str = "protein"
 @tool()
 def vmd_mutate_residue(psf: str, pdb: str, out_prefix: str, segid: str, resid: int, new_resname: str,
                        vmd_path: Optional[str] = None) -> dict:
-    """Mutate one residue in a PSF/PDB pair (VMD mutator plugin), e.g. segid P0, resid 6, new_resname ALA."""
+    """Mutate one residue in a PSF/PDB pair (VMD mutator plugin), e.g. segid P0, resid 6, new_resname ALA. Use a dry system (vmd_build_system with solvate=false): it failed on a solvated one."""
     return _run("vmd_mutate_residue", build.mutate_residue, psf=_p(psf), pdb=_p(pdb), out_prefix=_p(out_prefix),
                 segid=segid, resid=resid, new_resname=new_resname, vmd_path=_p(vmd_path))
 

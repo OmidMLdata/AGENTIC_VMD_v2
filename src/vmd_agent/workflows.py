@@ -146,7 +146,12 @@ def equilibration_check(topology: str, trajectory: str, out_dir: str, options: d
             run.figure(r["plot"])
     drift = (res.get("rgyr") or {}).get("start_vs_end", {})
     if drift.get("significant"):
-        run.finding("warning", "the radius of gyration changed significantly between the start and the end of the run.")
+        size = abs(drift.get("diff", 0.0)) / max(abs(drift.get("start_mean") or 0.0), 1e-9)
+        if size >= 0.01:           # a change a person would care about
+            run.finding("warning", f"the radius of gyration changed by {size:.1%} between the start and the end of the run.")
+        else:                      # detectable with many frames, but too small to matter
+            run.finding("note", f"the radius of gyration differs between the start and the end by {abs(drift['diff']):.3f} Å "
+                                f"({size:.2%}): statistically detectable, too small to matter.")
     pbc = an.get("pbc") or {}
     if pbc.get("n_jump_frames") or pbc.get("n_split_frames"):
         run.finding("warning", f"the molecule is split across the periodic box in {pbc.get('n_split_frames', 0)} frame(s) "

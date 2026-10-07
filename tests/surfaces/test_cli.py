@@ -223,11 +223,19 @@ def _flags_of(sub, command):
     return flags
 
 
-def test_every_command_and_every_flag_the_readme_names_exists():
-    """The README tables are the user's manual: a command or flag that is not real fails here."""
+def _docs_text():
+    """README and every page of docs/: the manual a user reads."""
+    import glob
     import os
+    base = os.path.join(os.path.dirname(__file__), "..", "..")
+    paths = [os.path.join(base, "README.md")] + sorted(glob.glob(os.path.join(base, "docs", "*.md")))
+    return "\n".join(open(p, encoding="utf-8").read() for p in paths)
+
+
+def test_every_command_and_every_flag_the_manual_names_exists():
+    """The README tables are the user's manual: a command or flag that is not real fails here."""
     import re
-    readme = open(os.path.join(os.path.dirname(__file__), "..", "..", "README.md"), encoding="utf-8").read()
+    readme = _docs_text()
     _, sub, cmds = _all_commands()
     seen = set()
     for line in readme.splitlines():
@@ -249,9 +257,8 @@ def test_every_command_and_every_flag_the_readme_names_exists():
     assert not missing, f"commands the README's tables do not describe: {sorted(missing)}"
 
 
-def test_every_vmd_command_is_described_in_the_readme():
-    import os
+def test_every_vmd_command_is_described_in_the_manual():
     from vmd_agent import vmd_cli
-    readme = open(os.path.join(os.path.dirname(__file__), "..", "..", "README.md"), encoding="utf-8").read()
+    readme = _docs_text()
     for n in vmd_cli.VMD_TOOLS:
         assert f"vmd-agent vmd {vmd_cli.command_name(n)}" in readme, n

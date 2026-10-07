@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.19.0: a README and docs, a web page, a tool test set, wall-clock times
+
+* **README and docs.** The README is now a README (what it is, install, use, the pipeline, what is verified, links); everything else moved into `docs/`:
+  install, ways to work, the command reference, models, workflows, VMD, the tools, MCP, Docker, development, architecture, methods, security, with an index.
+* **`vmd-agent ui`**: the toolkit in a web page on your computer (files with drop-to-add, the chat with every tool call as a card with its progress, pictures
+  and seconds, and a tab for whole jobs). Standard library only; listens on 127.0.0.1 only, with a one-time key, and reads and writes only inside your
+  files folder. The installer's last words, the end of setup and the first menu item all lead to it.
+* **The tool test set** (`vmd-agent bench tools`, `bench dataset`): a generated dataset whose properties are known by construction (a drifting trajectory, a
+  disulfide, a ligand, a density map, a video) and at least one case for each of the 53 tools, with negative cases (a wrong request must be refused). A test
+  fails if any tool has no case. It found two things: the settled-run check graded a statistically detectable 0.03 % change in the radius of gyration a
+  warning (it is now a warning only above 1 %), and mutating a solvated system fails in VMD's mutator (the error now says to mutate the dry system first).
+* **Wall-clock time of every execution.** Each model call and each tool call is timed: the terminal chat prints it per tool and per answer (`/time` for the
+  totals), the web page shows it per card, and the benchmark's records have `model_s`, `model_calls` and `tool_s` next to `wall_s`.
+* **Tool counts.** The stale "47 tools (27 plus 20)" in `docs/RESEARCH.md` and the chat help is corrected: 27 original + 24 that drive VMD + 2 whole-job tools = 53
+  (`docs/tools.md`, which says who gets which tools and what the benchmark's separate arm tools are).
+
 ## 0.18.0: fewer files, one flow
 
 * **Fewer files, nothing lost.** `start.sh` and `start.ps1` became `vmd-agent start` (and `vmd-agent start --down` stops the containers);

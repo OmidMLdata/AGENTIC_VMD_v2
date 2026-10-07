@@ -107,6 +107,7 @@ class Environment:
         self.blocked = 0
         self.tool_errors = 0
         self.t0 = time.time()
+        self.tool_s = 0.0
 
     # ---- specs
     def tool_specs(self) -> List[dict]:
@@ -130,6 +131,7 @@ class Environment:
     # ---- dispatch
     def call(self, name: str, args: Optional[dict] = None) -> dict:
         args = args if isinstance(args, dict) else {}
+        started = time.time()
         if name not in self.names:
             res = {"error": f"unknown tool '{name}'"
                             if name not in _SPECS else
@@ -149,12 +151,15 @@ class Environment:
         failed = isinstance(res, dict) and bool(res.get("error"))
         if failed and not res.get("blocked"):
             self.tool_errors += 1
+        seconds = time.time() - started
+        self.tool_s += seconds
         self.log.append({"tool": name, "args": compact(args),
-                         "error": failed})
+                         "error": failed, "seconds": round(seconds, 3)})
         return res
 
     def stats(self) -> dict:
         return {"tool_calls": len(self.log), "tool_errors": self.tool_errors,
+                "tool_s": round(self.tool_s, 2),
                 "blocked": self.blocked,
                 "wall_s": round(time.time() - self.t0, 2)}
 

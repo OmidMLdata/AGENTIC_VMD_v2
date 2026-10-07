@@ -312,6 +312,8 @@ def summarize_agents(records: Sequence[dict], by: str = "label",
             "mean_tool_calls": float(np.mean(
                 [r.get("tool_calls", 0) for r in rows])),
             "mean_wall_s": float(np.mean([r.get("wall_s", 0) for r in rows])),
+            "mean_model_s": float(np.mean([r.get("model_s") or 0 for r in rows])),   # wall-clock inside the model's calls
+            "mean_tool_s": float(np.mean([r.get("tool_s") or 0 for r in rows])),     # wall-clock inside the tools
             "tokens_in": int(sum(r.get("tokens_in") or 0 for r in rows)),
             "tokens_out": int(sum(r.get("tokens_out") or 0 for r in rows)),
             "by_family": fams}

@@ -200,7 +200,7 @@ def test_status_shows_each_setting_and_whether_the_model_answers(tmp_path):
 
 # -------------------------------------------------------------------- the menu
 def test_the_menu_quits_and_offers_setup_on_a_first_visit():
-    io_ = Typed(["n", "8"])                              # no setup, quit
+    io_ = Typed(["n", "9"])                              # no setup, quit
     assert wizard.menu(io_) == 0
     assert "first time" in io_.text and "What would you like to do?" in io_.text
 
@@ -211,7 +211,7 @@ def test_the_menu_runs_a_real_check_of_a_statement(tmp_path):
     out = io.StringIO()
     real_stdout, sys.stdout = sys.stdout, out
     try:
-        wizard.menu(Typed(["4", "lysozyme.pdb", "It has 4 disulfide bridges", "8"]))
+        wizard.menu(Typed(["5", "lysozyme.pdb", "It has 4 disulfide bridges", "9"]))
     finally:
         sys.stdout = real_stdout
     assert "supported" in out.getvalue()                 # the real verifier ran
@@ -224,7 +224,7 @@ def test_the_menu_runs_a_real_analysis_on_files_in_the_users_folder(tmp_path):
     out = io.StringIO()
     real_stdout, sys.stdout = sys.stdout, out
     try:
-        wizard.menu(Typed(["3", "sample.pdb", "sample.dcd", "rgyr", "8"]))
+        wizard.menu(Typed(["4", "sample.pdb", "sample.dcd", "rgyr", "9"]))
     finally:
         sys.stdout = real_stdout
     assert "rgyr" in out.getvalue().lower()
@@ -238,7 +238,7 @@ def test_ending_the_input_stream_leaves_the_menu_cleanly(monkeypatch):
 
 def test_the_menu_never_shows_a_traceback_for_a_bad_file(tmp_path):
     settings.save(data_dir=str(tmp_path), setup_done=True)
-    io_ = Typed(["4", "missing.pdb", "It has a membrane", "8"])
+    io_ = Typed(["5", "missing.pdb", "It has a membrane", "9"])
     assert wizard.menu(io_) == 0
 
 
@@ -281,3 +281,10 @@ def test_the_readme_install_lines_point_at_files_that_exist():
     readme = open(os.path.join(ROOT, "README.md")).read()
     for f in ("install.sh", "install.ps1"):
         assert f"main/{f}" in readme and os.path.exists(os.path.join(ROOT, f))
+
+
+def test_the_menu_opens_the_web_page_first():
+    seen = []
+    assert wizard.menu(Typed(["n", "1", "9"]), run_cli=lambda argv: seen.append(argv) or 0) == 0
+    assert seen == [["ui"]]
+    assert wizard.MENU[0].startswith("The web page") and wizard.MENU[-1] == "Quit"

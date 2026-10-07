@@ -188,9 +188,36 @@ def _bench_agent(args):
         print(open(f"{args.out_dir}/summary.md").read())
 
 
+def _bench_tools(args) -> int:
+    from vmd_agent import tool_cases, tool_dataset
+    if args.bench_cmd == "dataset":
+        info = tool_dataset.make_dataset(args.folder)
+        print(f"wrote {len(info['files'])} files to {args.folder}: " + ", ".join(sorted(info["files"])))
+        return 0
+    if args.list:
+        for c in tool_cases.CASES:
+            print(f"{c.id:34s} {c.tool:30s} {('needs ' + ', '.join(c.needs)) if c.needs else ''}")
+        print(f"{len(tool_cases.CASES)} cases, {len(tool_cases.covered_tools())} tools")
+        return 0
+    try:
+        records = tool_cases.run(args.data_dir, args.only, log=None if args.json else print, skip=args.skip)
+    except ValueError as e:
+        print(f"vmd-agent bench tools: {e}", file=sys.stderr)
+        return 2
+    summ = tool_cases.summary(records)
+    if args.json:
+        print(json.dumps({"summary": summ, "records": [r.__dict__ for r in records]}, indent=1, default=str))
+    else:
+        print(f"\n{summ['pass']} passed, {summ['fail']} failed, {summ['skip']} skipped ({summ['tools_covered']} tools exercised, "
+              f"{summ['seconds']} s of tool time)")
+    return 1 if summ["fail"] else 0
+
+
 def _bench(args):
     from vmd_agent import bench
     from vmd_agent.bench import sampling, rating_study, conditions
+    if args.bench_cmd in ("tools", "dataset"):
+        return _bench_tools(args)
     if args.bench_cmd == "docker":
         from vmd_agent import launcher
         rest, mode = list(args.rest), args.mode
@@ -268,7 +295,7 @@ GROUPS = [
     ("5. Run a whole job and get a report", ["workflow", "report"]),
     ("6. Drive VMD itself (needs VMD)", ["vmd"]),
     ("7. Check and keep records", ["probe-video", "interpret-video", "provenance", "validate", "validate-dssp", "bench"]),
-    ("Ask in plain language", ["menu", "chat"]),
+    ("Ask in plain language", ["ui", "menu", "chat"]),
     ("Connect other programs", ["mcp-config", "mcp-check", "tools", "tool"]),
     ("This computer", ["probe", "renderers"]),
 ]
@@ -490,8 +517,17 @@ def build_parser():
     sp.add_argument("--no-stream", action="store_true",
                     help="show each answer when it is complete instead of as it is written")
     sp.add_argument("--tools", choices=["all", "core", "vmd"], default="all",
-                    help="which tools the model gets: all (47), core (the original 27) or vmd (the ones that drive "
-                         "VMD itself); fewer tools suit small models better")
+                    help="which tools the model gets: all (53), core (the original 27) or vmd (the 24 that drive "
+                         "VMD itself, the 2 workflow tools, inspect_files and probe_environment: 28); fewer tools suit small models better")
+    sp = sub.add_parser("ui", help="the toolkit in a web page on this computer: your files, the chat with the seconds each step "
+                        "took, and the whole jobs (opens your browser)")
+    sp.add_argument("--data-dir", help="the files folder (default: your saved setting, else the current folder)")
+    sp.add_argument("--port", type=int, default=0, help="the port on this computer (default: any free one)")
+    sp.add_argument("--no-browser", action="store_true", help="print the address and do not open the browser")
+    sp.add_argument("--base-url", help="model server address (default: your saved setting)")
+    sp.add_argument("--model", help="model name (default: your saved setting)")
+    sp.add_argument("--api-key", help="API key if the server needs one")
+    sp.add_argument("--tools", choices=["all", "core", "vmd"], default="all", help="which tools the chat gets")
     sp = sub.add_parser("mcp-check", help="check an MCP server install the way a "
                         "real client uses it (needs the mcp SDK, Python >= 3.10)")
     sp.add_argument("--roots", nargs="+", help="allowed root directories to give the server")
@@ -599,6 +635,15 @@ def build_parser():
     b.add_argument("--live-api", action="store_true",
                    help="make one tiny API call to prove the key and model work")
     b.add_argument("--no-require-container", action="store_true")
+    b = bsub.add_parser("tools", help="the tool test set: run every tool on a generated dataset whose answers are known "
+                        "by construction, with the wall-clock seconds of each")
+    b.add_argument("--data-dir", default="tool_testset", help="where the dataset and the tools' outputs are written")
+    b.add_argument("--only", nargs="+", metavar="ID_OR_TOOL", help="run only these cases (or all cases of these tools)")
+    b.add_argument("--skip", nargs="+", default=[], choices=["vmd", "ffmpeg", "network"], help="do not run cases that need these")
+    b.add_argument("--list", action="store_true", help="list the cases and what each needs, and run nothing")
+    b.add_argument("--json", action="store_true", help="print the records as JSON")
+    b = bsub.add_parser("dataset", help="write the tool test set's files (a protein, a trajectory, maps, a video) and stop")
+    b.add_argument("folder")
     b = bsub.add_parser("docker", help="run the benchmark commands in a container with your VMD (Linux VMD only; "
                         "check-vmd tests the VMD you point at)")
     b.add_argument("action", choices=["check-vmd", "preflight", "suite", "plan", "run", "shell"])
@@ -653,6 +698,9 @@ def main(argv=None):
                                 data_dir=args.data_dir, vmd=args.vmd, model=args.model,
                                 model_choice={"local": 1, "online": 2, "app": 3,
                                               "skip": 4}.get(args.use))
+        if args.cmd == "ui":
+            from vmd_agent import ui
+            return ui.main(args.data_dir, args.port, not args.no_browser, args.base_url, args.model, args.api_key, args.tools)
         if args.cmd == "menu":
             from vmd_agent import wizard
             return wizard.menu()
@@ -918,7 +966,9 @@ def main(argv=None):
             from vmd_agent.visual.renderers import list_renderers
             _print(list_renderers(args.vmd))
         elif args.cmd == "bench":
-            _bench(args)
+            code = _bench(args)
+            if code:
+                return code
         elif args.cmd == "report":
             s = report_mod.Session(args.session_dir)
             r = report_mod.assemble_report(s.data, title=args.title,

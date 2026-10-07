@@ -141,7 +141,7 @@ def test_the_catalogue_is_consistent():
 
 
 def test_the_readme_lists_exactly_the_catalogue_with_its_date():
-    readme = open(os.path.join(ROOT, "README.md")).read()
+    readme = open(os.path.join(ROOT, "docs", "models.md")).read()
     assert models.MODELS_CHECKED in readme
     for m in models.CATALOGUE:
         assert f"`{m.tag}`" in readme, m.tag
@@ -229,5 +229,5 @@ def test_an_unreadable_version_is_said_so():
 
 
 def test_the_readme_says_which_vmd_version_and_that_none_was_tested():
-    r = open(os.path.join(ROOT, "README.md")).read()
+    r = open(os.path.join(ROOT, "docs", "vmd.md")).read()
     assert "## Which VMD version?" in r and "1.9.x" in r and "1.9.4a57" in r and "Not tested:" in r

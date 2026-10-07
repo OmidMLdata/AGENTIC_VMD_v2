@@ -14,7 +14,7 @@ The study design, the draft analysis plan and a comparison with the original pro
 repository contains no measured results.** The toolkit and the benchmark are built and tested; no language model has been
 evaluated, and no numbers from running the validation or the benchmark are recorded anywhere in the repository. Every
 quantity below is a design parameter (a threshold, a tolerance, a count of tools or task families), and every claim that
-would be a result is replaced by the command that produces it. Run the commands in the [development guide](../README.md#running-and-reproducing)
+would be a result is replaced by the command that produces it. Run the commands in the [development guide](development.md#running-and-reproducing)
 to obtain your own numbers.*
 
 ---
@@ -145,7 +145,7 @@ split molecule, damaged coordinates) the toolkit says so in the result, not only
 #### 3.2 Surfaces
 
 The same functions are exposed three ways: a Python library, a command line (`vmd-agent`, with subcommands from `probe` and
-`detect` to `analyze`, `keyframes`, `claims`, `validate`, `provenance` and `bench`), an MCP server with 47 tools (27 at the time of the original study design, 20 more that drive VMD itself), and a built-in chat front end (`vmd-agent chat`) that gives the same tools to any
+`detect` to `analyze`, `keyframes`, `claims`, `validate`, `provenance` and `bench`), an MCP server with 53 tools (27 at the time of the original study design, 24 more that drive VMD itself, and 2 that run whole workflows), and a built-in chat front end (`vmd-agent chat`) that gives the same tools to any
 OpenAI-compatible model, local open-source or hosted, so no MCP client is required. The
 original project this work extends exposed 24 tools and 16 command-line subcommands; all were retained (Section 12.1).
 
@@ -993,7 +993,7 @@ CI.
 * **DSSP versus `mkdssp` itself.** Compare it on your structures.
 * **Real VMD / Tachyon / ffmpeg:** the tests that need them are skipped where the program is absent. The VMD/Tachyon ones passed once
   against VMD 1.9.4a57 on macOS arm64; ffmpeg was absent there, and Linux and Windows VMD builds were never tried.
-* **Docker images:** never built (see [Docker](../README.md#docker)).
+* **Docker images:** never built (see [Docker](docker.md)).
 * **The MCP SDK:** tested through the real SDK where installed; not run in a real MCP client by the author.
 * **Real language models:** no benchmark has been run.
 * **Keyframes on real events:** the event study keeps the noise real but the *event* synthetic (a rigid motion). It does
@@ -1411,7 +1411,7 @@ Docker images unbuilt · real VMD/ffmpeg never run (fakes only) · no real-model
 ### 14. Third round: repository restructure (paths in sections 1 to 13 describe the *original* layout)
 
 `src/` layout at the repo root; role-based subpackages `inputs/ structure/ dynamics/ visual/ evidence/` (+ `bench/`);
-tests mirror the package; Docker files in `docker/`; the Architecture and Methods sections of the [README](../README.md); layering enforced by
+tests mirror the package; Docker files in `docker/`; the [Architecture](architecture.md) and [Methods](methods.md) pages; layering enforced by
 `tests/system/test_layering.py`. `probe_environment` and `select_keyframes(render=...)` moved to `vmd_agent.auto`
 (still exported from `vmd_agent`). Deep imports changed; see the table in `CHANGELOG.md`.
 

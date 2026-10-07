@@ -348,9 +348,12 @@ def setup(io: Optional[IO] = None, assume_yes: bool = False, check_only: bool = 
     io.say("\nStep 4 of 4: Finishing")
     settings.save(setup_done=True)
     io.say(f"  Your choices are saved ({settings.path()}).")
-    io.say("\nAll set. From now on just type:   vmd-agent")
+    io.say("\nAll set. From now on just type:   vmd-agent        (or  vmd-agent ui  for the web page)")
     if pick in (1, 2) and not ready:
         io.say("(The chat needs the model above to be ready first; the other features work already.)")
+    if not assume_yes and io.confirm("\nOpen the web page now? (your files, the chat and whole jobs, in your browser; Ctrl+C in this window stops it)", True):
+        from vmd_agent import cli
+        cli.main(["ui"])
     return 0
 
 
@@ -388,7 +391,8 @@ def _in_data(path: str) -> str:
     return os.path.join(base, p) if base else p
 
 
-MENU = ["Chat: ask questions about my files, or ask it to run VMD for you (measure, build a system, export a scene)",
+MENU = ["The web page: my files, the chat, whole jobs and pictures in one browser window (recommended)",
+        "Chat: ask questions about my files, or ask it to run VMD for you (measure, build a system, export a scene)",
         "Look at a structure (a PDB ID like 1UBQ, or one of my files): pictures and a description",
         "Analyse a simulation: RMSD, flexibility, size, contacts ...",
         "Check statements about a structure against its data",
@@ -414,8 +418,10 @@ def menu(io: Optional[IO] = None, run_cli: Optional[Callable[[List[str]], int]] 
         pick = io.choose("Type a number", MENU, default=1)
         try:
             if pick == 1:
-                run_cli(["chat"])
+                run_cli(["ui"])
             elif pick == 2:
+                run_cli(["chat"])
+            elif pick == 3:
                 what = io.ask("A PDB ID (like 1UBQ) or the name of a file in your folder")
                 if not what:
                     continue
@@ -427,23 +433,23 @@ def menu(io: Optional[IO] = None, run_cli: Optional[Callable[[List[str]], int]] 
                     run_cli(args)
                 else:
                     run_cli(["show", what.upper(), "--out-dir", out_dir])
-            elif pick == 3:
+            elif pick == 4:
                 top = io.ask("Structure file (PDB, PSF ...)")
                 trj = io.ask("Trajectory file (DCD, XTC ...)")
                 if not top or not trj:
                     continue
                 what = io.ask("What to measure (rmsd rmsf rgyr contacts hbonds sasa convergence)", "rmsd rgyr")
                 run_cli(["analyze", _in_data(top), _in_data(trj), "--do"] + what.split())
-            elif pick == 4:
+            elif pick == 5:
                 top = io.ask("Structure file")
                 claim = io.ask("A statement to check (e.g. It has 4 disulfide bridges)")
                 if top and claim:
                     run_cli(["claims", _in_data(top), claim])
-            elif pick == 5:
-                setup_ai_app(io, settings.get("data_dir") or os.getcwd())
             elif pick == 6:
-                show_status(io)
+                setup_ai_app(io, settings.get("data_dir") or os.getcwd())
             elif pick == 7:
+                show_status(io)
+            elif pick == 8:
                 setup(io)
             else:
                 return 0

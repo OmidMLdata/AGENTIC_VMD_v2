@@ -291,3 +291,12 @@ def test_preflight_for_an_open_model_names_an_unreachable_server_clearly():
     by = {c["name"]: c for c in r["checks"]}
     assert "cannot reach the model server" in by["llm_server"]["detail"]
     assert "api_key" not in by                  # a local model needs no key
+
+
+def test_every_tool_call_in_the_benchmark_is_timed(built):
+    t = _task(built, "rmsd_last")
+    env = tools.Environment(t, "python_mdanalysis", allow_exec=True)
+    env.call("run_python", {"code": "import time; time.sleep(0.2)"})
+    env.call("list_files", {})
+    assert env.log[0]["seconds"] >= 0.2 and env.log[1]["seconds"] < env.log[0]["seconds"]
+    assert env.stats()["tool_s"] >= 0.2

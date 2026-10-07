@@ -138,6 +138,27 @@ def _short(value, n: int = 60) -> str:
     return s if len(s) <= n else s[:n - 3] + "..."
 
 
+# ------------------------------------------------------------------ clocks
+def new_clock() -> dict:
+    """Wall-clock bookkeeping: seconds waiting for the model, seconds in tools, and each tool call's own time."""
+    return {"wall_s": 0.0, "model_s": 0.0, "tool_s": 0.0, "model_calls": 0, "tool_calls": [], "first_token_s": None}
+
+
+def add_clock(total: dict, turn: dict) -> None:
+    for k in ("wall_s", "model_s", "tool_s", "model_calls"):
+        total[k] += turn[k]
+    total["tool_calls"] += turn["tool_calls"]
+
+
+def clock_line(c: dict) -> str:
+    """One line a person can read: how long the question took, and where the time went."""
+    parts = [f"model {c['model_s']:.1f} s in {c['model_calls']} call{'s' if c['model_calls'] != 1 else ''}"]
+    if c["tool_calls"]:
+        parts.append(f"tools {c['tool_s']:.1f} s in {len(c['tool_calls'])} call{'s' if len(c['tool_calls']) != 1 else ''}")
+    first = f", first words after {c['first_token_s']:.1f} s" if c.get("first_token_s") is not None else ""
+    return f"took {c['wall_s']:.1f} s ({'; '.join(parts)}{first})"
+
+
 # ------------------------------------------------------------------ session
 class ChatSession:
     """A conversation with a model that can call the toolkit's tools."""
@@ -160,7 +181,15 @@ class ChatSession:
         self.names = list(toolset.PROFILES[tools])
         self.tools = to_openai_tools(toolset.tool_specs(self.names))
         self.usage = {"input_tokens": 0, "output_tokens": 0}
+        self.clock = new_clock()               # wall-clock of the whole session
+        self.last_turn: dict = new_clock()     # wall-clock of the latest question
+        self.turn: dict = self.last_turn
+        self.on_event: Optional[Callable[[dict], None]] = None   # structured events for a screen (the web page); see _emit
         self.reset()
+
+    def _emit(self, **event) -> None:
+        if self.on_event:
+            self.on_event(event)
 
     def reset(self) -> None:
         self.messages: List[dict] = [{"role": "system", "content": self.system}]
@@ -176,12 +205,15 @@ class ChatSession:
             return render_result({"error": f"unknown tool '{name}'",
                                   "available": self.names})
         self.echo(f"  -> {name}({', '.join(f'{k}={_short(v)}' for k, v in args.items())})")
+        self._emit(type="tool_start", name=name, args={k: _short(v, 200) for k, v in args.items()})
         started = time.time()
+
+        def note(m, f=None):
+            self.echo(f"     ... {m}")
+            self._emit(type="tool_progress", name=name, text=str(m), fraction=f)
         try:
-            with progress.listen(lambda m, f=None: self.echo(f"     ... {m}")):
+            with progress.listen(note):
                 result = fn(**args)
-            if time.time() - started > 5:
-                self.echo(f"     done in {time.time() - started:.0f} s")
         except TypeError as e:
             expected = toolset.tool_schema(fn)["input_schema"]
             result = {"error": f"bad arguments for {name}: {e}",
@@ -189,8 +221,15 @@ class ChatSession:
                       "required": expected["required"]}
         except Exception as e:
             result = {"error": f"{type(e).__name__}: {e}"}
-        if isinstance(result, dict) and result.get("error"):
+        seconds = time.time() - started
+        self.turn["tool_s"] += seconds
+        self.turn["tool_calls"].append({"name": name, "seconds": round(seconds, 3)})
+        self.echo(f"     {seconds:.1f} s")
+        failed = isinstance(result, dict) and bool(result.get("error"))
+        if failed:
             self.echo(f"     ! {str(result['error'])[:140]}")
+        self._emit(type="tool_end", name=name, seconds=round(seconds, 3), error=str(result["error"])[:300] if failed else None,
+                   result=result)
         return render_result(result)
 
     # ---- keep the history inside a model's context window
@@ -208,6 +247,16 @@ class ChatSession:
         """One user turn. With ``on_token`` the answer is delivered piece by piece as the model writes it (an answer
         that the guard is about to send back is held until it is known to be kept). The full text is returned either way;
         ``self.streamed`` tells whether it was already delivered through ``on_token``."""
+        self.turn = new_clock()
+        began = time.time()
+        try:
+            return self._ask(text, on_token)
+        finally:
+            self.turn["wall_s"] = time.time() - began
+            self.last_turn = self.turn
+            add_clock(self.clock, self.turn)
+
+    def _ask(self, text: str, on_token: Optional[Callable[[str], None]]) -> str:
         hint = route(text) if "run_workflow" in self.names else None
         self.messages.append({"role": "user", "content": text + (
             f"\n\n[hint from the toolkit: the workflow `{hint}` answers this question properly (several checks, graded findings, a report). "
@@ -222,8 +271,12 @@ class ChatSession:
             held: List[str] = []
             live = bool(on_token) and (used_tool or not (self.guard and question_about_data))
             first = {"seen": False}
+            asked = time.time()
+            self._emit(type="model_start")
 
             def piece(tok: str) -> None:
+                if not first["seen"] and self.turn["first_token_s"] is None:
+                    self.turn["first_token_s"] = time.time() - asked
                 first["seen"] = True
                 if live:
                     on_token(tok)                                   # type: ignore[misc]
@@ -244,6 +297,9 @@ class ChatSession:
             finally:
                 if wait:
                     wait.cancel()
+                self.turn["model_s"] += time.time() - asked
+                self.turn["model_calls"] += 1
+                self._emit(type="model_end", seconds=round(time.time() - asked, 3))
             parsed = parse_choice(resp, self.names)
             for k in self.usage:
                 self.usage[k] += parsed["usage"][k]
@@ -275,8 +331,36 @@ class ChatSession:
                 "Ask again more narrowly, or raise --max-turns.)")
 
 
+# --------------------------------------------------------------- the model server
+def resolve_connection(base_url: Optional[str] = None, model: Optional[str] = None, api_key: Optional[str] = None):
+    """The model server, model and key to use: what was asked for, else the environment, else the saved settings, else the
+    defaults. Starts the private Ollama inside the vmd-agent folder if that is what setup chose."""
+    from vmd_agent import settings
+    base_url = base_url or os.environ.get(ENV_URL) or settings.get("llm_url") or DEFAULT_URL
+    model = model or os.environ.get(ENV_MODEL) or settings.get("llm_model") or DEFAULT_MODEL
+    api_key = api_key or os.environ.get(ENV_KEY) or settings.get("llm_key")
+    if settings.get("ollama_mode") == "private" and base_url == ollama_local.url():
+        ollama_local.start()                         # our own copy, inside the vmd-agent folder
+    return base_url, model, api_key
+
+
+def check_connection(base_url: str, model: str, api_key: Optional[str] = None) -> Optional[List[str]]:
+    """None if the server answers and has the model; otherwise the lines that say what is wrong and what to do."""
+    try:
+        available = list_models(base_url, api_key)
+    except LLMError as e:
+        return [f"vmd-agent chat: {e}",
+                "Start your model server first (for Ollama: `ollama serve`), or point "
+                f"--base-url / ${ENV_URL} at it."]
+    if available and model not in available:
+        return [f"vmd-agent chat: the model '{model}' is not available on that server.",
+                "Available: " + ", ".join(available[:12]) + ("" if len(available) <= 12 else ", ..."),
+                f"For Ollama, install it with `ollama pull {model}`."]
+    return None
+
+
 # ----------------------------------------------------------------------- CLI
-HELP = """commands:  /tools  list the tools    /reset  start over    /help    /quit
+HELP = """commands:  /tools  list the tools    /time  where the time went    /reset  start over    /help    /quit
 Ask in plain language, e.g. "what is in protein.pdb?" or "does the RMSD drift in run1.dcd?"."""
 
 
@@ -289,31 +373,16 @@ def main(base_url: Optional[str] = None, model: Optional[str] = None,
     an interactive session. Returns a process exit code."""
     out = out or sys.stdout
     say = lambda m="": print(m, file=out, flush=True)
-    from vmd_agent import settings
-    base_url = (base_url or os.environ.get(ENV_URL) or settings.get("llm_url")
-                or DEFAULT_URL)
-    model = (model or os.environ.get(ENV_MODEL) or settings.get("llm_model")
-             or DEFAULT_MODEL)
-    api_key = api_key or os.environ.get(ENV_KEY) or settings.get("llm_key")
-    if settings.get("ollama_mode") == "private" and base_url == ollama_local.url():
-        ollama_local.start()                         # our own copy, inside the vmd-agent folder
+    base_url, model, api_key = resolve_connection(base_url, model, api_key)
     if roots:
         os.environ[security.ENV_ROOTS] = os.pathsep.join(
             os.path.realpath(r) for r in roots)
     rts = ensure_roots()
 
-    try:
-        available = list_models(base_url, api_key) if check_model else []
-    except LLMError as e:
-        say(f"vmd-agent chat: {e}")
-        say("Start your model server first (for Ollama: `ollama serve`), or point "
-            f"--base-url / ${ENV_URL} at it.")
-        return 2
-    if check_model and available and model not in available:
-        say(f"vmd-agent chat: the model '{model}' is not available on that server.")
-        say("Available: " + ", ".join(available[:12]) +
-            ("" if len(available) <= 12 else ", ..."))
-        say(f"For Ollama, install it with `ollama pull {model}`.")
+    problem = check_connection(base_url, model, api_key) if check_model else None
+    if problem:
+        for line in problem:
+            say(line)
         return 2
 
     session = ChatSession(base_url, model, api_key, max_turns, temperature,
@@ -323,6 +392,7 @@ def main(base_url: Optional[str] = None, model: Optional[str] = None,
         """Ask and show the answer: piece by piece as it is written when streaming, else all at once."""
         if not stream:
             say(lead + session.ask(question))
+            say(f"  ({clock_line(session.last_turn)})")
             return
         shown: List[str] = []
 
@@ -339,6 +409,7 @@ def main(base_url: Optional[str] = None, model: Optional[str] = None,
             out.flush()
         else:
             say(lead + full)
+        say(f"  ({clock_line(session.last_turn)})")
     try:
         if prompt:
             answer(prompt)
@@ -370,6 +441,14 @@ def main(base_url: Optional[str] = None, model: Optional[str] = None,
         if line == "/reset":
             session.reset()
             say("(conversation cleared)")
+            continue
+        if line == "/time":
+            c = session.clock
+            say(f"this conversation: {c['wall_s']:.1f} s in all; model {c['model_s']:.1f} s over {c['model_calls']} calls, "
+                f"tools {c['tool_s']:.1f} s over {len(c['tool_calls'])} calls")
+            slow = sorted(c["tool_calls"], key=lambda t: -t["seconds"])[:5]
+            if slow:
+                say("slowest tools: " + ", ".join(f"{t['name']} {t['seconds']:.1f} s" for t in slow))
             continue
         if line == "/tools":
             say(", ".join(session.names))

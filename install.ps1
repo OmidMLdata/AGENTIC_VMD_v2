@@ -48,5 +48,6 @@ Say "Step 3 of 3: setup"
 & $run setup
 
 Write-Host ""
-Write-Host "Done. Next time run:  $run"
+Write-Host "Done. The web page (your files, the chat, whole jobs):  $run ui"
+Write-Host "The numbered menu, any time:  $run"
 Write-Host "To remove everything, delete the folder:  $Home_"

@@ -8,7 +8,7 @@
 
 Every import is checked, including those inside functions, so a lazy import
 cannot smuggle in a back-edge. If this fails, either fix the dependency or
-update the Architecture section of the README and this table together.
+update docs/architecture.md and this table together.
 """
 import ast
 import os
@@ -20,7 +20,7 @@ FOUNDATION = ("environment", "security", "llm_client", "platform_info", "setting
               "models", "ollama_local", "progress")
 
 COMPOSERS = ("auto", "cli", "server", "mcp_check", "toolset", "chat",
-             "launcher", "wizard", "vmd_tools", "vmd_cli", "workflows", "reporting", "__init__")
+             "launcher", "wizard", "vmd_tools", "vmd_cli", "workflows", "reporting", "ui", "tool_cases", "tool_dataset", "__init__")
 
 ALLOWED = {
     "inputs": set(),
