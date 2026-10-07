@@ -27,8 +27,10 @@ from typing import Callable, Optional
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
 from vmd_agent import chat, progress, security, toolset
+from vmd_agent.structure import viewer
 
 ASSETS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ui_assets")
+SCRIPTS = {"style.css": "text/css; charset=utf-8", "app.js": "text/javascript; charset=utf-8", "viewer.js": "text/javascript; charset=utf-8"}
 MAX_UPLOAD = 1_000_000_000                       # bytes
 KINDS = {".pdb": "structure", ".cif": "structure", ".mmcif": "structure", ".gro": "structure", ".psf": "structure",
          ".mol2": "structure", ".xyz": "structure", ".prmtop": "structure", ".dcd": "trajectory", ".xtc": "trajectory",
@@ -113,6 +115,22 @@ class State:
         self.token = secrets.token_urlsafe(24)
         self.busy = threading.Lock()
         self.session = chat.ChatSession(base_url, model, api_key, tools=tools, echo=lambda m: None)
+        self.models: dict = {}                       # structures opened in the viewer, most recent last
+        self.model_lock = threading.Lock()
+
+    def model_for(self, topology: str, trajectory: Optional[str] = None) -> "viewer.Model":
+        """The viewer's model of a structure (and trajectory); opened once, then kept (the last four)."""
+        key = (topology, trajectory)
+        with self.model_lock:
+            if key not in self.models:
+                self.models[key] = viewer.Model(topology, trajectory)
+                while len(self.models) > 4:
+                    self.models.pop(next(iter(self.models)))
+            return self.models[key]
+
+    def set_tools(self, profile: str) -> None:
+        self.tools = profile
+        self.session = chat.ChatSession(self.base_url, self.model, self.api_key, tools=profile, echo=lambda m: None)
 
     def status(self) -> dict:
         from vmd_agent import __version__
@@ -122,7 +140,8 @@ class State:
         return {"version": __version__, "data_dir": self.root, "model": self.model, "server": self.base_url,
                 "model_ready": problem is None, "model_problem": " ".join(problem) if problem else None,
                 "vmd": env.get("vmd_path"), "vmd_version": env.get("vmd_version"), "tachyon": bool(env.get("tachyon_path")),
-                "ffmpeg": bool(env.get("ffmpeg")), "n_tools": len(toolset.TOOLS), "tools_in_chat": len(self.session.names),
+                "ffmpeg": bool(env.get("ffmpeg")), "n_tools": len(toolset.TOOLS), "tools_in_chat": len(self.session.names), "profile": self.tools,
+                "profiles": {k: len(v) for k, v in toolset.PROFILES.items()},
                 "clock": self.session.clock}
 
 
@@ -188,8 +207,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if url.path == "/":
             with open(os.path.join(ASSETS, "index.html"), "rb") as fh:
                 self._send(200, fh.read(), "text/html; charset=utf-8",
-                           {"Content-Security-Policy": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; "
-                                                      "script-src 'self' 'unsafe-inline'; media-src 'self'; frame-src 'self'"})
+                           {"Content-Security-Policy": "default-src 'self'; img-src 'self' data:; media-src 'self'; frame-src 'self'"})
+        elif url.path.startswith("/assets/") and url.path[8:] in SCRIPTS:
+            with open(os.path.join(ASSETS, url.path[8:]), "rb") as fh:
+                self._send(200, fh.read(), SCRIPTS[url.path[8:]])
+        elif url.path in ("/api/structure", "/api/frame"):
+            self._structure(url.path, parse_qs(url.query))
         elif url.path == "/api/status":
             self._json(self.state.status())
         elif url.path == "/api/files":
@@ -207,6 +230,28 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._serve_file(unquote(url.path[len("/files/"):]))
         else:
             self._send(404, b"not found", "text/plain")
+
+    def _structure(self, which: str, q: dict) -> None:
+        """The atoms of a structure for the viewer, or the coordinates of one frame."""
+        try:
+            top = security.check_path(os.path.join(self.state.root, q.get("path", [""])[0]))
+            traj_rel = q.get("traj", [""])[0]
+            traj = security.check_path(os.path.join(self.state.root, traj_rel)) if traj_rel else None
+            for f in (top, traj):
+                if f and not (os.path.isfile(f) and security.is_within(f, self.state.root)):
+                    raise FileNotFoundError(os.path.basename(f))
+            model = self.state.model_for(top, traj)
+            if which == "/api/frame":
+                i = int(q.get("i", ["0"])[0])
+                with self.state.model_lock:
+                    xyz = model.frame(i)
+                return self._json({"i": i, "xyz": [round(float(x), 2) for x in xyz.ravel()]})
+            with self.state.model_lock:
+                return self._json(model.describe())
+        except (security.SecurityError, FileNotFoundError):
+            return self._json({"error": "no such file in your files folder"}, 404)
+        except Exception as e:                                         # a file MDAnalysis cannot read is a message, not a crash
+            return self._json({"error": f"cannot show this file: {type(e).__name__}: {str(e)[:200]}"}, 415)
 
     def _serve_file(self, rel: str) -> None:
         try:
@@ -245,6 +290,14 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return self._stream(lambda emit: self._workflow(payload, emit))
             if url.path == "/api/look":
                 return self._look(payload)
+            if url.path == "/api/profile":
+                profile = str(payload.get("tools") or "")
+                if profile not in toolset.PROFILES:
+                    return self._json({"error": f"tools must be one of {', '.join(toolset.PROFILES)}"}, 400)
+                if self.state.busy.locked():
+                    return self._json({"error": "another job is still running; wait for it to finish"}, 409)
+                self.state.set_tools(profile)
+                return self._json(self.state.status())
             if url.path == "/api/reset":
                 self.state.session.reset()
                 return self._json({"ok": True})

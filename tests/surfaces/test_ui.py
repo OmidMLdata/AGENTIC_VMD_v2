@@ -171,3 +171,41 @@ def test_the_command_prints_an_address_with_the_key(tmp_path, monkeypatch):
     assert cli.main(["ui", "--data-dir", str(tmp_path), "--no-browser", "--port", "0"]) == 0
     assert said[0][0] == str(tmp_path) and said[0][2] is False
     time.sleep(0)
+
+
+def test_the_page_is_served_as_files_with_a_strict_policy_and_no_inline_script(page):
+    status, body, headers = page.req("GET", "/")
+    html = body.decode()
+    assert status == 200 and "<script>" not in html and 'onclick=' not in html and ' style="' not in html
+    assert headers["Content-Security-Policy"].startswith("default-src 'self'") and "unsafe-inline" not in headers["Content-Security-Policy"]
+    for name, ctype in (("style.css", "text/css"), ("app.js", "text/javascript"), ("viewer.js", "text/javascript")):
+        s, b, h = page.req("GET", "/assets/" + name)
+        assert s == 200 and h["Content-Type"].startswith(ctype) and len(b) > 500
+        assert page.req("GET", "/assets/" + name, cookie=False)[0] == 403
+    assert page.req("GET", "/assets/index.html")[0] == 404 and page.req("GET", "/assets/..%2Fui.py")[0] == 404
+
+
+def test_the_viewer_gets_atoms_bonds_and_other_frames(page):
+    shutil.copy(os.path.join(DATA, "ubq_md", "protein.pdb"), os.path.join(page.root, "md.pdb"))
+    shutil.copy(os.path.join(DATA, "ubq_md", "protein.dcd"), os.path.join(page.root, "md.dcd"))
+    s, body, _ = page.req("GET", "/api/structure?path=md.pdb&traj=md.dcd")
+    mol = json.loads(body)
+    assert s == 200 and mol["frames"] > 1 and len(mol["xyz"]) == 3 * mol["n_atoms"] and len(mol["bonds"]) > mol["n_atoms"] * 0.8
+    assert not mol["reduced"] and len(mol["element"]) == mol["n_atoms"] and mol["radius"] > 5
+    f0 = json.loads(page.req("GET", "/api/frame?path=md.pdb&traj=md.dcd&i=0")[1])["xyz"]
+    f3 = json.loads(page.req("GET", "/api/frame?path=md.pdb&traj=md.dcd&i=3")[1])["xyz"]
+    assert len(f0) == len(f3) == len(mol["xyz"]) and f0 != f3                              # the same atoms, moved
+    assert page.req("GET", "/api/structure?path=..%2F..%2Fetc%2Fpasswd")[0] == 404
+    assert page.req("GET", "/api/structure?path=missing.pdb")[0] == 404
+    open(os.path.join(page.root, "notes.pdb"), "w").write("this is not a structure\n")
+    s, body, _ = page.req("GET", "/api/structure?path=notes.pdb")
+    assert s == 415 and "cannot show" in json.loads(body)["error"]
+    assert page.req("GET", "/api/structure", cookie=False)[0] == 403
+
+
+def test_the_tools_the_chat_offers_can_be_changed_from_the_page(page):
+    s, body, _ = page.post("/api/profile", {"tools": "core"})
+    status = json.loads(body)
+    assert s == 200 and status["profile"] == "core" and status["tools_in_chat"] == 27 and status["profiles"]["all"] == 53
+    assert page.post("/api/profile", {"tools": "nonsense"})[0] == 400
+    assert json.loads(page.post("/api/profile", {"tools": "all"})[1])["tools_in_chat"] == 53

@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.20.0: a workbench page with a molecule viewer, and a model benchmark
+
+* **The web page is a workbench laid out like VMD's own windows**: molecules (files; the drawn one is marked T), a black display with a viewer, the assistant (chat and whole jobs), and a
+  console with the seconds of every call, plus a status bar. The viewer draws a structure (and its trajectory, with a frame slider) with VMD's drawing and colour names (Trace, Lines, VDW,
+  Points; Name, Chain, ResType, Resid, Index) and its default colours, rotates with the mouse, saves a PNG, and shows the figures the tools make. Served as plain files with a strict
+  content-security policy (no inline script); the server sends atoms, bonds and frames from `structure/viewer.py`. The chat's tool set (all, core, vmd) can be changed from the status bar.
+* **The model benchmark** (`vmd-agent bench models`): 58 plain-language tasks in 14 categories, one per kind of functionality (inspect, claims, trajectory, VMD measurements, files, building,
+  maps, rendering, video, whole jobs, hand-offs, records, network, and requests that must be declined), asked of any OpenAI-compatible model in a fresh conversation and a fresh copy of the
+  generated dataset, and graded by a program. Per run: right tool, right answer and files, numbers grounded, the tools called, seconds (whole, in the model, in the tools), tokens. Resumable;
+  `summary.md` compares models with 95% intervals. Checked against a real model, which showed two graders were too lenient (a "2 chains" answer; 112 residues with the ligand counted); both fixed
+  and tested.
+* **"Does the model see all 53 tools at once?"** Answered in `docs/tools.md`: by default yes, about 8,000 tokens of descriptions with every question (`vmd-agent tools --size` measures it);
+  `--tools core` and `--tools vmd` are about half. A test keeps the page's numbers true.
+* The chat records every tool call (`call_log`: arguments and results), which the benchmark reads.
+
 ## 0.19.0: a README and docs, a web page, a tool test set, wall-clock times
 
 * **README and docs.** The README is now a README (what it is, install, use, the pipeline, what is verified, links); everything else moved into `docs/`:

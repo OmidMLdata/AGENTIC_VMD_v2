@@ -21,6 +21,7 @@ The [README](../README.md) is the way in. These pages are the detail, in the ord
 | [MCP clients](mcp.md) | use the tools from Claude Code, Claude Desktop or another client |
 | [Docker](docker.md) | the container routes, and what has not been run |
 | [The tool test set](tool-test-set.md) | a dataset and a case for every tool |
+| [The model benchmark](model-benchmark.md) | tasks per kind of functionality, to run on each language model |
 | [Development](development.md) | set up, test, reproduce, the benchmark |
 | [Architecture](architecture.md) | how the code fits together |
 | [Methods](methods.md) | how each measurement is computed |

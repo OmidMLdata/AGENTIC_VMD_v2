@@ -50,6 +50,7 @@ analysis, keyframes and claim checking.
 | `vmd-agent interpret-video VIDEO` | verify a video and pull out stills you can map back to simulation frames | `-n N` stills · `--out-dir DIR` · `--timestamps ...` · `--stride N` · `--first-frame N` · `--time-per-frame T` · `--time-unit` · `--count-frames` |
 | `vmd-agent validate TOP TRAJ` | cross-check the analysis against independent NumPy | `--sel` · `--sel2` · `--cutoff` |
 | `vmd-agent validate-dssp ID_OR_FILE ...` | compare the secondary-structure code with the PDB's own annotations | `--cache DIR` · `--mdtraj` |
+| `vmd-agent bench models` | put language models in front of the tools: tasks per kind of functionality, graded by a program, with seconds (see [the model benchmark](model-benchmark.md)) | `--model` · `--base-url` · `--api-key` · `--categories` · `--only` · `--repeats` · `--tools` · `--no-guard` · `--skip` · `--list` · `--summarize` |
 | `vmd-agent bench tools` | run every tool on a generated dataset whose answers are known, with the seconds each took (see [the tool test set](tool-test-set.md)) | `--data-dir` · `--only` · `--skip` · `--list` · `--json` |
 | `vmd-agent bench ...` | the research benchmark, also in a container with your VMD (`vmd-agent bench docker`) | see [Development](development.md#running-and-reproducing) and [Docker](docker.md#docker) |
 
@@ -67,7 +68,7 @@ analysis, keyframes and claim checking.
 | `vmd-agent probe` / `vmd-agent renderers` | what VMD, drawing backends and libraries this computer has | `--vmd PATH` |
 | `vmd-agent mcp-config` | the settings that connect Claude Desktop / Code to the tools | `--write` add them to Claude Desktop (with a backup) · `--roots FOLDER ...` · `--vmd PATH` |
 | `vmd-agent mcp-check` | test an MCP server install the way a real client uses it | `--roots` · `--vmd` · `--render` · `--command` · `--args` · `--env KEY=VALUE` |
-| `vmd-agent tools` | list every tool the chat and MCP server offer | `--group all\|core\|vmd` |
+| `vmd-agent tools` | list every tool the chat and MCP server offer | `--group all\|core\|vmd` · `--size` (how much of a model's context the descriptions take) |
 | `vmd-agent tool NAME '{json}'` | run any one tool with its arguments as JSON | example: `vmd-agent tool probe_environment '{}'` |
 
 `vmd-agent --help` shows every command grouped in the order of this page; `vmd-agent <command> --help` shows one command's flags.

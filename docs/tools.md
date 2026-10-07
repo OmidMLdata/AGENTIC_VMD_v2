@@ -16,12 +16,33 @@ There are **53** in three groups. The count is checked by a test, so this page c
 Older notes and one help string said "47 tools (27 plus 20)". That was the count before the later VMD tools and the two workflow tools
 were added: 27 + 24 + 2 = 53.
 
+## Does the model see all 53 at once?
+
+**By default, yes.** `vmd-agent chat` and the web page send the description of every tool the model may use with *every* question, and with all 53
+that is about 32,000 characters, roughly **8,000 tokens**, before the model has read your question. The short sets are about half that:
+
+| `--tools` | Tools | Descriptions sent with every question |
+|---|---|---|
+| `all` (default) | 53 | about 8,000 tokens |
+| `core` | 27 | about 3,900 tokens |
+| `vmd` | 28 | about 4,300 tokens |
+
+(`vmd-agent tools --group all --size` measures this on your copy; 4 characters per token is a rough rule.) This matters for two reasons:
+
+* **Context.** The private Ollama keeps a 16,384-token context, so the descriptions take about half of it before anything else is said. A model with
+  a small context, or a small model that picks worse from a long list, does better with `--tools core` or `--tools vmd`.
+* **Speed.** A model reads those tokens on every call, so the first answer is slower with all 53.
+
+The web page has a "chat tools" menu in its status bar to switch between the three without restarting. Which set suits which model is something the
+[model benchmark](model-benchmark.md) can tell you: run it with `--tools all`, then `--tools core`, and compare. Nothing here chooses a subset for
+you per question yet; the chat only points the model at a whole-job workflow when the question clearly matches one.
+
 ## Who gets which tools
 
 | Where | Tools | Why |
 |---|---|---|
 | The MCP server and `vmd-agent tools` | all 53 | an AI app can handle a long list |
-| `vmd-agent chat` and the web page | all 53 by default; `--tools core` gives the original 27, `--tools vmd` gives 28: the 24, the 2 workflow tools, `inspect_files` and `probe_environment` | a small local model chooses better from a shorter list |
+| `vmd-agent chat` and the web page | all 53 at once by default; `--tools core` gives the original 27, `--tools vmd` gives 28: the 24, the 2 workflow tools, `inspect_files` and `probe_environment` | a small local model chooses better from a shorter list |
 | The benchmark's arms (`vmd-agent bench agent-run`) | **their own small sets**: `vmd_agent` 10, `vmd_agent_no_verify` 9, `vmd_agent_no_keyframes` 9, `python_mdanalysis` 4, `vmd_plain` 4 | an arm is a controlled experiment: what does the toolkit add over a model that writes its own code? Each arm also gets `list_files`, `read_text_file` and `submit_answer`, which exist only inside the benchmark |
 
 The benchmark's tools are separate on purpose: they are confined to one task's folder, they have no way to draw or download, and

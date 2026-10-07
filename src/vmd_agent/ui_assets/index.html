@@ -4,366 +4,70 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>vmd-agent</title>
-<style>
-:root {
-  --bg: #f6f7f9; --panel: #ffffff; --ink: #1c2430; --muted: #657084; --line: #e1e5ec; --accent: #2f6fed; --accent-ink: #ffffff;
-  --ok: #1f8f4e; --warn: #b7791f; --bad: #c0392b; --note: #4c6a92; --chip: #eef1f6; --code: #f1f3f8; --shadow: 0 1px 2px rgba(20,30,50,.06), 0 4px 14px rgba(20,30,50,.05);
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #12161d; --panel: #1a2029; --ink: #e6eaf1; --muted: #98a2b3; --line: #2a3340; --accent: #6b9bff; --accent-ink: #0d1320;
-    --ok: #4cc38a; --warn: #e0a84a; --bad: #ef7a6c; --note: #8fb0dc; --chip: #232b37; --code: #202833; --shadow: none;
-  }
-}
-:root[data-theme="dark"] {
-  --bg: #12161d; --panel: #1a2029; --ink: #e6eaf1; --muted: #98a2b3; --line: #2a3340; --accent: #6b9bff; --accent-ink: #0d1320;
-  --ok: #4cc38a; --warn: #e0a84a; --bad: #ef7a6c; --note: #8fb0dc; --chip: #232b37; --code: #202833; --shadow: none;
-}
-* { box-sizing: border-box; }
-html, body { height: 100%; }
-body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
-button, input, select, textarea { font: inherit; color: inherit; }
-header { display: flex; align-items: center; gap: 14px; padding: 10px 18px; background: var(--panel); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
-header h1 { margin: 0; font-size: 17px; letter-spacing: .2px; }
-header h1 small { color: var(--muted); font-weight: 400; margin-left: 6px; }
-.pills { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; align-items: center; }
-.pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; background: var(--chip); font-size: 12.5px; color: var(--muted); }
-.pill i { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); display: inline-block; }
-.pill.ok i { background: var(--ok); } .pill.bad i { background: var(--bad); } .pill.warn i { background: var(--warn); }
-.pill b { color: var(--ink); font-weight: 600; }
-#theme { background: none; border: 1px solid var(--line); border-radius: 8px; padding: 3px 9px; cursor: pointer; color: var(--muted); }
-main { display: grid; grid-template-columns: 290px minmax(0, 1fr); gap: 14px; padding: 14px 18px; height: calc(100% - 56px); min-height: 0; }
-.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; box-shadow: var(--shadow); min-height: 0; display: flex; flex-direction: column; }
-.card > h2 { margin: 0; padding: 11px 14px; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); border-bottom: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; }
-.scroll { overflow: auto; min-height: 0; flex: 1; }
-#drop { margin: 10px; padding: 12px; border: 1.5px dashed var(--line); border-radius: 10px; text-align: center; color: var(--muted); font-size: 13px; cursor: pointer; }
-#drop.over { border-color: var(--accent); color: var(--accent); background: var(--chip); }
-.file { display: flex; gap: 9px; align-items: center; padding: 7px 14px; cursor: pointer; border-top: 1px solid transparent; }
-.file:hover { background: var(--chip); }
-.file.sel { background: var(--chip); box-shadow: inset 3px 0 0 var(--accent); }
-.file .ic { width: 22px; height: 22px; border-radius: 6px; flex: none; display: grid; place-items: center; font-size: 11px; font-weight: 700; color: var(--accent-ink); background: var(--muted); }
-.k-structure .ic { background: #3b82f6; } .k-trajectory .ic { background: #8b5cf6; } .k-image .ic { background: #14b8a6; } .k-video .ic { background: #ec4899; }
-.k-map .ic { background: #f59e0b; } .k-report .ic { background: #22a06b; } .k-data .ic, .k-script .ic { background: #64748b; } .k-folder .ic { background: none; color: var(--muted); font-size: 14px; }
-.file .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
-.file .sz { color: var(--muted); font-size: 12px; flex: none; }
-.empty { padding: 18px 14px; color: var(--muted); font-size: 13.5px; }
-.tabs { display: flex; gap: 2px; padding: 8px 10px 0; border-bottom: 1px solid var(--line); }
-.tab { padding: 8px 14px; border: 0; background: none; cursor: pointer; color: var(--muted); border-bottom: 2px solid transparent; font-weight: 500; }
-.tab.on { color: var(--ink); border-bottom-color: var(--accent); }
-.pane { display: none; flex: 1; min-height: 0; flex-direction: column; }
-.pane.on { display: flex; }
-#log { padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; }
-.msg { max-width: 860px; }
-.msg.me { align-self: flex-end; background: var(--accent); color: var(--accent-ink); padding: 8px 14px; border-radius: 14px 14px 4px 14px; white-space: pre-wrap; }
-.msg.ai { align-self: flex-start; white-space: pre-wrap; }
-.msg.ai .answer { padding: 2px 0; }
-.tool { align-self: flex-start; width: 100%; max-width: 860px; border: 1px solid var(--line); border-radius: 10px; background: var(--code); padding: 8px 12px; font-size: 13px; }
-.tool .head { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
-.tool .name { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 600; }
-.tool .args { color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; overflow-wrap: anywhere; }
-.tool .sec { margin-left: auto; font-variant-numeric: tabular-nums; color: var(--muted); }
-.tool.run .sec::before { content: "running "; }
-.tool.err { border-color: var(--bad); }
-.tool .prog { color: var(--note); font-size: 12.5px; }
-.bar { height: 4px; background: var(--line); border-radius: 3px; overflow: hidden; margin-top: 6px; }
-.bar > div { height: 100%; width: 0; background: var(--accent); transition: width .2s; }
-.tool img, .figs img { max-width: 100%; border-radius: 8px; margin-top: 8px; border: 1px solid var(--line); }
-.figs { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
-.clock { align-self: flex-start; font-size: 12.5px; color: var(--muted); background: var(--chip); border-radius: 999px; padding: 2px 11px; font-variant-numeric: tabular-nums; }
-.mline { align-self: flex-start; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.think { color: var(--muted); font-style: italic; font-size: 13px; }
-.dots::after { content: ""; animation: d 1.2s steps(4) infinite; }
-@keyframes d { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
-#composer { border-top: 1px solid var(--line); padding: 10px 12px; display: flex; gap: 8px; align-items: flex-end; }
-#q { flex: 1; resize: none; border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; background: var(--bg); max-height: 160px; outline: none; }
-#q:focus { border-color: var(--accent); }
-.btn { border: 1px solid var(--line); background: var(--panel); border-radius: 10px; padding: 8px 14px; cursor: pointer; }
-.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
-.btn:disabled { opacity: .5; cursor: default; }
-.hints { padding: 4px 18px 0; display: flex; gap: 6px; flex-wrap: wrap; }
-.hint { border: 1px solid var(--line); background: var(--panel); border-radius: 999px; padding: 3px 11px; font-size: 12.5px; cursor: pointer; color: var(--muted); }
-.hint:hover { color: var(--ink); border-color: var(--accent); }
-.banner { margin: 12px 18px 0; padding: 10px 14px; border-radius: 10px; background: var(--chip); border-left: 4px solid var(--warn); font-size: 13.5px; }
-#wf { padding: 16px 18px; overflow: auto; }
-#wf label { display: block; font-size: 12.5px; color: var(--muted); margin: 10px 0 3px; }
-#wf select { width: 100%; max-width: 520px; padding: 7px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--bg); }
-#wf .does { color: var(--muted); max-width: 640px; margin: 4px 0 0; }
-.finding { display: flex; gap: 10px; padding: 6px 0; border-top: 1px solid var(--line); }
-.badge { flex: none; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; border-radius: 5px; padding: 1px 7px; height: 20px; margin-top: 2px; color: var(--accent-ink); background: var(--note); }
-.badge.ok { background: var(--ok); } .badge.warning { background: var(--warn); } .badge.problem { background: var(--bad); }
-.verdict { font-size: 16.5px; font-weight: 600; margin: 14px 0 4px; }
-table.steps { border-collapse: collapse; width: 100%; max-width: 760px; font-size: 13px; margin-top: 10px; }
-table.steps td, table.steps th { text-align: left; padding: 4px 8px; border-top: 1px solid var(--line); font-variant-numeric: tabular-nums; }
-#preview { padding: 14px; border-top: 1px solid var(--line); max-height: 45%; overflow: auto; font-size: 13px; }
-#preview img, #preview video { max-width: 100%; border-radius: 8px; }
-#preview pre { background: var(--code); padding: 10px; border-radius: 8px; overflow: auto; margin: 6px 0 0; font-size: 12px; }
-#preview .row { display: flex; gap: 6px; flex-wrap: wrap; margin: 8px 0; }
-@media (max-width: 860px) {
-  main { grid-template-columns: 1fr; height: auto; }
-  .card.files { max-height: 280px; }
-  .card.work { min-height: 70vh; }
-  header .pills { margin-left: 0; }
-}
-</style>
+<link rel="stylesheet" href="/assets/style.css">
 </head>
 <body>
-<header>
+<header id="top">
+  <span class="logo"></span>
   <h1>vmd-agent <small id="ver"></small></h1>
-  <div class="pills" id="pills"></div>
-  <button id="theme" title="Switch light and dark">◐</button>
+  <span class="grow"></span>
+  <button class="iconbtn" id="theme" title="Switch light and dark">Light / dark</button>
 </header>
-<main>
-  <section class="card files">
-    <h2><span>Your files</span><span id="where" style="text-transform:none;letter-spacing:0"></span></h2>
+
+<div id="work">
+  <section class="pane" id="molecules">
+    <header>Molecules <span class="grow"></span></header>
     <div id="drop">Drop files here, or click to add<input id="pick" type="file" multiple hidden></div>
     <div class="scroll" id="files"></div>
-    <div id="preview" hidden></div>
+    <div id="info" hidden></div>
   </section>
-  <section class="card work">
+
+  <section class="pane" id="displaypane">
+    <header>Display <span class="grow"></span><span id="folder"></span></header>
+    <div id="display">
+      <canvas id="view"></canvas>
+      <div id="media"></div>
+      <div id="nodata"><div><b>Nothing drawn yet</b>Double-click a structure on the left. Drag to rotate, scroll to zoom, shift-drag to move, double-click the picture to reset.</div></div>
+      <div id="bar">
+        <span class="chip">Drawing <select id="rep"><option>Trace</option><option>Lines</option><option>VDW</option><option>Points</option></select></span>
+        <span class="chip">Colour <select id="color"><option>Name</option><option>Chain</option><option>ResType</option><option>Resid</option><option>Index</option><option>Mono</option></select></span>
+        <span class="chip"><label><input type="checkbox" id="show-protein" checked> protein</label><label><input type="checkbox" id="show-other" checked> other</label><label><input type="checkbox" id="show-water"> water</label></span>
+        <span class="chip"><button id="reset" title="Reset the view">Reset</button><button id="snap" title="Save the picture as a PNG">Save PNG</button></span>
+      </div>
+      <div id="caption"></div>
+      <div id="frames"><span class="chip"><button id="play" title="Play">▶</button></span><input type="range" id="slider" min="0" max="0" value="0"><span class="chip" id="flabel">frame 1</span>
+        <span class="chip">speed <select id="fps"><option value="4">4/s</option><option value="8" selected>8/s</option><option value="16">16/s</option><option value="30">30/s</option></select></span></div>
+    </div>
+    <div id="gallery"></div>
+  </section>
+
+  <section class="pane" id="assistant">
     <div class="tabs"><button class="tab on" data-p="chat">Chat</button><button class="tab" data-p="jobs">Whole jobs</button></div>
-    <div class="pane on" id="chat">
+    <div id="chat" class="on">
       <div id="banner"></div>
       <div class="scroll" id="scroll"><div id="log"></div></div>
       <div class="hints" id="hints"></div>
       <div id="composer">
         <textarea id="q" rows="1" placeholder="Ask about a file, for example: what is in protein.pdb?"></textarea>
-        <button class="btn" id="reset" title="Start a new conversation">New</button>
+        <button class="btn" id="new" title="Start a new conversation">New</button>
         <button class="btn primary" id="send">Send</button>
       </div>
     </div>
-    <div class="pane" id="jobs"><div class="scroll" id="wf"></div></div>
+    <div id="jobs"><div class="scroll" id="wf"></div></div>
   </section>
-</main>
-<script>
-"use strict";
-const $ = (s, r = document) => r.querySelector(s);
-const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
-const fmt = s => s < 10 ? s.toFixed(1) + " s" : Math.round(s) + " s";
-const size = n => n < 1024 ? n + " B" : n < 1048576 ? (n / 1024).toFixed(0) + " KB" : (n / 1048576).toFixed(1) + " MB";
-const api = (p, body) => fetch(p, body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-let files = [], status = {}, selected = null, busy = false;
 
-// ---- header
-const pill = (cls, label, value) => { const p = el("span", "pill " + cls); p.append(el("i")); p.append(document.createTextNode(label + " ")); const b = el("b", null, value); p.append(b); return p; };
-async function loadStatus() {
-  status = await (await api("/api/status")).json();
-  $("#ver").textContent = "v" + status.version;
-  const box = $("#pills"); box.textContent = "";
-  box.append(pill(status.model_ready ? "ok" : "bad", "model", status.model));
-  box.append(pill(status.vmd ? "ok" : "warn", "VMD", status.vmd ? (status.vmd_version || "found") : "not found"));
-  box.append(pill(status.ffmpeg ? "ok" : "warn", "ffmpeg", status.ffmpeg ? "ready" : "missing"));
-  box.append(pill("", "tools", status.tools_in_chat + " of " + status.n_tools));
-  $("#where").textContent = status.data_dir.split(/[\\/]/).slice(-1)[0];
-  $("#where").title = status.data_dir;
-  $("#banner").textContent = "";
-  if (!status.model_ready) {
-    const b = el("div", "banner", "The chat needs a model, and none answers right now: " + (status.model_problem || "") + "  The files and whole jobs work without one. Run `vmd-agent setup` to choose a model.");
-    $("#banner").append(b);
-  }
-}
+  <section class="pane" id="console">
+    <header>Console <span class="grow"></span><span id="totals"></span><button class="btn small" id="clear">Clear</button></header>
+    <div id="consolelog"></div>
+  </section>
+</div>
 
-// ---- files
-const ICON = { structure: "3D", trajectory: "▶▶", image: "img", video: "mp4", map: "map", report: "doc", data: "{}", script: "tcl", other: "·" };
-let open_dirs = new Set(), everything = [];
-function fileRow(f, depth) {
-  const row = el("div", "file k-" + f.kind + (f.path === selected ? " sel" : ""));
-  row.style.paddingLeft = (14 + depth * 16) + "px";
-  row.append(el("span", "ic", ICON[f.kind] || "·"), el("span", "nm", f.path.split("/").pop()), el("span", "sz", size(f.size)));
-  row.title = f.path;
-  row.onclick = () => select(f);
-  return row;
-}
-async function fill(box, dir, depth) {
-  const r = await (await api("/api/files" + (dir ? "?dir=" + encodeURIComponent(dir) : ""))).json();
-  if (!dir) everything = r.everything || [];
-  for (const d of r.folders) {
-    const row = el("div", "file k-folder" + (open_dirs.has(d.path) ? " open" : ""));
-    row.style.paddingLeft = (14 + depth * 16) + "px";
-    row.append(el("span", "ic", open_dirs.has(d.path) ? "▾" : "▸"), el("span", "nm", d.path.split("/").pop() + "/"), el("span", "sz", d.n_files + " files"));
-    const inner = el("div");
-    row.onclick = () => { open_dirs.has(d.path) ? open_dirs.delete(d.path) : open_dirs.add(d.path); loadFiles(); };
-    box.append(row, inner);
-    if (open_dirs.has(d.path)) await fill(inner, d.path, depth + 1);
-  }
-  for (const f of r.files) box.append(fileRow(f, depth));
-  return r;
-}
-async function loadFiles() {
-  const box = $("#files"); const fresh = el("div");
-  const r = await fill(fresh, "", 0);
-  box.textContent = ""; box.append(fresh);
-  files = everything;
-  if (!r.files.length && !r.folders.length) box.append(el("div", "empty", "No files yet. Drop a structure (.pdb) and a trajectory (.dcd) here, or put them in this folder on your computer."));
-  fillWorkflowFiles();
-}
-async function select(f) {
-  selected = f.path; loadFiles();
-  const pv = $("#preview"); pv.hidden = false; pv.textContent = "";
-  const url = "/files/" + f.path.split("/").map(encodeURIComponent).join("/");
-  pv.append(el("div", null, f.path));
-  if (f.kind === "image") { const i = el("img"); i.src = url; pv.append(i); }
-  else if (f.kind === "video") { const v = el("video"); v.src = url; v.controls = true; pv.append(v); }
-  else if (f.kind === "report" && f.path.endsWith(".html")) { const a = el("a", null, "Open the report"); a.href = url; a.target = "_blank"; pv.append(a); }
-  const row = el("div", "row");
-  const looks = f.kind === "structure" || f.kind === "trajectory" ? ["inspect_files", "detect_system", "structure_stats"] : f.kind === "video" ? ["probe_video"] : [];
-  const out = el("div");
-  for (const t of looks) {
-    const b = el("button", "btn", t.replace(/_/g, " "));
-    b.onclick = async () => {
-      b.disabled = true; out.textContent = "…";
-      const r = await (await api("/api/look", { tool: t, path: f.path })).json();
-      out.textContent = ""; out.append(el("div", "clock", t + " took " + fmt(r.seconds || 0)));
-      out.append(el("pre", null, JSON.stringify(r.result || r, null, 1).slice(0, 6000)));
-      b.disabled = false;
-    };
-    row.append(b);
-  }
-  if (f.kind === "structure" || f.kind === "trajectory") { const b = el("button", "btn", "ask about it"); b.onclick = () => { $("#q").value = "What is in " + f.path + "?"; show("chat"); $("#q").focus(); }; row.append(b); }
-  pv.append(row, out);
-}
-async function upload(list) {
-  for (const f of list) {
-    const r = await fetch("/api/upload?name=" + encodeURIComponent(f.name), { method: "POST", body: f });
-    const j = await r.json(); if (j.error) alert(f.name + ": " + j.error);
-  }
-  loadFiles();
-}
-const drop = $("#drop");
-drop.onclick = () => $("#pick").click();
-$("#pick").onchange = e => upload([...e.target.files]);
-["dragenter", "dragover"].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.add("over"); }));
-["dragleave", "drop"].forEach(t => drop.addEventListener(t, e => { e.preventDefault(); drop.classList.remove("over"); }));
-drop.addEventListener("drop", e => upload([...e.dataTransfer.files]));
-
-// ---- tabs
-function show(p) { document.querySelectorAll(".tab").forEach(t => t.classList.toggle("on", t.dataset.p === p)); document.querySelectorAll(".pane").forEach(x => x.classList.toggle("on", x.id === p)); }
-document.querySelectorAll(".tab").forEach(t => t.onclick = () => show(t.dataset.p));
-
-// ---- server-sent events from a POST
-async function stream(path, body, on) {
-  const r = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  if (!r.ok || !r.body) { const j = await r.json().catch(() => ({})); on({ type: "error", text: j.error || ("HTTP " + r.status) }); return; }
-  const reader = r.body.getReader(), dec = new TextDecoder(); let buf = "";
-  for (;;) {
-    const { value, done } = await reader.read(); if (done) break;
-    buf += dec.decode(value, { stream: true });
-    let i; while ((i = buf.indexOf("\n\n")) >= 0) { const chunk = buf.slice(0, i); buf = buf.slice(i + 2); if (chunk.startsWith("data: ")) on(JSON.parse(chunk.slice(6))); }
-  }
-}
-
-// ---- chat
-const log = $("#log"), scroller = $("#scroll");
-const toBottom = () => { scroller.scrollTop = scroller.scrollHeight; };
-function figs(paths) { const d = el("div", "figs"); for (const p of paths || []) { const i = el("img"); i.src = "/files/" + p.split("/").map(encodeURIComponent).join("/"); i.title = p; d.append(i); } return d; }
-async function send(text) {
-  if (busy || !text.trim()) return;
-  busy = true; $("#send").disabled = true; $("#q").value = ""; autosize();
-  log.append(el("div", "msg me", text));
-  const think = el("div", "think"); think.append(document.createTextNode("the model is working")); think.append(el("span", "dots")); log.append(think);
-  const running = new Set(); let current = null, block = null, said = "";
-  // each stretch of text the model writes is its own block, in the order things happen: text, tool, text, tool, ... answer
-  const place = node => log.insertBefore(node, think.isConnected ? think : null);
-  const textBlock = () => { if (!block) { block = el("div", "msg ai"); place(block); said = ""; } return block; };
-  const tick = () => { for (const t of running) t.sec.textContent = fmt((performance.now() - t.t) / 1000); };
-  const ticker = setInterval(tick, 200);
-  await stream("/api/chat", { message: text }, ev => {
-    if (ev.type === "token") { think.hidden = true; said += ev.text; textBlock().textContent = said; }
-    else if (ev.type === "model_start") { think.hidden = false; log.append(think); }
-    else if (ev.type === "model_end") { think.hidden = true; place(el("div", "mline", "model call " + fmt(ev.seconds))); }
-    else if (ev.type === "tool_start") {
-      think.hidden = true; block = null;
-      const box = el("div", "tool run"), head = el("div", "head"), sec = el("span", "sec", "0.0 s");
-      head.append(el("span", "name", ev.name), el("span", "args", Object.entries(ev.args || {}).map(([k, v]) => k + "=" + v).join(", ")), sec);
-      const prog = el("div", "prog"), bar = el("div", "bar"); bar.append(el("div")); bar.hidden = true;
-      box.append(head, prog, bar); place(box);
-      current = { box, sec, prog, bar, t: performance.now() }; running.add(current);
-    }
-    else if (ev.type === "tool_progress" && current) {
-      current.prog.textContent = ev.text;
-      if (ev.fraction != null) { current.bar.hidden = false; current.bar.firstChild.style.width = Math.round(ev.fraction * 100) + "%"; }
-    }
-    else if (ev.type === "tool_end" && current) {
-      running.delete(current); current.box.classList.remove("run"); current.sec.textContent = fmt(ev.seconds);
-      current.bar.hidden = true; if (ev.error) { current.box.classList.add("err"); current.prog.textContent = ev.error; }
-      if (ev.images && ev.images.length) current.box.append(figs(ev.images));
-      think.hidden = false; log.append(think);
-    }
-    else if (ev.type === "answer") {
-      think.remove();
-      if (!block || !ev.streamed || ev.text !== said) { textBlock().textContent = ev.text; }          // the checked answer, with its warnings, replaces the stream
-      log.append(el("div", "clock", ev.line));
-    }
-    else if (ev.type === "error") { think.remove(); textBlock().textContent = "Something went wrong: " + ev.text; }
-    toBottom();
-  });
-  clearInterval(ticker); think.remove();
-  busy = false; $("#send").disabled = false; $("#q").focus(); loadFiles();
-}
-const autosize = () => { const q = $("#q"); q.style.height = "auto"; q.style.height = Math.min(q.scrollHeight, 160) + "px"; };
-$("#q").addEventListener("input", autosize);
-$("#q").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send($("#q").value); } });
-$("#send").onclick = () => send($("#q").value);
-$("#reset").onclick = async () => { await api("/api/reset", {}); log.textContent = ""; };
-const HINTS = ["What is in my files?", "Has my run settled?", "Which hydrogen bonds persist?", "Draw it from the front and the side", "What can VMD do here?"];
-for (const h of HINTS) { const b = el("button", "hint", h); b.onclick = () => { $("#q").value = h; $("#q").focus(); }; $("#hints").append(b); }
-
-// ---- whole jobs
-let workflows = {};
-function fillWorkflowFiles() { if ($("#wfname")) renderSlots(); }
-async function loadWorkflows() {
-  workflows = (await (await api("/api/workflows")).json()).workflows || {};
-  const box = $("#wf"); box.textContent = "";
-  box.append(el("div", null, "A whole job runs several tools in a fixed order, grades what it finds, and writes a report you can send to someone."));
-  box.append(el("label", null, "Which job"));
-  const sel = el("select"); sel.id = "wfname";
-  for (const k of Object.keys(workflows)) sel.append(new Option(k.replace(/_/g, " "), k));
-  sel.onchange = renderSlots; box.append(sel, el("div", "does"), el("div")); box.lastChild.id = "slots";
-  const run = el("button", "btn primary", "Run"); run.id = "runwf"; run.style.marginTop = "14px"; run.onclick = runWorkflow; box.append(run, el("div")); box.lastChild.id = "wfout";
-  renderSlots();
-}
-function renderSlots() {
-  const name = $("#wfname").value, w = workflows[name]; if (!w) return;
-  $("#wf .does").textContent = w.does + (w.needs_vmd ? " (needs VMD)" : "");
-  const box = $("#slots"); const old = [...box.querySelectorAll("select")].map(s => s.value); box.textContent = "";
-  w.files.forEach((slot, i) => {
-    box.append(el("label", null, slot.replace(/_/g, " ")));
-    const s = el("select"); s.dataset.slot = i;
-    const want = /traj/.test(slot) ? "trajectory" : /map/.test(slot) ? "map" : "structure";
-    for (const f of files.filter(f => f.kind === want || (slot === "topology" && f.kind === "structure"))) s.append(new Option(f.path, f.path));
-    if (old[i]) s.value = old[i];
-    box.append(s);
-  });
-}
-async function runWorkflow() {
-  if (busy) return; busy = true;
-  const name = $("#wfname").value, chosen = [...document.querySelectorAll("#slots select")].map(s => s.value);
-  const out = $("#wfout"); out.textContent = ""; $("#runwf").disabled = true;
-  if (chosen.some(c => !c)) { out.append(el("div", "banner", "Pick a file for each line first (add files on the left).")); busy = false; $("#runwf").disabled = false; return; }
-  const prog = el("div", "prog", "starting…"); out.append(prog); const bar = el("div", "bar"); bar.append(el("div")); bar.hidden = true; out.append(bar);
-  await stream("/api/workflow", { name, files: chosen }, ev => {
-    if (ev.type === "tool_progress") { prog.textContent = ev.text; if (ev.fraction != null) { bar.hidden = false; bar.firstChild.style.width = Math.round(ev.fraction * 100) + "%"; } }
-    else if (ev.type === "error") out.append(el("div", "banner", "Something went wrong: " + ev.text));
-    else if (ev.type === "workflow") {
-      prog.remove(); bar.remove(); const r = ev.result;
-      if (r.error) { out.append(el("div", "banner", r.error)); return; }
-      out.append(el("div", "verdict", r.verdict), el("div", "clock", "the whole job took " + fmt(ev.seconds)));
-      for (const f of r.findings || []) { const row = el("div", "finding"); row.append(el("span", "badge " + f.level, f.level), el("span", null, f.text)); out.append(row); }
-      const t = el("table", "steps"); t.append(Object.assign(el("tr"), { innerHTML: "<th>#</th><th>step</th><th>tool</th><th>seconds</th>" }));
-      for (const s of r.steps || []) { const tr = el("tr"); tr.append(el("td", null, s.n), el("td", null, s.label + (s.ok ? "" : "  (failed)")), el("td", null, s.tool), el("td", null, Number(s.seconds).toFixed(2))); t.append(tr); }
-      out.append(t, figs(ev.images));
-      if (ev.report_html) { const a = el("a", null, "Open the report (report.html)"); a.href = "/files/" + ev.report_html.split("/").map(encodeURIComponent).join("/"); a.target = "_blank"; const d = el("div"); d.style.marginTop = "12px"; d.append(a); out.append(d); }
-      loadFiles();
-    }
-  });
-  busy = false; $("#runwf").disabled = false;
-}
-
-// ---- theme and start
-const root = document.documentElement;
-try { const t = localStorage.getItem("vmd-theme"); if (t) root.dataset.theme = t; } catch (e) {}
-$("#theme").onclick = () => { const dark = getComputedStyle(root).getPropertyValue("--bg").trim() === "#12161d"; root.dataset.theme = dark ? "light" : "dark"; try { localStorage.setItem("vmd-theme", root.dataset.theme); } catch (e) {} };
-loadFiles(); loadWorkflows(); loadStatus();                 // independent, so the files appear while VMD and the model are being asked
-setInterval(() => { if (!busy) loadFiles(); }, 8000);
-</script>
+<footer id="status">
+  <span id="statusleft"></span>
+  <span class="grow"></span>
+  <span>chat tools <select id="profile"></select></span>
+</footer>
+<script src="/assets/viewer.js"></script>
+<script src="/assets/app.js"></script>
 </body>
 </html>

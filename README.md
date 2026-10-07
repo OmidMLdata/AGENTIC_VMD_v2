@@ -11,8 +11,10 @@ checks its work.
   and a cluster), each saving the exact Tcl it ran so you can repeat it in your own VMD.
 * **Whole jobs, not just single commands.** Workflows run several tools in a fixed order, grade the findings and write a report with the
   checksums of your inputs.
-* **Four ways to work, one set of tools:** a web page, a menu, a chat, and plain commands. Everything is timed: you see how long every model call and
+* **Four ways to work, one set of tools:** a web page with a molecule viewer, a menu, a chat, and plain commands. Everything is timed: you see how long every model call and
   every tool call took.
+* **Tested.** A [tool test set](docs/tool-test-set.md) checks every tool against data with known answers, and a [model benchmark](docs/model-benchmark.md) scores any language model on tasks for
+  each kind of functionality.
 * **Contained.** One private folder, no administrator rights, nothing installed system-wide. Nothing is sent anywhere unless you choose an online model.
 
 **You need** a Mac, Windows or Linux computer, an internet connection, and VMD (free, from UIUC) if you want VMD-quality pictures and the VMD-driven
@@ -63,6 +65,7 @@ Put your structure and trajectory files in your files folder and ask for them by
 | use VMD's own commands | `vmd-agent vmd` lists them |
 | see if everything works here | `vmd-agent doctor` |
 | test every tool on data with known answers | `vmd-agent bench tools` |
+| score a language model on these tools | `vmd-agent bench models --model NAME` |
 
 ## The pipeline
 
@@ -79,7 +82,8 @@ One project goes through the same stages whichever way you work. `vmd-agent --he
 | 7. Check and keep records | re-check hashes, videos, validation | `vmd-agent provenance`, `report`, `validate` | [Commands](docs/commands.md#7-check-and-keep-records) |
 
 Behind all of it are **53 tools**: the 27 original ones, the 24 that drive VMD, and 2 that run whole jobs ([the list](docs/tools.md)). The chat, the web page,
-the [MCP server](docs/mcp.md) and the commands all call the same functions.
+the [MCP server](docs/mcp.md) and the commands all call the same functions. By default a chat model is offered **all 53 at once** (about 8,000 tokens of descriptions with every
+question); `--tools core` or `--tools vmd` offers about half, which suits small models ([details](docs/tools.md#does-the-model-see-all-53-at-once)).
 
 ## What has and has not been verified
 
@@ -94,7 +98,7 @@ Tests that need something the machine lacks are **skipped with the reason shown,
 ## Documentation
 
 [**All the pages**](docs/index.md): [Install and set up](docs/install.md) · [Ways to work](docs/using.md) · [Command reference](docs/commands.md) · [Models](docs/models.md) ·
-[Whole jobs](docs/workflows.md) · [VMD](docs/vmd.md) · [The 53 tools](docs/tools.md) · [The tool test set](docs/tool-test-set.md) · [MCP clients](docs/mcp.md) ·
+[Whole jobs](docs/workflows.md) · [VMD](docs/vmd.md) · [The 53 tools](docs/tools.md) · [The tool test set](docs/tool-test-set.md) · [The model benchmark](docs/model-benchmark.md) · [MCP clients](docs/mcp.md) ·
 [Docker](docs/docker.md) · [Development](docs/development.md) · [Architecture](docs/architecture.md) · [Methods](docs/methods.md) · [Security](docs/security.md) ·
 [Research paper](docs/RESEARCH.md) · [Changelog](CHANGELOG.md)
 

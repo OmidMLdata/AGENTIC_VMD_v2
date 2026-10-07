@@ -188,6 +188,36 @@ def _bench_agent(args):
         print(open(f"{args.out_dir}/summary.md").read())
 
 
+def _bench_models(args) -> int:
+    from vmd_agent import chat, model_bench, model_tasks
+    if args.list:
+        for cat, tasks in model_tasks.by_category().items():
+            print(f"{cat} ({len(tasks)})")
+            for t in tasks:
+                print(f"  {t.id:20s} {('needs ' + ', '.join(t.needs)) if t.needs else '':14s} {t.prompt[:90]}")
+        print(f"{len(model_tasks.TASKS)} tasks in {len(model_tasks.CATEGORIES)} categories")
+        return 0
+    if args.summarize:
+        print(model_bench.write_summary(args.out_dir))
+        return 0
+    if not args.model:
+        print("vmd-agent bench models: name the model(s) with --model (or use --list / --summarize)", file=sys.stderr)
+        return 2
+    base_url, _, api_key = chat.resolve_connection(args.base_url, args.model[0], args.api_key)
+    problem = chat.check_connection(base_url, args.model[0], api_key)
+    if problem:
+        print("\n".join(problem), file=sys.stderr)
+        return 2
+    try:
+        model_bench.run(args.model, args.data_dir, args.out_dir, base_url, api_key, args.categories, args.only, args.repeats, args.tools,
+                        args.max_turns, args.temperature, not args.no_guard, args.skip, args.force, log=print)
+    except ValueError as e:
+        print(f"vmd-agent bench models: {e}", file=sys.stderr)
+        return 2
+    print("\nsummary: " + model_bench.write_summary(args.out_dir))
+    return 0
+
+
 def _bench_tools(args) -> int:
     from vmd_agent import tool_cases, tool_dataset
     if args.bench_cmd == "dataset":
@@ -218,6 +248,8 @@ def _bench(args):
     from vmd_agent.bench import sampling, rating_study, conditions
     if args.bench_cmd in ("tools", "dataset"):
         return _bench_tools(args)
+    if args.bench_cmd == "models":
+        return _bench_models(args)
     if args.bench_cmd == "docker":
         from vmd_agent import launcher
         rest, mode = list(args.rest), args.mode
@@ -487,6 +519,7 @@ def build_parser():
     sp.add_argument("--quiet", action="store_true", help="do not show progress while it runs")
     sp = sub.add_parser("tools", help="list every tool (the chat's and the MCP server's), with what it does")
     sp.add_argument("--group", choices=["all", "core", "vmd"], default="all")
+    sp.add_argument("--size", action="store_true", help="say how much of a model's context the descriptions of these tools take up in every request")
     sp = sub.add_parser("tool", help="run any single tool once, with its arguments as JSON",
                         epilog='example:  vmd-agent tool vmd_measure \'{"topology": "a.pdb", "trajectory": "a.dcd", "kind": "rgyr"}\'')
     sp.add_argument("name", help="tool name (see `vmd-agent tools`)")
@@ -642,6 +675,24 @@ def build_parser():
     b.add_argument("--skip", nargs="+", default=[], choices=["vmd", "ffmpeg", "network"], help="do not run cases that need these")
     b.add_argument("--list", action="store_true", help="list the cases and what each needs, and run nothing")
     b.add_argument("--json", action="store_true", help="print the records as JSON")
+    b = bsub.add_parser("models", help="put language models in front of the tools: tasks per kind of functionality, graded by a program, "
+                        "with the seconds each took")
+    b.add_argument("--model", nargs="+", help="the model(s) to test, as the server names them (several = one after the other)")
+    b.add_argument("--base-url", help="OpenAI-style address (default: your saved setting, else Ollama at http://localhost:11434/v1)")
+    b.add_argument("--api-key", help="API key if the server needs one")
+    b.add_argument("--data-dir", default="model_bench_data", help="where the dataset and the temporary working copies go")
+    b.add_argument("--out-dir", default="model_bench_out", help="where records.jsonl, summary.md and summary.json go")
+    b.add_argument("--categories", nargs="+", help="only these categories (see --list)")
+    b.add_argument("--only", nargs="+", metavar="TASK", help="only these tasks")
+    b.add_argument("--repeats", type=int, default=1, help="ask each task this many times (models vary from run to run)")
+    b.add_argument("--tools", choices=["all", "core", "vmd"], default="all", help="which tools the model is offered (see docs/tools.md)")
+    b.add_argument("--max-turns", type=int, default=12)
+    b.add_argument("--temperature", type=float, default=0.0)
+    b.add_argument("--no-guard", action="store_true", help="turn off the chat's checks (the nudge to use a tool, the number check): a raw model")
+    b.add_argument("--skip", nargs="+", default=[], choices=["vmd", "ffmpeg", "network"], help="leave out tasks that need these")
+    b.add_argument("--force", action="store_true", help="ask again even if the record is already in --out-dir")
+    b.add_argument("--list", action="store_true", help="list the tasks by category, and run nothing")
+    b.add_argument("--summarize", action="store_true", help="only rebuild summary.md from the records already in --out-dir")
     b = bsub.add_parser("dataset", help="write the tool test set's files (a protein, a trajectory, maps, a video) and stop")
     b.add_argument("folder")
     b = bsub.add_parser("docker", help="run the benchmark commands in a container with your VMD (Linux VMD only; "
@@ -743,8 +794,14 @@ def main(argv=None):
             return vmd_cli.run(args, _print)
         if args.cmd == "tools":
             from vmd_agent import toolset
-            for spec in toolset.tool_specs(list(toolset.PROFILES[args.group])):
+            specs = toolset.tool_specs(list(toolset.PROFILES[args.group]))
+            for spec in specs:
                 print(f"{spec['name']:<28} {spec['description'][:110]}")
+            if args.size:
+                from vmd_agent.llm_client import to_openai_tools
+                chars = len(json.dumps(to_openai_tools(specs)))
+                print(f"\n{len(specs)} tools: their descriptions are {chars:,} characters, about {chars // 4:,} tokens, sent with every question "
+                      "(4 characters per token is a rough rule; the chat keeps a 16,384-token context with the private Ollama)")
             return 0
         if args.cmd == "tool":
             from vmd_agent import toolset

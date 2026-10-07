@@ -16,17 +16,27 @@ vmd-agent ui                    # opens your browser; Ctrl+C in the terminal sto
 vmd-agent ui --data-dir ~/my-project --port 8765 --no-browser
 ```
 
-* **Your files** (left): everything in your files folder, with a drop zone to add more. Click a structure, trajectory or video to look at it
-  (`inspect files`, `detect system`, `structure stats`, `probe video`, each with the seconds it took), to see an image or play a video, or to ask the chat about it.
-* **Chat** (middle): the model's text as it is written, and every tool it calls as a card with its arguments, a progress bar when the tool
-  reports progress, any pictures it made, and **the seconds it took**. Each model call is timed too, and a line under every answer says where the time
-  went. The numbers in the answer are checked against the tools' results exactly as in the terminal chat ([How the chat keeps a model honest](models.md#how-the-chat-keeps-a-model-honest)).
-* **Whole jobs** (second tab): pick a [workflow](workflows.md), pick the files, run it, and read the verdict, the graded findings, the step table with
-  seconds and the figures, with a link to the report. No model is needed for this tab.
+A workbench laid out like VMD's own windows: a list of molecules on the left (VMD's Main window), a black display in the middle (its Graphics window), the assistant
+on the right, and a console along the bottom (its Tk console), with a status bar under it.
 
-It runs **only on this computer**: it listens on 127.0.0.1, answers only requests addressed to it by that name, and wants the one-time key that is part
-of the address it prints (kept in a cookie), so no other web page you have open can use it. It can read and write only inside your files folder, never
-overwrites an uploaded file, and runs one job at a time. It needs nothing beyond what vmd-agent already installs.
+* **Molecules.** Everything in your files folder, with a drop zone to add more and folders that open. A file that is drawn is marked **T** (top), as in VMD. Click a file for
+  its details and for read-only looks (`inspect files`, `detect system`, `structure stats`, `probe video`, each with the seconds it took); double-click a structure to draw it.
+* **Display.** A viewer drawn on a canvas with VMD's names for things. **Drawing:** `Trace` (the backbone), `Lines` (bonds), `VDW` (spheres), `Points`.
+  **Colour:** `Name` (by element, in VMD's colours), `Chain`, `ResType` (acidic, basic, polar, nonpolar), `Resid`, `Index`, `Mono`. Switches for protein, other (ligands, ions) and water.
+  Drag to rotate, scroll to zoom, shift-drag (or right-drag) to move, double-click to reset; the axes sit in the corner (x red, y green, z blue). A structure with a trajectory
+  gets a frame slider and play with a speed menu. **Save PNG** keeps the picture. Images and videos that tools make open in the same place, and every figure a tool makes is kept in a
+  strip under the display. A system of more than 40,000 atoms opens as its backbone and non-solvent atoms only, and the caption says so.
+* **Assistant, Chat.** The model's text as it is written, every tool call as a card (click it for its arguments) with a progress bar and **the seconds it took**, each model call timed, and
+  a line under every answer saying where the time went. The numbers in an answer are checked against the tools' results exactly as in the terminal chat ([How the chat keeps a model honest](models.md#how-the-chat-keeps-a-model-honest)).
+* **Assistant, Whole jobs.** Pick a [workflow](workflows.md), pick the files, run it, and read the verdict, the graded findings, the step table with seconds and the figures, with a link to the
+  report. No model is needed for this tab.
+* **Console.** A running log of everything: each tool and model call with its seconds, progress, and the totals of the session (click its title to fold it).
+* **Status bar.** Whether the model answers, VMD's version, ffmpeg, and a **chat tools** menu: `all`, `core` or `vmd` (see [Does the model see all 53 at once?](tools.md#does-the-model-see-all-53-at-once)).
+
+It runs **only on this computer**: it listens on 127.0.0.1, answers only requests addressed to it by that name, and wants the one-time key that is part of the address it prints (kept in a
+cookie), so no other web page you have open can use it. It can read and write only inside your files folder, never overwrites an uploaded file, and runs one job at a time. It needs nothing
+beyond what vmd-agent already installs. The drawing is vmd-agent's own and is a convenient look at a structure, not a replacement for VMD's: no surfaces, no secondary-structure
+cartoons; for those, [drive VMD itself](vmd.md#6-drive-vmd-itself).
 
 ## Wall-clock time of every execution
 

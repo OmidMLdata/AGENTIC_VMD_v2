@@ -48,7 +48,7 @@ Some cases are **negative**: a wrong request must be refused, not answered with 
 The NAMD input is checked against the system it was written for, never run in NAMD; the SLURM script is checked for the resources you asked
 for, never run on a cluster. The three network cases (`search_pdb`, `fetch_structure`, `fetch_and_visualize`) talk to the live PDB and
 need a connection. Cases that need VMD were only run with VMD 1.9.4a57 on macOS. The dataset is small and idealised: it checks that the
-tools work, not that their answers are good on your real systems. For that, use your own data and the [benchmark](development.md).
+tools work, not that their answers are good on your real systems. For that, use your own data and the [benchmark](development.md). To test a *language model* on these tools, use the [model benchmark](model-benchmark.md).
 
 ## Adding a case
 

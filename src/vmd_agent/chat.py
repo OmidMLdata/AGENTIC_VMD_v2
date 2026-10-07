@@ -184,6 +184,7 @@ class ChatSession:
         self.clock = new_clock()               # wall-clock of the whole session
         self.last_turn: dict = new_clock()     # wall-clock of the latest question
         self.turn: dict = self.last_turn
+        self.call_log: List[dict] = []         # every tool call so far: name, arguments, the result as returned, seconds
         self.on_event: Optional[Callable[[dict], None]] = None   # structured events for a screen (the web page); see _emit
         self.reset()
 
@@ -224,6 +225,7 @@ class ChatSession:
         seconds = time.time() - started
         self.turn["tool_s"] += seconds
         self.turn["tool_calls"].append({"name": name, "seconds": round(seconds, 3)})
+        self.call_log.append({"name": name, "arguments": args, "result": result, "seconds": round(seconds, 3)})
         self.echo(f"     {seconds:.1f} s")
         failed = isinstance(result, dict) and bool(result.get("error"))
         if failed:
