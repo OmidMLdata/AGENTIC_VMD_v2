@@ -10,7 +10,7 @@ import time
 import pytest
 
 from vmd_agent import ui
-from tests.surfaces.test_timing import _server
+from conftest import scripted_server as _server
 
 DATA = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data")
 

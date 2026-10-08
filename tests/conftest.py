@@ -15,6 +15,10 @@ did not run, not a test that passed.
                        ``VMD_AGENT_LIVE_LLM_MODEL=<name>``; ``requires_llm``
 * real network:        reachable rcsb.org; ``requires_network``
 """
+import http.server
+import json
+import threading
+import time
 import os
 import sys
 import warnings
@@ -236,3 +240,41 @@ def _clean_env(monkeypatch):
     for k in ("VMD_AGENT_ALLOWED_ROOTS", "VMD_AGENT_ALLOW_UNSAFE_TCL",
               "VMD_AGENT_ALLOW_PRIVATE_URLS", "VMD_AGENT_ENABLE_TCL"):
         monkeypatch.delenv(k, raising=False)
+
+
+# ---- a model server for tests of the agent: real HTTP, the chat API's wire format, scripted replies (no model is judged with it)
+DELAY = 0.25
+
+
+def scripted_server(replies):
+    """Answers each POST with the next of ``replies`` (a dict: content and/or tool_calls) after DELAY seconds, as plain JSON."""
+    calls = []
+
+    class H(http.server.BaseHTTPRequestHandler):
+        def do_POST(self):
+            calls.append(json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0)))))
+            time.sleep(DELAY)
+            msg = {"role": "assistant", **replies[min(len(calls), len(replies)) - 1]}
+            usage = {"prompt_tokens": 5, "completion_tokens": 2}
+            if calls[-1].get("stream"):                       # the same reply as server-sent events, as streaming clients ask for
+                delta = {k: v for k, v in msg.items() if k != "role" and v}
+                if "tool_calls" in delta:
+                    delta["tool_calls"] = [{"index": i, **c} for i, c in enumerate(delta["tool_calls"])]
+                events = [{"choices": [{"delta": delta, "finish_reason": None}]},
+                          {"choices": [{"delta": {}, "finish_reason": "stop"}], "usage": usage}]
+                body = b"".join(b"data: " + json.dumps(e).encode() + b"\n\n" for e in events) + b"data: [DONE]\n\n"
+                ctype = "text/event-stream"
+            else:
+                body = json.dumps({"choices": [{"message": msg, "finish_reason": "stop"}], "usage": usage}).encode()
+                ctype = "application/json"
+            self.send_response(200)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *a):
+            pass
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    return srv, f"http://127.0.0.1:{srv.server_address[1]}/v1", calls

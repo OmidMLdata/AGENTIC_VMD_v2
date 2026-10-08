@@ -9,7 +9,7 @@ import os
 import pytest
 
 from vmd_agent import model_bench as B, model_tasks as M, toolset
-from tests.surfaces.test_timing import _server
+from conftest import scripted_server as _server
 
 
 @pytest.fixture(scope="module")

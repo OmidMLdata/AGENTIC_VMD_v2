@@ -208,7 +208,7 @@ def test_a_list_of_statements_to_judge_is_pointed_at_verify_claims(text, wanted)
 
 
 def test_the_hint_is_added_to_the_question_only_when_the_tool_is_offered():
-    from tests.surfaces.test_timing import _server
+    from conftest import scripted_server as _server
     srv, url, requests = _server([{"content": "ok"}])
     try:
         agent.Agent(url, "m", guard=False).ask("Which of these are true: (1) a ligand")
@@ -225,7 +225,7 @@ def _tool_then(*replies):
 
 
 def test_an_answer_with_numbers_no_tool_returned_is_sent_back_once_and_the_correction_is_kept():
-    from tests.surfaces.test_timing import _server
+    from conftest import scripted_server as _server
     srv, url, requests = _server(_tool_then({"content": "The free energy is -8421.55 kcal/mol."}, {"content": "That cannot be measured with these tools."}))
     try:
         a = agent.Agent(url, "m")
@@ -237,7 +237,7 @@ def test_an_answer_with_numbers_no_tool_returned_is_sent_back_once_and_the_corre
 
 
 def test_a_second_unsupported_answer_is_flagged_not_sent_back_again():
-    from tests.surfaces.test_timing import _server
+    from conftest import scripted_server as _server
     srv, url, requests = _server(_tool_then({"content": "It is -8421.55 kcal/mol."}, {"content": "Really, -8421.55 kcal/mol."}))
     try:
         answer = agent.Agent(url, "m").ask("List the surface styles.")
@@ -247,7 +247,7 @@ def test_a_second_unsupported_answer_is_flagged_not_sent_back_again():
 
 
 def test_a_streamed_answer_is_flagged_but_cannot_be_taken_back():
-    from tests.surfaces.test_timing import _server
+    from conftest import scripted_server as _server
     srv, url, requests = _server(_tool_then({"content": "It is -8421.55 kcal/mol."}))
     got = []
     try:
@@ -258,7 +258,7 @@ def test_a_streamed_answer_is_flagged_but_cannot_be_taken_back():
 
 
 def test_a_grounded_answer_is_not_sent_back():
-    from tests.surfaces.test_timing import _server
+    from conftest import scripted_server as _server
     srv, url, requests = _server(_tool_then({"content": "QuickSurf and Surf draw surfaces."}))
     try:
         answer = agent.Agent(url, "m").ask("List the surface styles.")

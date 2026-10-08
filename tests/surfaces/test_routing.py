@@ -113,7 +113,7 @@ def test_every_tool_belongs_to_the_base_or_a_group(tool):
 
 
 # ------------------------------------------------------------------------------------ inside the agent
-from tests.surfaces.test_timing import _server  # noqa: E402
+from conftest import scripted_server as _server
 from vmd_agent import agent  # noqa: E402
 
 
