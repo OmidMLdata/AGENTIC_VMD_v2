@@ -1,32 +1,17 @@
 # vmd-agent
 
-Ask questions about your molecular structures and simulations **in plain language** and get answers worked out from real measurements: what is in a system, how it moves,
-whether a statement about it is true. [VMD](https://www.ks.uiuc.edu/Research/vmd/) does the measuring and the drawing; vmd-agent is the **agent** in between, a language model
-that decides which VMD tools to use, runs them, and has every answer checked against what the tools actually returned.
+You ask a question about a molecular system in ordinary words, and vmd-agent answers it by running real measurements. What's in this file? Has my run settled? Is this statement true? It uses
+[VMD](https://www.ks.uiuc.edu/Research/vmd/) for the measuring and the drawing. A language model sits in the middle: it decides which tools to run, reads what they return, and writes the answer. Any number
+in that answer has to have come from a tool, and if one didn't, it gets sent back or flagged.
 
-It works out for itself what computer it is on (Mac, Windows or Linux) and runs the model **on your own computer with a free open-source model by default**. Prefer Claude Code or Claude Desktop as the assistant? Choose that
-in setup instead of a local model; vmd-agent then just supplies the tools, like any other MCP server.
+By default the model is a free, open-source one running on your own computer, so nothing leaves your machine. If you'd rather have Claude Code or Claude Desktop do the thinking, you can pick that in setup;
+vmd-agent then just hands them its tools.
 
-## Highlights
-
-* **An agent for VMD.** Describe what you want; the agent picks from **57 tools** in eleven groups, runs them, and answers from their numbers. It says how each number was obtained.
-* **Open-source first.** Free models run locally through a private copy of Ollama, chosen to fit your memory. Nothing leaves your computer unless you choose an online model.
-* **An agent over your own VMD.** The agent drives the VMD window you can see: load a system, draw it as a cartoon or a surface, colour it, zoom to the ligand, step through frames, ask what is selected, take a picture. Every picture and number is VMD's own; nothing is imitated. [Your VMD window](docs/guide/window.md).
-* **A complete wrapper around VMD.** The library covers VMD itself: measurements, interactions, trajectory conversion, density maps, system building, scenes, movies and hand-offs to NAMD and
-  a cluster. Each tool that runs VMD saves the exact Tcl it ran, so you can repeat it in your own VMD.
-* **Whole jobs, not only single tools.** Six workflows sit above the tools: each runs several of them in a fixed order, grades what it finds and writes a report with the checksums of your inputs and the Tcl of every step.
-* **Four ways to work, one library.** A web page that looks like VMD and drives a real one, a numbered menu, a terminal chat, and one command, `vmd-agent tool`, that runs any tool.
-* **Honest answers.** Every number must come from a tool; a model that answers from memory is sent back to use one, a number no tool returned is sent back or flagged, and a request that cannot be answered
-  is declined rather than guessed.
-* **Everything is timed.** You see how long each model call and each tool call took.
-* **Contained.** One private folder, no administrator rights, nothing installed system-wide. The agent can only read and write inside the files folder you choose.
-* **Pick a model by measuring.** A built-in benchmark scores any model on 67 tasks, one per kind of functionality, so you can choose the model that suits your work and your computer.
-
-**You need** a Mac, Windows or Linux computer, an internet connection, and VMD (free, from UIUC) for VMD-quality pictures and the VMD-driven tools. **You do not need** Python, Git, Docker, ffmpeg, an account or any AI app.
+You need a Mac, Windows or Linux computer and an internet connection. VMD itself is free from UIUC and worth having, because pictures and many of the tools use it. You don't need Python, Git, Docker or an account.
 
 ## Install
 
-Open a terminal (Mac: `Cmd` + `Space`, type `Terminal`; Windows: Start menu, type `PowerShell`), paste **one line**, and answer four questions.
+Open a terminal (on a Mac, press `Cmd` + `Space` and type `Terminal`; on Windows, search the Start menu for `PowerShell`), paste one line, and answer a few questions.
 
 Mac or Linux:
 
@@ -40,29 +25,27 @@ Windows (PowerShell):
 powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/OmidMLdata/AGENTIC_VMD_v2/main/install/install.ps1 | iex"
 ```
 
-Everything goes into one folder (`~/vmd-agent`); deleting it removes everything. Setup finds VMD and starts it once to prove it works, makes a files folder the agent is confined to, and lets you
-choose who answers: a free model on your computer (recommended), an online service, Claude Desktop or Code, or none. More: [Install and set up](docs/guide/install.md).
+The installer puts the program in one folder (`~/vmd-agent`) and needs no administrator rights. Setup then finds VMD and starts it once to make sure it runs, asks for a files folder (the agent can only
+see that folder), and asks who should answer your questions: a free model on your computer (recommended), an online service, Claude Code or Desktop, or nobody. Nothing big is downloaded without asking first.
+The details are in [Install and set up](docs/guide/install.md).
 
-### What it works out by itself
+If you'd rather keep everything, including the model, inside your project folder, `vmd-agent setup --home here` creates a `.vmd-agent` folder there and offers to move an existing model into it.
+Git ignores that folder.
 
-| It looks at | And then |
-|---|---|
-| the **operating system and CPU** (macOS, Linux, Windows, WSL, a container; Apple Silicon or not) | finds VMD where that system keeps it, uses the right launcher, paths and settings folder, and tells you what cannot work here (for example, a Mac's VMD cannot run inside Docker) |
-| the **memory and graphics card** | suggests the model that fits: the 8B default from 16 GB (or with an NVIDIA card), the 3B from 8 GB, and says plainly when there is too little for a model that can use tools |
-| **VMD**: whether it is there, starts, and its version | uses it for pictures and the tools that run VMD; without it every other tool still works, with built-in pictures |
-| **Ollama** | runs the open-source model through a private copy kept inside the vmd-agent folder (or yours, if you have one), downloading a model only after asking |
-| **Claude Code or Desktop** | notes whether they are installed, and offers them as an *alternative* assistant in setup (the choice is yours; nothing is registered unless you pick it) |
+`vmd-agent doctor` shows what it found on your computer (system, memory, graphics card, VMD, Ollama) and what to do next.
 
-`vmd-agent doctor` prints all of this and what to do next.
+## Using it
 
-## Four ways to work
+There are four ways in, and they all use the same tools.
 
-| Way | What it is | Start it |
-|---|---|---|
-| **The web page** | A remote for a **real VMD window**, laid out like VMD in your browser: menus and a command palette, the molecule list, **representations** (selection, drawing method, colour, material), animation and a console, all acting on VMD, and a display that shows **VMD's own pictures**; plus the chat with every tool call shown with its progress and seconds, **a form for every tool** (drop-downs, check boxes, buttons), a tab that runs whole jobs, and a terminal for developers | `vmd-agent ui` |
-| **The menu** | Numbered choices in plain words: look at a structure, analyse a simulation, check a statement, connect an AI app | `vmd-agent` |
-| **The chat** | Ask in plain language in the terminal; answers stream as they are written, with the time each step took | `vmd-agent chat` |
-| **The command line** | Scripts and batches without any model: any tool of the library, with flags made from its parameters | `vmd-agent tool NAME ...` |
+* **The web page** (`vmd-agent ui`) is a remote control for a real VMD window. It's laid out like VMD, with a molecule list, a representations editor, animation controls and a console, and the picture in the
+  middle is VMD's own. Alongside it you get the chat, a form for every tool, a tab for whole jobs, and a terminal for developers.
+* **The menu** (`vmd-agent`) is a numbered list in plain words: look at a structure, analyse a simulation, check a statement.
+* **The chat** (`vmd-agent chat`) is the same conversation in the terminal.
+* **The command line** (`vmd-agent tool NAME ...`) runs any single tool without a model, which is handy for scripts.
+
+Put your structure and trajectory files in your files folder and ask for them by name: *"What is in protein.pdb?"*, *"Has my run settled? Use run.psf and run.dcd."*, *"Which salt bridges persist?"*,
+*"Build a solvated, neutral system from 1ubq.pdb."*
 
 ```bash
 vmd-agent tools                                                          # the library, in groups
@@ -73,14 +56,15 @@ vmd-agent tool measure_with_vmd run.pdb run.dcd --kind rgyr              # one o
 vmd-agent workflow equilibration_check run.psf run.dcd                   # a whole job, with a report
 ```
 
-Put your structure and trajectory files in your files folder and ask for them by name: *"What is in protein.pdb?"*, *"Has my run settled? Use run.psf and run.dcd."*, *"Which salt bridges persist?"*,
-*"Build a solvated, neutral system from 1ubq.pdb."*
+### Driving your VMD window
 
-## What it can do
+The agent can work the VMD window you're looking at: load a system, draw it as a cartoon or a surface, colour it, zoom to the ligand, step through frames, ask what a selection contains, take a picture. Every
+picture and number comes from VMD. A small script inside VMD listens on your own machine only and accepts a short, fixed list of commands, none of which runs arbitrary Tcl. Many analysis tools also take
+`show_in_window`, which draws their result in that window afterwards (the salt bridges as licorice, a fitted model inside its map, and so on). [How it works](docs/guide/window.md).
 
-### The tool library: 57 tools in eleven groups
+## The tools
 
-A tool does one thing. Every tool is available to the chat, to an MCP client and to `vmd-agent tool NAME`; there is no second list. [Every tool, with what it does and whether it needs VMD](docs/guide/tools.md).
+There are **57 tools** in eleven groups. A tool does one thing, and each one is available to the chat, to MCP clients and to `vmd-agent tool NAME`. [Every tool, what it does, and whether it needs VMD](docs/guide/tools.md).
 
 | Group | Tools |
 |---|---|
@@ -96,79 +80,81 @@ A tool does one thing. Every tool is available to the chat, to an MCP client and
 | **Video** (2) | `probe_video` · `interpret_video` |
 | **Evidence and records** (4) | `verify_claims` · `record_visual_interpretation` · `assemble_report` · `verify_provenance` |
 
-* **Understand a structure.** Detects what a system contains (protein chains, ligands, water, ions, lipids, nucleic acids, materials), counts bonds, disulfides, hydrogen bonds and salt bridges, assigns secondary
-  structure, checks chirality, cis peptides and chain gaps, and draws it from several angles with a legend that ties every colour to what it shows. Structures come from your files, the PDB, AlphaFold or a URL.
-* **Measure a simulation.** RMSD, RMSF, radius of gyration, contacts, hydrogen bonds, distances, solvent-accessible area and density, with convergence tests that say whether a run has settled; event-aware
-  keyframes that pick the frames where something actually happens; and **claim checking**: a statement about the system comes back supported, contradicted or "cannot tell", with the evidence.
-* **Drive VMD itself.** VMD's own `measure` commands, interactions as how often each pair is present, secondary structure per frame, Ramachandran regions, trajectory conversion, density maps, solvated
-  CHARMM36 systems, mutations, membranes and nanotubes, scenes rendered to images and rotating movies or exported as a folder you can open in your own VMD, cryo-EM map fitting, NAMD inputs and SLURM scripts.
-  `probe_environment` with `plugins` classifies every plugin of *your* VMD as driven, GUI-only, needing another program, or not yet wrapped. [VMD](docs/guide/vmd.md).
-* **Videos and records.** Read a video's real metadata, prove it decodes and pull stills you can map back to simulation frames; re-check the hashes recorded for an earlier run; assemble a written report from a session.
+In plain terms, they cover:
 
-### Workflows: whole jobs above the tools
+* **Understanding a structure:** what it contains (chains, ligands, water, ions, lipids, nucleic acids), bonds, disulfides, hydrogen bonds, secondary structure, chirality and chain gaps, and pictures from several angles with a legend.
+  Structures can come from your files, the PDB, AlphaFold or a URL.
+* **Measuring a simulation:** RMSD, RMSF, radius of gyration, contacts, hydrogen bonds, distances, surface area and density, with tests for whether a run has converged, and keyframes picked from where something
+  actually happens. You can also check a written statement against the data and get back supported, contradicted or "can't tell", with the evidence.
+* **Running VMD itself:** its `measure` commands, trajectory conversion, density maps, solvated CHARMM36 systems, mutations, membranes, nanotubes, rendered scenes and movies, and NAMD and SLURM files. Each tool that
+  runs VMD saves the exact Tcl it used, so you can repeat it in your own VMD. [More on VMD](docs/guide/vmd.md).
+* **Videos and records:** read a video's real metadata, pull stills and map them back to simulation frames, re-check recorded hashes, and put a report together from a session.
 
-A workflow is not a tool: it runs several tools in a fixed order, grades the findings (ok, note, warning, problem), gives a verdict and writes `report.md` and `report.html` with the figures, every caveat the
-tools raised, the methods, the SHA-256 of every input and the Tcl of every VMD step. The agent reaches all six through one call, `run_workflow`; from a terminal it is `vmd-agent workflow NAME FILE ...`. [Workflows](docs/guide/workflows.md).
+## Whole jobs
+
+A workflow isn't a tool. It runs several tools in a fixed order, grades what it finds (ok, note, warning, problem), gives a verdict, and writes `report.md` and `report.html` with the figures, every caveat the tools
+raised, the SHA-256 of your input files and the Tcl of each VMD step. The agent reaches all six through one call, `run_workflow`; from a terminal it's `vmd-agent workflow NAME FILE ...`.
+[Workflows](docs/guide/workflows.md).
 
 | Workflow | Files | What it does |
 |---|---|---|
-| `structure_overview` | structure | what is in it, and is it in good shape: composition, torsions, chirality, gaps, pictures |
+| `structure_overview` | structure | what's in it and whether it's in good shape: composition, torsions, chirality, gaps, pictures |
 | `equilibration_check` | topology, trajectory | has the run settled: RMSD and size convergence, periodic box, two engines compared |
 | `interaction_report` | topology, trajectory | hydrogen bonds and salt bridges (and contacts with a partner group), as how often each is present |
 | `compare_runs` | topology, two trajectories | RMSD, size and fluctuation of two runs side by side |
 | `prepare_simulation` | structure | check the input, build a solvated neutral CHARMM36 system, write NAMD and SLURM files |
 | `cryoem_fit` | model, map | fit a model into a cryo-EM map, with a picture and a session for VMD |
 
-## The agent
+## How the agent works
 
-One module runs the model, the tools and the checks, and every screen is a thin front end on it, so the chat, the web page and the benchmark behave the same.
+One module runs the model, the tools and the checks, and every front end sits on top of it, so the chat, the web page and the benchmark behave alike.
 
-* **Routing.** `--tools auto` offers the model only the tools that fit the question, plus a way to ask for more; `--tools all` gives it the whole library (about 12,000 tokens of descriptions, most of a small model's context).
-  [Which tools a model sees](docs/guide/tools.md#does-the-model-see-all-of-them-at-once).
-* **Argument repair.** A number written as text, `RMSD` for `rmsd`, a missing folder in a file name, a trajectory given as the topology: put right when there is only one way to read it, and the result says so.
-* **Plain results.** The results models misread most start with a one-sentence summary, and parameters whose names do not say what they do are described to the model.
-* **The guard.** A data question answered without a tool is sent back once; an answer with a number no tool returned is sent back once, then flagged.
-* **MCP.** The same tools are an MCP server for Claude Code, Claude Desktop or any client. [MCP clients](docs/guide/mcp.md).
+* **Routing.** By default (`--tools auto`) the model is offered only the tools that fit your question, plus a way to ask for more. A small model's context is limited, and all 57 descriptions take most of it.
+  `--tools all` offers everything. [Which tools a model sees](docs/guide/tools.md#does-the-model-see-all-of-them-at-once).
+* **Argument repair.** If the model writes a number as text, `RMSD` instead of `rmsd`, or a file name without its folder, that's fixed when there's only one sensible reading, and the result says so.
+* **The guard.** A data question answered without a tool is sent back once. An answer containing a number no tool returned is sent back once, then flagged. Requests that can't be answered are declined, not guessed.
+* **Timing.** Every model call and every tool call shows how long it took.
+* **MCP.** The same tools work as an MCP server for Claude Code, Claude Desktop or any other client. [MCP clients](docs/guide/mcp.md).
 
-More: [architecture](docs/reference/architecture.md#the-agent-and-what-surrounds-the-model).
+More in [the architecture notes](docs/reference/architecture.md#the-agent-and-what-surrounds-the-model).
 
 ## Choosing a model
 
-The suggested open-source models ([the list](docs/guide/models.md), each checked against the Ollama library) differ in how well they use tools. The built-in benchmark puts a model in front of the tools with 58
-plain-language requests in 15 kinds of functionality (inspecting files, claims, trajectories, VMD measurements, conversion, building, maps, rendering, driving a VMD window, video, whole jobs, hand-offs, records, network, and requests
-that must be declined). Each task has the tools that answer it and the **correct answer**, worked out from data built to have known properties ([every prompt and its correct answer](docs/benchmarks/model-benchmark-tasks.md)),
-and is graded by a program, with the seconds of every model call and tool call.
+Models differ a lot in how well they use tools. There's a built-in benchmark that gives a model 67 plain-language requests across 15 kinds of work (inspecting files, claims, trajectories, VMD measurements,
+building, maps, rendering, driving the VMD window, video, whole jobs and requests that should be declined). Each task has a correct answer worked out from data built to have known properties, and a program grades it.
+See [every prompt and its correct answer](docs/benchmarks/model-benchmark-tasks.md). The suggested models are listed in [Models](docs/guide/models.md).
 
 ```bash
 vmd-agent bench models --list --reference          # every prompt and what a correct answer says
 vmd-agent bench models --model granite4.1:8b       # one model on your local server
 vmd-agent bench models --catalogue --pull          # every suggested model, one after another (downloaded into the private Ollama)
-vmd-agent bench models --summarize                 # the comparison: success by model and by kind of functionality, seconds, tokens
+vmd-agent bench models --summarize                 # the comparison: success by model and by kind of work, seconds, tokens
 vmd-agent bench tools                              # every tool on generated data with known answers
 ```
 
-Details: [the model benchmark](docs/benchmarks/model-benchmark.md), [the tool test set](docs/benchmarks/tool-test-set.md).
+More: [the model benchmark](docs/benchmarks/model-benchmark.md) and [the tool test set](docs/benchmarks/tool-test-set.md).
 
-## Safe by design
+## Safety
 
-The agent can only read and write inside your files folder. Tcl is never taken from a caller: each VMD command builds its script from validated values and runs it headless with a scrubbed environment and a timeout.
-The free-form Tcl tool is off unless you switch it on. Downloads are limited to the sources you name, and the private model server is checked against its published checksum before it runs. [Security](docs/reference/security.md).
+The agent can only read and write inside your files folder, and it can't touch its own settings folder at all. Tcl is never taken from a caller: each VMD command builds its script from validated values and
+runs it headless, with a cleaned environment and a time limit. The free-form Tcl tool is off unless you switch it on. Downloads are limited to the sources you name, and the private model server is checked against its
+published checksum before it runs. [Security](docs/reference/security.md).
 
-## Repository layout
+## What's in this repository
 
 ```
-src/vmd_agent/     the package: the agent, the tool library, VMD wrappers (vmdkit/), analysis, drawing, the web page, the benchmarks
+src/vmd_agent/     the package: the agent, the tools, the VMD wrappers (vmdkit/), analysis, drawing, the web page, the benchmarks
 install/           the one-line installers (install.sh for Mac and Linux, install.ps1 for Windows)
 docker/            Dockerfile, compose files and helpers for the container routes
 docs/              the manual: guide/ (using it), benchmarks/ (choosing a model), reference/ (architecture, methods, security, research), CHANGELOG and NOTICE
-tests/             the test suite, mirrored on the package
+tests/             the test suite, laid out like the package
 .github/           CI
 ```
 
 ## Documentation
 
-[**All the pages**](docs/index.md): [Install and set up](docs/guide/install.md) · [Ways to work](docs/guide/using.md) · [The command line](docs/guide/commands.md) · [Models](docs/guide/models.md) ·
-[Whole jobs](docs/guide/workflows.md) · [VMD](docs/guide/vmd.md) · [The tool library](docs/guide/tools.md) · [MCP clients](docs/guide/mcp.md) · [Docker](docs/guide/docker.md) ·
+[All the pages](docs/index.md): [Install and set up](docs/guide/install.md) · [Ways to work](docs/guide/using.md) · [The command line](docs/guide/commands.md) · [Models](docs/guide/models.md) ·
+[Whole jobs](docs/guide/workflows.md) · [VMD](docs/guide/vmd.md) · [Your VMD window](docs/guide/window.md) · [The tool library](docs/guide/tools.md) · [MCP clients](docs/guide/mcp.md) · [Docker](docs/guide/docker.md) ·
 [The model benchmark](docs/benchmarks/model-benchmark.md) · [Development](docs/reference/development.md) · [Architecture](docs/reference/architecture.md) · [Methods](docs/reference/methods.md) ·
 [Security](docs/reference/security.md) · [Research paper](docs/reference/RESEARCH.md) · [Changelog](docs/CHANGELOG.md)
 
