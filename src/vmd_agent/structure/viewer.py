@@ -25,6 +25,7 @@ _ACIDIC, _BASIC = {"ASP", "GLU"}, {"LYS", "ARG", "HIS", "HSD", "HSE", "HSP", "HI
 _POLAR = {"SER", "THR", "ASN", "GLN", "TYR", "CYS", "CYX"}
 _NONPOLAR = {"ALA", "VAL", "LEU", "ILE", "PRO", "PHE", "TRP", "MET", "GLY"}
 _PROTEIN_RESNAMES = _ACIDIC | _BASIC | _POLAR | _NONPOLAR | {"MSE", "ACE", "NME", "NMA"}
+_NUCLEIC_RESNAMES = {"A", "C", "G", "U", "T", "DA", "DC", "DG", "DT", "DU", "RA", "RC", "RG", "RU", "ADE", "CYT", "GUA", "THY", "URA"}
 
 
 def _restype(resname: str) -> int:
@@ -84,14 +85,15 @@ class Model:
                 bonds = np.asarray(pairs, int).tolist()
         names = [str(n) for n in ag.names]
         uniq = lambda seq: sorted(set(seq))     # noqa: E731
-        els, rns, chs = uniq(elements.tolist()), uniq(resn), uniq(chains)
+        els, rns, chs, nms = uniq(elements.tolist()), uniq(resn), uniq(chains), uniq(names)
         centre = pos.mean(0) if len(pos) else np.zeros(3)
         radius = float(np.linalg.norm(pos - centre, axis=1).max()) if len(pos) else 1.0
         return {"n_atoms": int(len(ag)), "n_atoms_total": int(self.n_all), "reduced": self.reduced, "frames": self.n_frames,
                 "xyz": np.round(pos, 2).ravel().tolist(), "elements": els, "element": [els.index(e) for e in elements.tolist()],
                 "resnames": rns, "resname": [rns.index(r) for r in resn], "restype": [_restype(r) for r in resn], "restypes": RESTYPES,
                 "chains": chs, "chain": [chs.index(c) for c in chains], "resid": [int(r) for r in ag.resids],
-                "is_ca": [n == "CA" for n in names], "is_protein": [bool(x) for x in np.isin(np.asarray(resn), list(_PROTEIN_RESNAMES))],
+                "is_ca": [n == "CA" for n in names], "names": nms, "name": [nms.index(n) for n in names],
+                "is_nucleic": [r in _NUCLEIC_RESNAMES for r in resn], "is_protein": [bool(x) for x in np.isin(np.asarray(resn), list(_PROTEIN_RESNAMES))],
                 "is_water": [r in _WATER for r in resn], "bonds": bonds, "bond_method": method,
                 "centre": np.round(centre, 2).tolist(), "radius": round(radius, 2),
                 "box": [float(x) for x in self.u.dimensions[:3]] if self.u.dimensions is not None and self.u.dimensions[0] > 0 else None}

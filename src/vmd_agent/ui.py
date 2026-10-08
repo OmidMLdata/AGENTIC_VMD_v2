@@ -30,7 +30,7 @@ from vmd_agent import agent as agent_mod, progress, security, toolset
 from vmd_agent.structure import viewer
 
 ASSETS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ui_assets")
-SCRIPTS = {"style.css": "text/css; charset=utf-8", "app.js": "text/javascript; charset=utf-8", "viewer.js": "text/javascript; charset=utf-8"}
+SCRIPTS = {"style.css": "text/css; charset=utf-8", **{n: "text/javascript; charset=utf-8" for n in ("app.js", "viewer.js", "selection.js", "commands.js", "markdown.js")}}
 MAX_UPLOAD = 1_000_000_000                       # bytes
 KINDS = {".pdb": "structure", ".cif": "structure", ".mmcif": "structure", ".gro": "structure", ".psf": "structure",
          ".mol2": "structure", ".xyz": "structure", ".prmtop": "structure", ".dcd": "trajectory", ".xtc": "trajectory",
@@ -119,12 +119,12 @@ class State:
         self.model_lock = threading.Lock()
 
     def model_for(self, topology: str, trajectory: Optional[str] = None) -> "viewer.Model":
-        """The viewer's model of a structure (and trajectory); opened once, then kept (the last four)."""
+        """The viewer's model of a structure (and trajectory); opened once, then kept (the last eight)."""
         key = (topology, trajectory)
         with self.model_lock:
             if key not in self.models:
                 self.models[key] = viewer.Model(topology, trajectory)
-                while len(self.models) > 4:
+                while len(self.models) > 8:
                     self.models.pop(next(iter(self.models)))
             return self.models[key]
 
@@ -377,7 +377,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
         def on_event(ev: dict) -> None:
             if ev["type"] == "tool_end":
-                ev = {**ev, "images": images_in(ev.pop("result", None), root)}
+                result = ev.pop("result", None)
+                ev = {**ev, "images": images_in(result, root), "preview": json.dumps(agent_mod.digest(result), default=str)[:2400]}
             emit(ev)
         s.on_event = on_event
         try:

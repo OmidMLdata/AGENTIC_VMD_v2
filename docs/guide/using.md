@@ -16,22 +16,30 @@ vmd-agent ui                    # opens your browser; Ctrl+C in the terminal sto
 vmd-agent ui --data-dir ~/my-project --port 8765 --no-browser
 ```
 
-A workbench laid out like VMD's own windows: a list of molecules on the left (VMD's Main window), a black display in the middle (its Graphics window), the assistant
-on the right, and a console along the bottom (its Tk console), with a status bar under it.
+A workbench laid out like VMD's own windows: a **Molecules** list (VMD's Main window) and your files on the left, the **Display** in the middle (its Graphics window), the assistant on the right,
+and a **console** along the bottom (its Tk console), with a menu bar on top (File, Molecule, Graphics, Display, Mouse, Animation, Extensions, Help) and a status bar under it. Every action is in
+the menus, in the command palette (**Ctrl/⌘ K** searches all of them), on a keyboard shortcut (press **?**), or in the console. The three splitters resize the columns and the console (they are
+remembered; double-click one to restore it), and the light/dark/automatic theme button is in the menu bar.
 
-* **Molecules.** Everything in your files folder, with a drop zone to add more and folders that open. A file that is drawn is marked **T** (top), as in VMD. Click a file for
-  its details and for read-only looks (`inspect files`, `detect system`, `structure stats`, `probe video`, each with the seconds it took); double-click a structure to draw it.
-* **Display.** A viewer drawn on a canvas with VMD's names for things. **Drawing:** `Trace` (the backbone), `Lines` (bonds), `VDW` (spheres), `Points`.
-  **Colour:** `Name` (by element, in VMD's colours), `Chain`, `ResType` (acidic, basic, polar, nonpolar), `Resid`, `Index`, `Mono`. Switches for protein, other (ligands, ions) and water.
-  Drag to rotate, scroll to zoom, shift-drag (or right-drag) to move, double-click to reset; the axes sit in the corner (x red, y green, z blue). A structure with a trajectory
-  gets a frame slider and play with a speed menu. **Save PNG** keeps the picture. Images and videos that tools make open in the same place, and every figure a tool makes is kept in a
-  strip under the display. A system of more than 40,000 atoms opens as its backbone and non-solvent atoms only, and the caption says so.
-* **Assistant, Chat.** The model's text as it is written, every tool call as a card (click it for its arguments) with a progress bar and **the seconds it took**, each model call timed, and
-  a line under every answer saying where the time went. The numbers in an answer are checked against the tools' results exactly as in the terminal chat ([How the chat keeps a model honest](models.md#how-the-chat-keeps-a-model-honest)).
+* **Molecules.** A table as in VMD: ID, **T** (top molecule), **D** (drawn), name, atoms, frames. Load several and show or hide each. Below it, everything in your files folder, with a drop zone and
+  folders that open. Click a file for its details and read-only looks (`inspect files`, `detect system`, `structure stats`, `probe video`, each with its seconds); double-click a structure to draw it
+  as a new molecule, or a trajectory to load it into the top molecule.
+* **Representations** (Graphics menu, **Ctrl/⌘ R**). Each molecule has any number of representations, each with a selection, a drawing method (`Lines`, `Licorice`, `CPK`, `VDW`, `Points`, `Trace`,
+  `Tube`) and a colouring method (`Name`, `Chain`, `ResType`, `Resid`, `Index`, `Mono`, `ColorID`). Selections use VMD's own language: `protein`, `water`, `backbone`, `sidechain`, `name CA`,
+  `resname ALA GLY`, `chain A`, `resid 10 to 40`, `within 5 of resname LIG`, `same residue as ...`, combined with `and`, `or`, `not` and parentheses; a mistake is explained under the box.
+* **Display.** Rotate, Move, Zoom and **Query** (click an atom to see what it is) mouse modes as in VMD's Mouse menu, perspective or orthographic projection, depth cueing, axes and background
+  colour, and the animation bar (first, previous, play, next, last, reverse, a frame box, speed, and the loop, once and rock styles). **Save picture** keeps the view as a PNG. Images and videos that
+  tools make open in the same place, and every figure is kept in a strip under the display. A system of more than 40,000 atoms opens as its backbone and non-solvent atoms only, and the caption says so.
+* **Console.** VMD's commands for what the page shows: `mol new`, `mol addfile`, `mol addrep`, `mol modselect`, `mol modstyle`, `mol modcolor`, `mol delrep`, `mol top`, `mol delete`, `animate goto`, `animate forward`,
+  `display projection`, `display depthcue`, `axes location`, `color Display Background`, `rotate`, `scale`, plus `ask ...` (send a question to the assistant), `look TOOL FILE`, `workflow NAME FILES` and `help`.
+  Arrow keys recall earlier commands. It also logs every tool and model call with its seconds and progress, and the totals of the session.
+* **Assistant, Chat.** The model's answer is written as Markdown (headings, lists, tables, code; never raw HTML), every tool call is a collapsible card with its arguments, result, a progress bar and
+  **the seconds it took**, each model call is timed, and a line under every answer says where the time went. The numbers in an answer are checked against the tools' results exactly as in the terminal
+  chat ([How the chat keeps a model honest](models.md#how-the-chat-keeps-a-model-honest)).
 * **Assistant, Whole jobs.** Pick a [workflow](workflows.md), pick the files, run it, and read the verdict, the graded findings, the step table with seconds and the figures, with a link to the
   report. No model is needed for this tab.
-* **Console.** A running log of everything: each tool and model call with its seconds, progress, and the totals of the session (click its title to fold it).
-* **Status bar.** Whether the model answers, VMD's version, ffmpeg, and a **chat tools** menu: `all`, `core` or `vmd` (see [Does the model see all 53 at once?](tools.md#does-the-model-see-all-53-at-once)).
+* **Status bar.** Whether the model answers, VMD's version, ffmpeg, the mouse mode, and a **chat tools** menu: `all`, `core` or `vmd` (see [Does the model see all 53 at once?](tools.md#does-the-model-see-all-53-at-once)).
+  On a narrow window the columns stack.
 
 It runs **only on this computer**: it listens on 127.0.0.1, answers only requests addressed to it by that name, and wants the one-time key that is part of the address it prints (kept in a
 cookie), so no other web page you have open can use it. It can read and write only inside your files folder, never overwrites an uploaded file, and runs one job at a time. It needs nothing

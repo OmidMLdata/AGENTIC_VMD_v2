@@ -178,7 +178,8 @@ def test_the_page_is_served_as_files_with_a_strict_policy_and_no_inline_script(p
     html = body.decode()
     assert status == 200 and "<script>" not in html and 'onclick=' not in html and ' style="' not in html
     assert headers["Content-Security-Policy"].startswith("default-src 'self'") and "unsafe-inline" not in headers["Content-Security-Policy"]
-    for name, ctype in (("style.css", "text/css"), ("app.js", "text/javascript"), ("viewer.js", "text/javascript")):
+    for name, ctype in (("style.css", "text/css"), ("app.js", "text/javascript"), ("viewer.js", "text/javascript"), ("selection.js", "text/javascript"),
+                        ("commands.js", "text/javascript"), ("markdown.js", "text/javascript")):
         s, b, h = page.req("GET", "/assets/" + name)
         assert s == 200 and h["Content-Type"].startswith(ctype) and len(b) > 500
         assert page.req("GET", "/assets/" + name, cookie=False)[0] == 403

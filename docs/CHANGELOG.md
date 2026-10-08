@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.23.0: the web page follows VMD's interface
+
+* **Menus, command palette and shortcuts**: File, Molecule, Graphics, Display, Mouse, Animation, Extensions and Help menus; Ctrl/⌘ K searches every action; a shortcuts sheet (`?`); keyboard-operable menus,
+  splitters and dialogs; light, dark or automatic theme; resizable, remembered columns.
+* **Several molecules** with VMD's ID / T / D table, and **representations** per molecule: selection, drawing method and colouring method, with VMD's selection language (`selection.js`) evaluated in the page.
+* **A console that speaks VMD** (`commands.js`): `mol new|addfile|addrep|modselect|modstyle|modcolor|delrep|top|delete`, `animate ...`, `display ...`, `axes`, `rotate`, `scale`, plus `ask`, `look`, `workflow`.
+* **Display**: Query-atom mode, orthographic projection, depth cueing, background colour, animation styles (loop, once, rock), nucleic acids and `Licorice`, `CPK`, `Tube` drawings.
+* **Chat**: Markdown answers rendered without raw HTML (`markdown.js`), collapsible tool cards with results, copy button.
+
 ## 0.22.0: the computer decides, the benchmark checks itself, and every suggested model can be tested in one command
 
 * **It reads the computer** (`platform_info.py`, `models.recommend`): memory on macOS, Linux and Windows, an NVIDIA card, Claude Code (installed? already registered as an MCP server?). Setup names the computer and
