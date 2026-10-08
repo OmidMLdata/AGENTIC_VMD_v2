@@ -628,11 +628,6 @@ def library_tools() -> List[str]:
     return [n for _g, _d, ts in LIBRARY for n, _v in ts]
 
 
-def group_of(name: str) -> str:
-    """The library group a tool belongs to ('' for the workflow entry point)."""
-    return next((g for g, _d, ts in LIBRARY for n, _v in ts if n == name), "")
-
-
 def needs_vmd(name: str) -> str:
     """'yes', 'no' or 'optional': whether the tool needs VMD installed."""
     return next((v for _g, _d, ts in LIBRARY for n, v in ts if n == name), "no")

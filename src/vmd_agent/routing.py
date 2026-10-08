@@ -75,11 +75,6 @@ def select(question: str, available: Sequence[str]) -> List[str]:
     return [n for n in available if n in want]
 
 
-def group_of(tool: str) -> str:
-    """The first group that holds ``tool`` ('' if it is only in the base set)."""
-    return next((g for g, (tools, _) in GROUPS.items() if tool in tools), "")
-
-
 #: the agent-internal tool a model uses to ask for more tools when the routed set lacks one (it is not one of the 57 library tools and exists only in "auto")
 OFFER = "offer_tools"
 

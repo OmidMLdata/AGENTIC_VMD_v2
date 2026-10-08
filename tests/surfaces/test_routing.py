@@ -128,7 +128,7 @@ def test_only_available_tools_are_offered():
 
 @pytest.mark.parametrize("tool", sorted(set(ALL)))
 def test_every_tool_belongs_to_the_base_or_a_group(tool):
-    assert tool in routing.BASE or routing.group_of(tool), f"{tool} can never be offered by routing"
+    assert tool in routing.BASE or any(tool in tools for tools, _ in routing.GROUPS.values()), f"{tool} can never be offered by routing"
 
 
 # ------------------------------------------------------------------------------------ inside the agent

@@ -21,7 +21,7 @@ namespace eval ::vmdagent_link {
     variable bgcolors {@BGCOLORS@}
     variable axeslocs {Off LowerLeft LowerRight UpperLeft UpperRight Origin}
     variable verbs {ping state mol_list mol_new mol_addfile mol_delete mol_top mol_rename mol_show mol_clear
-                    rep_list rep_add rep_modify rep_delete display view anim query measure label_add label_clear
+                    rep_list rep_add rep_modify rep_delete display view anim query measure
                     snapshot save_state}
     variable tracked
     array set tracked {projection Perspective axes LowerLeft background black shadows off ambientocclusion off culling off antialias off}
@@ -356,18 +356,6 @@ proc ::vmdagent_link::v_measure {kind m args} {
     set v [measure $kind $idx molid $m]
     return [jobj kind [js $kind] value [jn $v] frame [molinfo $m get frame]]
 }
-proc ::vmdagent_link::v_label_add {sel m limit} {
-    variable maxatoms
-    need_mol $m
-    need_int $limit "limit"
-    if {$limit < 1 || $limit > $maxatoms} { set limit $maxatoms }
-    set s [atomselect $m [need_sel $sel]]
-    set ids [lrange [$s list] 0 [expr {$limit - 1}]]
-    $s delete
-    foreach i $ids { label add Atoms $m/$i }
-    return [jobj labelled [llength $ids]]
-}
-proc ::vmdagent_link::v_label_clear {} { label delete Atoms all; return [jobj cleared true] }
 
 # ---- pictures and state files
 proc ::vmdagent_link::v_snapshot {path quality} {

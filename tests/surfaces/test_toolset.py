@@ -33,7 +33,8 @@ def test_the_registry_holds_every_tool():
 def test_the_library_is_one_grouped_list():
     names = toolset.library_tools()
     assert len(names) == len(set(names))                                    # a tool is in exactly one group
-    assert all(toolset.group_of(n) for n in names) and toolset.group_of("run_workflow") == ""
+    grouped = [n for _g, _d, ts in toolset.LIBRARY for n, _v in ts]
+    assert set(grouped) == set(names) and "run_workflow" not in grouped
     assert {toolset.needs_vmd(n) for n in names} == {"yes", "no", "optional"}
     assert set(toolset.ALL) == set(toolset.TOOLS)
 

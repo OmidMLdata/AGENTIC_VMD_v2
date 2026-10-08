@@ -30,8 +30,8 @@ BRIDGE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "vmdkit", "liv
 
 #: the commands the bridge accepts (the same list is written into the bridge, which refuses any other)
 VERBS = ("ping", "state", "mol_list", "mol_new", "mol_addfile", "mol_delete", "mol_top", "mol_rename", "mol_show", "mol_clear",
-         "rep_list", "rep_add", "rep_modify", "rep_delete", "display", "view", "anim", "query", "measure", "label_add",
-         "label_clear", "snapshot", "save_state")
+         "rep_list", "rep_add", "rep_modify", "rep_delete", "display", "view", "anim", "query", "measure",
+         "snapshot", "save_state")
 STYLES = ("Lines", "Bonds", "DynamicBonds", "HBonds", "Points", "VDW", "CPK", "Licorice", "Beads", "Tube", "Trace", "Ribbons",
           "NewRibbons", "Cartoon", "NewCartoon", "PaperChain", "Twister", "QuickSurf", "MSMS", "Surf", "Dotted", "Solvent",
           "Isosurface", "VolumeSlice")
@@ -437,12 +437,6 @@ class Window:
             radius, selection = args
             return self.link.call("measure", "sasa", _int(molecule, "molecule"), repr(_num(radius, "probe radius")), _selection(selection))
         return self.link.call("measure", kind, _int(molecule, "molecule"), *[str(_int(a, "an atom index")) for a in args])
-
-    def label(self, selection: str, molecule: int, limit: int = 50) -> dict:
-        return self.link.call("label_add", _selection(selection), _int(molecule, "molecule"), _int(limit, "limit"))
-
-    def clear_labels(self) -> dict:
-        return self.link.call("label_clear")
 
     # -- pictures and state files
     def snapshot(self, out_png: str, quality: str = "fast") -> dict:

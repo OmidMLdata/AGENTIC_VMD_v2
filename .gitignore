@@ -39,3 +39,10 @@ settings.json
 # ---- VMD itself must never be committed (UIUC licence); only the drop-folder's README is kept
 docker/vmd-dist/*
 !docker/vmd-dist/README.md
+
+# ---- vmd-agent's own data folder in a working folder: settings (may hold an API key), the window link's token and the
+#      downloaded model server and model files (many GB). It also ignores itself; this keeps it out even if that file is lost.
+.vmd-agent/
+/ollama/
+*.gguf
+*.safetensors

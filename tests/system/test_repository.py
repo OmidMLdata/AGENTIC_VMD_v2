@@ -68,3 +68,14 @@ def test_the_version_is_the_same_everywhere():
     toml = open(os.path.join(ROOT, "pyproject.toml")).read()
     assert f'version = "{vmd_agent.__version__}"' in toml
     assert f"## {vmd_agent.__version__}" in open(os.path.join(ROOT, "docs", "CHANGELOG.md")).read()
+
+
+def test_the_models_and_settings_in_a_working_folder_can_never_be_committed():
+    """`.vmd-agent/` (settings with a key, the window token, the model server and its models) is ignored by the repository's own rules, not only by the file inside it."""
+    import subprocess
+    root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    if not os.path.isdir(os.path.join(root, ".git")):
+        pytest.skip("not a Git checkout")
+    paths = [".vmd-agent/config/settings.json", ".vmd-agent/ollama/ollama", ".vmd-agent/ollama/models/blobs/sha256-0", "ollama/models/x", "weights.gguf", "m.safetensors"]
+    r = subprocess.run(["git", "check-ignore", "--no-index", *paths], cwd=root, capture_output=True, text=True)
+    assert sorted(r.stdout.split()) == sorted(paths)

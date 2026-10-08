@@ -133,8 +133,6 @@ def test_display_view_molecule_and_state_commands_work_and_are_read_back(window)
     win.show(0, False)
     m = win.molecules()[0]
     assert m["name"] == "ubq" and m["shown"] is False and m["top"] is True
-    win.label("name CA", 0, 5)
-    win.clear_labels()
     with pytest.raises(vmdlink.LinkError):
         win.view("restore", "never_saved")
     win.clear()

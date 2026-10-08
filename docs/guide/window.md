@@ -79,7 +79,7 @@ tools (a movie of the window is one `window_movie` away), `convert_trajectory` a
 The window runs a small program (`vmdkit/live_bridge.tcl`) inside VMD that listens on `127.0.0.1` on a random port. Only a request that carries a one-time token can talk to it; the token is generated for each
 window and kept in a file only you can read.
 
-* A request is a **command name and arguments**. The names are a fixed list of 23; there is no command that runs Tcl, runs a program or reads a file, and VMD's `quit` is not among them.
+* A request is a **command name and arguments**. The names are a fixed list of 21; there is no command that runs Tcl, runs a program or reads a file, and VMD's `quit` is not among them.
 * Every argument is checked **twice**, once in Python and again inside VMD: numbers are numbers, a molecule is one VMD has, a drawing method, colour or material is from VMD's own lists, a file is an absolute path inside
   the folders vmd-agent may use, and a selection contains only the characters VMD's selection language needs (no `$`, `[`, `]`, `;`, quotes or braces).
 * A request is taken apart as a Tcl **list** and never evaluated, so text such as `[exit]` inside an argument is just text.
@@ -92,6 +92,6 @@ is still running afterwards. Security note: another program running as you on th
 
 * Started with `vmd-agent tool window_open`, the page's **Open VMD window** button, or by the first command that needs it. On Linux a display is needed; on a server use `--headless` through the Python API or
   `VMD_AGENT_WINDOW_HEADLESS=1`, which runs the same commands with no window (pictures then come from VMD's built-in ray tracer).
-* Picking an atom with the mouse, VMD's Tk windows (Timeline, Hydrogen Bonds, the plugin windows), labels' placement and clipping planes are not exposed: do those in VMD itself.
+* Picking an atom with the mouse, VMD's Tk windows (Timeline, Hydrogen Bonds, the plugin windows), labels, clipping planes are not exposed: do those in VMD itself.
 * Where VMD closes the window, the link is gone; the next command says so and `window_open` starts a new one.
 * Written and run on macOS (VMD 1.9.4a57, Apple Silicon). The window is started with `sh` and `tail`, so Linux uses the same path; Windows starts VMD directly, and neither has been run here.

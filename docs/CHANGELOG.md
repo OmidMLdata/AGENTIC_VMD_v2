@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.30.1: dead code removed, models cannot be committed
+
+* **Removed** what nothing used: the window's label commands (`label_add`, `label_clear`: the bridge now accepts 21 commands) and two helpers (`group_of` in `routing.py` and `toolset.py`) that only a test called.
+* **`.gitignore`** now ignores `.vmd-agent/`, `/ollama/`, `*.gguf` and `*.safetensors` itself, besides the ignore file inside `.vmd-agent`; a test checks it.
+
 ## 0.30.0: the model and settings can be moved into the working folder
 
 * **`vmd-agent setup --home here`** (or answering the question) offers to **move** the private Ollama with its models and the settings from the installer's or per-user folder into `.vmd-agent` in the working folder: a rename, nothing
