@@ -8,7 +8,7 @@
 
 Every import is checked, including those inside functions, so a lazy import
 cannot smuggle in a back-edge. If this fails, either fix the dependency or
-update docs/architecture.md and this table together.
+update docs/reference/architecture.md and this table together.
 """
 import ast
 import os

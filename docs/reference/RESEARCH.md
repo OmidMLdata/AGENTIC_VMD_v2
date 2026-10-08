@@ -1,6 +1,6 @@
 # Research
 
-The study design, the draft analysis plan and a comparison with the original project. Everything here is about *how the toolkit is evaluated*; how to use it is in the [README](../README.md). No measured results are included anywhere in this repository.
+The study design, the draft analysis plan and a comparison with the original project. Everything here is about *how the toolkit is evaluated*; how to use it is in the [README](../../README.md). No measured results are included anywhere in this repository.
 
 **Parts:** [I. Paper](#part-i-paper) · [II. Preregistration (draft)](#part-ii-preregistration-draft) · [III. What changed from the original project](#part-iii-what-changed-from-the-original-project)
 
@@ -993,7 +993,7 @@ CI.
 * **DSSP versus `mkdssp` itself.** Compare it on your structures.
 * **Real VMD / Tachyon / ffmpeg:** the tests that need them are skipped where the program is absent. The VMD/Tachyon ones passed once
   against VMD 1.9.4a57 on macOS arm64; ffmpeg was absent there, and Linux and Windows VMD builds were never tried.
-* **Docker images:** never built (see [Docker](docker.md)).
+* **Docker images:** never built (see [Docker](../guide/docker.md)).
 * **The MCP SDK:** tested through the real SDK where installed; not run in a real MCP client by the author.
 * **Real language models:** no benchmark has been run.
 * **Keyframes on real events:** the event study keeps the noise real but the *event* synthetic (a rigid motion). It does

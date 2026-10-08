@@ -71,7 +71,7 @@ With few tasks per category the intervals are wide; use `--repeats` (models vary
   intervals, which assume independent runs, are too narrow. To see how much a model varies, use a small temperature (for example `--temperature 0.4 --repeats 3`). The same goes for comparing tool sets: at
   temperature 0 a model can pass a task with one set and fail it with another because the exact wording of the prompt changed, which says little about either set. Compare on many tasks or several samples.
 * **Same conditions.** Compare models with the same `--tools`, `--temperature`, `--max-turns` and guard setting. The records say which were used.
-* **What is being measured.** The model *and* the agent around it (routing, argument repair, compact results, the guard: see [Architecture](architecture.md#the-agent-and-what-surrounds-the-model)). To tell a model's
+* **What is being measured.** The model *and* the agent around it (routing, argument repair, compact results, the guard: see [Architecture](../reference/architecture.md#the-agent-and-what-surrounds-the-model)). To tell a model's
   ability from the agent's help, run the same model with `--tools all --no-guard` and with the defaults.
 * **Comparing a change to the agent.** Run `--smoke` before and after into the same `--out-dir` (a change to the agent and a change to a grader are different things: the records do not say which graders
   were in force, so re-run both sides after changing a task). One run of 23 tasks cannot tell a few points apart; use `--repeats`.
@@ -84,5 +84,5 @@ With few tasks per category the intervals are wide; use `--repeats` (models vary
 
 ## Adding a task
 
-A task is `Task(id, category, prompt, tools, grade, needs)` in [`model_tasks.py`](../src/vmd_agent/model_tasks.py): `grade(run)` receives the answer, every tool call with its result, and the
+A task is `Task(id, category, prompt, tools, grade, needs)` in [`model_tasks.py`](../../src/vmd_agent/model_tasks.py): `grade(run)` receives the answer, every tool call with its result, and the
 folder the model worked in, and returns `None` for a pass or a reason for a fail. Compute the truth from the dataset, not from a run.

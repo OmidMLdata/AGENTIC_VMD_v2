@@ -4,7 +4,7 @@ import os
 import re
 
 ROOT = os.path.join(os.path.dirname(__file__), "..", "..")
-FILES = [os.path.join(ROOT, f) for f in ("README.md", "CHANGELOG.md", "NOTICE.md")] + \
+FILES = [os.path.join(ROOT, f) for f in ("README.md", "docs/CHANGELOG.md", "docs/NOTICE.md")] + \
         sorted(glob.glob(os.path.join(ROOT, "docs", "**", "*.md"), recursive=True))
 
 
@@ -36,13 +36,13 @@ def test_every_relative_markdown_link_resolves():
 
 def test_the_tool_counts_in_the_docs_match_the_code():
     from vmd_agent import toolset
-    page = open(os.path.join(ROOT, "docs", "tools.md"), encoding="utf-8").read()
+    page = open(os.path.join(ROOT, "docs", "guide", "tools.md"), encoding="utf-8").read()
     missing = [n for n in toolset.TOOLS if f"`{n}`" not in page]
     assert not missing, f"tools the page does not list: {missing}"
     total, core = len(toolset.TOOLS), len(toolset.CORE_TOOLS)
     assert f"# The {total} tools" in page and f"{core} + {total - core - 2} + 2 = {total}" in page
     for f in FILES:
-        if f.endswith("CHANGELOG.md") or f.endswith("tools.md"):
+        if f.endswith("CHANGELOG.md") or f.endswith(os.path.join("guide", "tools.md")):
             continue                                   # the history, and the page that explains where the old count came from
         text = open(f, encoding="utf-8").read()
         assert "47 tools" not in text, f"{f} still says 47 tools"
@@ -51,13 +51,13 @@ def test_the_tool_counts_in_the_docs_match_the_code():
 
 def test_every_page_of_the_docs_is_in_the_index():
     index = open(os.path.join(ROOT, "docs", "index.md"), encoding="utf-8").read()
-    pages = [os.path.basename(p) for p in glob.glob(os.path.join(ROOT, "docs", "*.md"))]
+    pages = [os.path.relpath(p, os.path.join(ROOT, "docs")).replace(os.sep, "/") for p in glob.glob(os.path.join(ROOT, "docs", "**", "*.md"), recursive=True)]
     assert [p for p in pages if p != "index.md" and f"]({p})" not in index] == []
 
 
 def test_the_model_benchmark_page_lists_every_category_with_its_true_task_count():
     from vmd_agent import model_tasks
-    page = open(os.path.join(ROOT, "docs", "model-benchmark.md"), encoding="utf-8").read()
+    page = open(os.path.join(ROOT, "docs", "benchmarks", "model-benchmark.md"), encoding="utf-8").read()
     rows = dict(re.findall(r"^\| `(\w+)` \|.*\| (\d+) \|$", page, flags=re.M))
     assert set(rows) == set(model_tasks.CATEGORIES)
     for category, tasks in model_tasks.by_category().items():
@@ -69,7 +69,7 @@ def test_the_docs_say_how_much_context_the_tool_descriptions_take():
     from vmd_agent import toolset
     from vmd_agent import toolhints
     from vmd_agent.llm_client import to_openai_tools
-    page = open(os.path.join(ROOT, "docs", "tools.md"), encoding="utf-8").read()
+    page = open(os.path.join(ROOT, "docs", "guide", "tools.md"), encoding="utf-8").read()
     said = {m.group(1): int(m.group(2).replace(",", "")) for m in re.finditer(r"^\| `(all|core|vmd)`[^|]*\| \d+ \| about ([\d,]+) tokens \|$", page, flags=re.M)}
     assert set(said) == {"all", "core", "vmd"}
     for profile, tokens_said in said.items():

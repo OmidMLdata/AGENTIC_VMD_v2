@@ -228,7 +228,7 @@ def _docs_text():
     import glob
     import os
     base = os.path.join(os.path.dirname(__file__), "..", "..")
-    paths = [os.path.join(base, "README.md")] + sorted(glob.glob(os.path.join(base, "docs", "*.md")))
+    paths = [os.path.join(base, "README.md")] + sorted(glob.glob(os.path.join(base, "docs", "**", "*.md"), recursive=True))
     return "\n".join(open(p, encoding="utf-8").read() for p in paths)
 
 

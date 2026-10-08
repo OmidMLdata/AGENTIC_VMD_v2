@@ -67,4 +67,4 @@ def test_the_version_is_the_same_everywhere():
     import vmd_agent
     toml = open(os.path.join(ROOT, "pyproject.toml")).read()
     assert f'version = "{vmd_agent.__version__}"' in toml
-    assert f"## {vmd_agent.__version__}" in open(os.path.join(ROOT, "CHANGELOG.md")).read()
+    assert f"## {vmd_agent.__version__}" in open(os.path.join(ROOT, "docs", "CHANGELOG.md")).read()

@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 #
 # vmd-agent container images.   VMD IS NOT INCLUDED (UIUC license), see
-# README.md (Docker section) and ../NOTICE.md.
+# README.md (Docker section) and ../docs/NOTICE.md.
 #
 #   docker build -f docker/Dockerfile -t vmd-agent .                           # default: open-source
 #   docker build -f docker/Dockerfile --target vmd-libs -t vmd-agent:hostvmd .  # + libs, mount your VMD

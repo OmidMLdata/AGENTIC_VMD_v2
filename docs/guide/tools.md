@@ -1,8 +1,8 @@
 # The 53 tools
 
-Everything vmd-agent can do is a **tool**: a plain Python function with a JSON description, in [`toolset.py`](../src/vmd_agent/toolset.py).
+Everything vmd-agent can do is a **tool**: a plain Python function with a JSON description, in [`toolset.py`](../../src/vmd_agent/toolset.py).
 The chat gives them to the model, the [MCP server](mcp.md) gives them to an AI app, the command line runs them as commands, the
-web page runs them for you, and the [tool test set](tool-test-set.md) runs every one of them on data whose answers are known.
+web page runs them for you, and the [tool test set](../benchmarks/tool-test-set.md) runs every one of them on data whose answers are known.
 They are the same functions in every case, so a number does not depend on how you asked for it.
 
 There are **53** in three groups. The count is checked by a test, so this page cannot drift from the code:
@@ -36,16 +36,16 @@ that is about 38,000 characters, roughly **9,500 tokens**, before the model has 
 
 **`--tools auto`** offers only the tools that fit each question, plus one more, `offer_tools`, which lets the model ask for another group when it needs one:
 
-* The router ([`routing.py`](../src/vmd_agent/routing.py)) reads the question's wording and the kinds of files it names, adds the tools of each group it mentions (trajectory, interactions, checks,
+* The router ([`routing.py`](../../src/vmd_agent/routing.py)) reads the question's wording and the kinds of files it names, adds the tools of each group it mentions (trajectory, interactions, checks,
   files, build, maps, render, video, records, network, ...) to a small base set (look at files, describe a system, check a statement, run a whole job), and so usually offers well under half of the tools.
   A question that matches nothing gets a wider set, never an empty menu.
 * **It is keyword matching, so it misses.** Questions worded differently from what its vocabulary expects can reach the model without the tool that would answer them (the tests keep two sets of such paraphrases, and every miss found was added as a new question). That is why `offer_tools` exists: a model that needs a tool it was not given asks for its group, and a model that calls a real tool it was not offered is allowed it (the agent says so). If
   your model does not use `offer_tools`, `--tools all` is the safe choice.
-* Whether `auto` is better than `all` for your model is a measurement, not a given: run the [model benchmark](model-benchmark.md) with each (`--tools all`, then `--tools auto`) and compare; the summary puts
+* Whether `auto` is better than `all` for your model is a measurement, not a given: run the [model benchmark](../benchmarks/model-benchmark.md) with each (`--tools all`, then `--tools auto`) and compare; the summary puts
   both side by side.
 
 The web page has a "chat tools" menu in its status bar to switch between them without restarting. Which set suits which model is something the
-[model benchmark](model-benchmark.md) can tell you: run it with `--tools all`, then `--tools core`, and compare. Nothing here chooses a subset for
+[model benchmark](../benchmarks/model-benchmark.md) can tell you: run it with `--tools all`, then `--tools core`, and compare. Nothing here chooses a subset for
 you per question yet; the chat only points the model at a whole-job workflow when the question clearly matches one.
 
 ## Who gets which tools

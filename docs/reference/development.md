@@ -25,7 +25,7 @@ images and lists its caveats; the legend is generated from what that renderer ac
 
 ### The research benchmark commands
 
-Every other command is in [Every command](using.md#ways-to-work). The benchmark ones (`vmd-agent bench <action>`; `vmd-agent bench --help`):
+Every other command is in [Every command](../guide/using.md#ways-to-work). The benchmark ones (`vmd-agent bench <action>`; `vmd-agent bench --help`):
 
 | Action | What it does |
 |---|---|
@@ -45,7 +45,7 @@ Every other command is in [Every command](using.md#ways-to-work). The benchmark 
   (`vmd-agent bench models --smoke`: one or two tasks per kind of functionality) through the agent with `VMD_AGENT_LIVE_TOOLS` (default `all`, what the chat uses; `auto` and `core` also work), and fails if the share passed falls below
   `VMD_AGENT_LIVE_MIN_SUCCESS` (default 0.5; set it a little below what your model scores), if the server fails, or if a request that must be declined is answered with an invented result.
   To compare a change, run `bench models --smoke` before and after into the same `--out-dir` and read `summary.md`.
-* **Test every tool:** `vmd-agent bench tools` runs all 53 tools on a generated dataset whose answers are known by construction, with the seconds each took ([the tool test set](tool-test-set.md)); the same cases run inside `pytest`.
+* **Test every tool:** `vmd-agent bench tools` runs all 53 tools on a generated dataset whose answers are known by construction, with the seconds each took ([the tool test set](../benchmarks/tool-test-set.md)); the same cases run inside `pytest`.
 * **`.gitignore`** keeps out caches and build output, editor files, everything vmd-agent writes while running (`vmd_scripts/`, `vmd_agent_output/`,
   `pdb_cache/`, `/data/`), anything that could hold a key (`.env`, `settings.json`, `/config/`), and VMD itself (`docker/vmd-dist/*`, which UIUC's
   licence forbids committing). A test checks that these stay ignored and that the test data stay tracked.
@@ -92,7 +92,7 @@ vmd-agent analyze system.psf traj.dcd --do rmsd rmsf rgyr contacts convergence -
 vmd-agent keyframes system.psf traj.dcd -k 9 --render
 ```
 
-MCP server: see [Use it from an MCP client](mcp.md#use-it-from-an-mcp-client); `vmd-agent mcp-check` verifies an install.
+MCP server: see [Use it from an MCP client](../guide/mcp.md#use-it-from-an-mcp-client); `vmd-agent mcp-check` verifies an install.
 
 ### 4. Reproduce the validation checks
 
@@ -165,7 +165,7 @@ vmd-agent bench docker run --mode withvmd --suite /data/suite --out-dir /data/ou
 
 `--mode withvmd` builds VMD from a **Linux** tarball you place in `docker/vmd-dist/`; `--mode hostvmd` with `VMD_HOME=...` mounts a
 Linux install. A Mac's VMD.app cannot run in a Linux container (run natively instead). Details:
-[Running the benchmark with your VMD](docker.md#running-the-benchmark-with-your-vmd-and-your-key).
+[Running the benchmark with your VMD](../guide/docker.md#running-the-benchmark-with-your-vmd-and-your-key).
 
 ### 6. Run the grounding component study
 

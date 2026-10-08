@@ -1,6 +1,6 @@
 # Install and set up
 
-Everything about getting vmd-agent onto a computer and choosing who answers your questions. The short version is on the [README](../README.md#install).
+Everything about getting vmd-agent onto a computer and choosing who answers your questions. The short version is on the [README](../../README.md#install).
 
 ## Install (about 5 minutes)
 
@@ -8,19 +8,19 @@ Everything about getting vmd-agent onto a computer and choosing who answers your
 Enter. Linux: your terminal app. **Paste ONE line and press Enter.** Mac or Linux:
 
 ```bash
-curl -LsSf https://raw.githubusercontent.com/OmidMLdata/AGENTIC_VMD_v2/main/install.sh | sh
+curl -LsSf https://raw.githubusercontent.com/OmidMLdata/AGENTIC_VMD_v2/main/install/install.sh | sh
 ```
 
 Windows (PowerShell):
 
 ```powershell
-powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/OmidMLdata/AGENTIC_VMD_v2/main/install.ps1 | iex"
+powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/OmidMLdata/AGENTIC_VMD_v2/main/install/install.ps1 | iex"
 ```
 
 It puts a small helper called [uv](https://docs.astral.sh/uv/) (which fetches Python for you) and vmd-agent, with everything they
 need including a bundled ffmpeg for movies, into **one private folder** (`~/vmd-agent`; Windows `%USERPROFILE%\vmd-agent`). No
 administrator password, no changes to your PATH or to any file outside that folder. It takes a few minutes, mostly downloading.
-The two installers (`install.sh`, `install.ps1`) are separate files only because a Mac's shell and PowerShell cannot read each
+The two installers (`install/install.sh`, `install/install.ps1`) are separate files only because a Mac's shell and PowerShell cannot read each
 other's language, and they must run before Python exists; they do the same thing.
 
 ## What it works out by itself
@@ -75,8 +75,8 @@ volume.)
 ## Other ways to install
 
 * **You already use Python:** `pip install "vmd-agent[server] @ https://github.com/OmidMLdata/AGENTIC_VMD_v2/archive/refs/heads/main.zip"`,
-  then `vmd-agent setup`. The packages are listed once, in [`pyproject.toml`](../pyproject.toml) (`[all]` adds the optional ones).
-* **From a downloaded copy:** run `./install.sh` (Mac/Linux) or `install.ps1` (Windows) from inside the folder; it installs that copy.
+  then `vmd-agent setup`. The packages are listed once, in [`pyproject.toml`](../../pyproject.toml) (`[all]` adds the optional ones).
+* **From a downloaded copy:** run `./install/install.sh` (Mac/Linux) or `install\install.ps1` (Windows) from inside the folder; it installs that copy.
 * **Docker (advanced):** `vmd-agent start` picks native or Docker from the facts about your computer and starts the chat
   (`--print-plan` shows what it would do, `--down` stops the containers). Docker cannot run a Mac or Windows VMD (it needs VMD's
   **Linux** build in `docker/vmd-dist/`) and on a Mac cannot use the Mac's graphics chip. See [Docker](docker.md#docker).

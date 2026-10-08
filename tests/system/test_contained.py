@@ -124,7 +124,7 @@ def test_install_never_runs_without_a_checksum(monkeypatch, tmp_path):
 
 @pytest.mark.parametrize("name", ["install.sh", "install.ps1"])
 def test_the_installers_confine_uv_to_one_folder(name):
-    s = open(os.path.join(ROOT, name)).read()
+    s = open(os.path.join(ROOT, "install", name)).read()
     for var in ("UV_INSTALL_DIR", "UV_UNMANAGED_INSTALL", "UV_NO_MODIFY_PATH", "UV_CACHE_DIR",
                 "UV_TOOL_DIR", "UV_TOOL_BIN_DIR", "UV_PYTHON_INSTALL_DIR", "VMD_AGENT_HOME"):
         assert var in s, var
@@ -141,7 +141,7 @@ def test_the_catalogue_is_consistent():
 
 
 def test_the_readme_lists_exactly_the_catalogue_with_its_date():
-    readme = open(os.path.join(ROOT, "docs", "models.md")).read()
+    readme = open(os.path.join(ROOT, "docs", "guide", "models.md")).read()
     assert models.MODELS_CHECKED in readme
     for m in models.CATALOGUE:
         assert f"`{m.tag}`" in readme, m.tag
@@ -229,5 +229,5 @@ def test_an_unreadable_version_is_said_so():
 
 
 def test_the_readme_says_which_vmd_version_and_that_none_was_tested():
-    r = open(os.path.join(ROOT, "docs", "vmd.md")).read()
+    r = open(os.path.join(ROOT, "docs", "guide", "vmd.md")).read()
     assert "## Which VMD version?" in r and "1.9.x" in r and "1.9.4a57" in r and "Not tested:" in r

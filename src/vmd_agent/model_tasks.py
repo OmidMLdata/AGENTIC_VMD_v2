@@ -3,7 +3,7 @@
 This is a different test from :mod:`vmd_agent.tool_cases`. The tool test set runs each tool directly and asks "does the
 tool work?". These tasks put a *language model* in front of the same tools and ask "can this model use them?": does it
 choose the right tool, give it the right arguments, report what the tool returned, and say so when it cannot answer. Run them on
-any model with ``vmd-agent bench models`` (see docs/model-benchmark.md).
+any model with ``vmd-agent bench models`` (see docs/benchmarks/model-benchmark.md).
 
 Every task is a plain-language request about the files of :mod:`vmd_agent.tool_dataset`, whose properties are known by
 construction, and is graded by a program, never by another model:

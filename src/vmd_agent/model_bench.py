@@ -219,7 +219,7 @@ def reference_text(truth: dict) -> str:
 def reference_markdown() -> str:
     """The task list as a documentation page: every prompt, the tools that answer it, and what a correct answer says."""
     out = ["# The benchmark's tasks and their correct answers", "",
-           "Generated from [`model_tasks.py`](../src/vmd_agent/model_tasks.py) and [`model_oracle.py`](../src/vmd_agent/model_oracle.py) (a test keeps this page in step with them). Each task is a plain-language request about the",
+           "Generated from [`model_tasks.py`](../../src/vmd_agent/model_tasks.py) and [`model_oracle.py`](../../src/vmd_agent/model_oracle.py) (a test keeps this page in step with them). Each task is a plain-language request about the",
            "files of the generated dataset ([the tool test set](tool-test-set.md)); the **correct answer** is what a perfect agent finds with the tools. The values below are facts of how the dataset was built or",
            "are computed from its files with MDAnalysis, independently of the toolkit; on your computer `vmd-agent bench models --list --reference` prints the same, and `vmd-agent bench models --oracle` runs every",
            "task's perfect plan through the real tools and grades it, to check that the benchmark itself can be passed. A model may word its answer differently: the graders accept any wording that states the facts.", "",

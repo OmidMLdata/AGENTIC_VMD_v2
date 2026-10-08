@@ -1,7 +1,7 @@
 #!/bin/sh
 # vmd-agent installer for macOS and Linux. Paste ONE line into a terminal:
 #
-#   curl -LsSf https://raw.githubusercontent.com/OmidMLdata/AGENTIC_VMD_v2/main/install.sh | sh
+#   curl -LsSf https://raw.githubusercontent.com/OmidMLdata/AGENTIC_VMD_v2/main/install/install.sh | sh
 #
 # Everything goes into ONE folder (default ~/vmd-agent; set VMD_AGENT_HOME to choose another):
 #   uv, Python, vmd-agent and its packages, uv's cache, your settings, and (if you choose it) a private
@@ -26,7 +26,7 @@ die() { printf '\nvmd-agent installer: %s\n' "$*" >&2; exit 1; }
 
 # If this script sits inside a downloaded copy of vmd-agent, install that copy instead of fetching one.
 HERE=""
-if [ -f "$0" ]; then HERE="$(cd "$(dirname "$0")" 2>/dev/null && pwd || echo "")"; fi
+if [ -f "$0" ]; then HERE="$(cd "$(dirname "$0")/.." 2>/dev/null && pwd || echo "")"; fi
 if [ -n "$HERE" ] && [ -f "$HERE/pyproject.toml" ] && grep -q 'name = "vmd-agent"' "$HERE/pyproject.toml" 2>/dev/null; then
   SOURCE="file://$HERE"
 fi

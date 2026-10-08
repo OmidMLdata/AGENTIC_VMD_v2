@@ -1,6 +1,6 @@
 # vmd-agent installer for Windows. Paste ONE line into PowerShell (search "PowerShell" in the Start menu):
 #
-#   powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/OmidMLdata/AGENTIC_VMD_v2/main/install.ps1 | iex"
+#   powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/OmidMLdata/AGENTIC_VMD_v2/main/install/install.ps1 | iex"
 #
 # Everything goes into ONE folder (default %USERPROFILE%\vmd-agent; set VMD_AGENT_HOME to choose another):
 # uv, Python, vmd-agent and its packages, settings, and (if you choose it) a private copy of the Ollama

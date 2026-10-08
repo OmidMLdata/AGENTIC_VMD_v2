@@ -125,8 +125,8 @@ independent NeRF builder validates DSSP; independent NumPy re-implementations cr
 
 ## The agent, and what surrounds the model
 
-One module, [`agent.py`](../src/vmd_agent/agent.py), is where a model, the tools and the checks meet. Every front end is thin: the terminal chat prints, the web page draws,
-the [model benchmark](model-benchmark.md) records and grades, and none of them chooses a tool, runs one or checks an answer. So a benchmark result describes what a person
+One module, [`agent.py`](../../src/vmd_agent/agent.py), is where a model, the tools and the checks meet. Every front end is thin: the terminal chat prints, the web page draws,
+the [model benchmark](../benchmarks/model-benchmark.md) records and grades, and none of them chooses a tool, runs one or checks an answer. So a benchmark result describes what a person
 gets, and a change to the agent shows up in the benchmark.
 
 ```

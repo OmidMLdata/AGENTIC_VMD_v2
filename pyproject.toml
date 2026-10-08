@@ -50,7 +50,7 @@ all = ["mcp>=1.2.0", "freesasa", "mdtraj", "anthropic", "pytest>=7", "hypothesis
 [project.urls]
 Homepage = "https://github.com/OmidMLdata/AGENTIC_VMD_v2"
 Issues = "https://github.com/OmidMLdata/AGENTIC_VMD_v2/issues"
-Changelog = "https://github.com/OmidMLdata/AGENTIC_VMD_v2/blob/main/CHANGELOG.md"
+Changelog = "https://github.com/OmidMLdata/AGENTIC_VMD_v2/blob/main/docs/CHANGELOG.md"
 
 [project.scripts]
 vmd-agent = "vmd_agent.cli:main"

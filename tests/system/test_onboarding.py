@@ -257,12 +257,12 @@ def test_every_command_has_a_plain_language_description():
 # ------------------------------------------------------------------ installers
 @pytest.mark.skipif(SH is None, reason="no sh")
 def test_install_script_parses():
-    assert subprocess.run([SH, "-n", os.path.join(ROOT, "install.sh")]).returncode == 0
+    assert subprocess.run([SH, "-n", os.path.join(ROOT, "install", "install.sh")]).returncode == 0
 
 
 @pytest.mark.parametrize("name", ["install.sh", "install.ps1"])
 def test_the_installers_are_honest_and_conservative(name):
-    s = open(os.path.join(ROOT, name)).read()
+    s = open(os.path.join(ROOT, "install", name)).read()
     assert "NEVER RUN" in s                              # says what is unverified
     assert "astral.sh/uv" in s                           # uv's official installer only
     import re
@@ -273,14 +273,14 @@ def test_the_installers_are_honest_and_conservative(name):
 
 
 def test_the_one_line_installer_gives_the_setup_the_keyboard():
-    s = open(os.path.join(ROOT, "install.sh")).read()
+    s = open(os.path.join(ROOT, "install", "install.sh")).read()
     assert "< /dev/tty" in s                              # the script itself arrives on a pipe
 
 
 def test_the_readme_install_lines_point_at_files_that_exist():
     readme = open(os.path.join(ROOT, "README.md")).read()
     for f in ("install.sh", "install.ps1"):
-        assert f"main/{f}" in readme and os.path.exists(os.path.join(ROOT, f))
+        assert f"main/install/{f}" in readme and os.path.exists(os.path.join(ROOT, "install", f))
 
 
 def test_the_menu_opens_the_web_page_first():

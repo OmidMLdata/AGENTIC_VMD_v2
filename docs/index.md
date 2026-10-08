@@ -2,29 +2,31 @@
 
 The [README](../README.md) is the way in. These pages are the detail, in the order you will need them.
 
-**Use it**
+**Use it** (`guide/`)
 
 | Page | What is in it |
 |---|---|
-| [Install and set up](install.md) | the installer, the setup questions, who answers, where everything lives, other ways to install, troubleshooting |
-| [Ways to work](using.md) | the web page, the menu, the chat, the commands; the wall-clock time of every execution |
-| [Command reference](commands.md) | every command and flag, in the order of the pipeline |
-| [Models](models.md) | the free models, and how the chat keeps one honest |
-| [Whole jobs](workflows.md) | workflows and reports |
-| [VMD](vmd.md) | which VMD versions, and the 24 commands that drive VMD itself |
-| [The 53 tools](tools.md) | what the original 27, the 24 VMD tools and the 2 workflow tools are, and who gets which |
+| [Install and set up](guide/install.md) | the installer, the setup questions, who answers, where everything lives, other ways to install, troubleshooting |
+| [Ways to work](guide/using.md) | the web page, the menu, the chat, the commands; the wall-clock time of every execution |
+| [Command reference](guide/commands.md) | every command and flag, in the order of the pipeline |
+| [Models](guide/models.md) | the free models, and how the chat keeps one honest |
+| [Whole jobs](guide/workflows.md) | workflows and reports |
+| [VMD](guide/vmd.md) | which VMD versions, and the 24 commands that drive VMD itself |
+| [The 53 tools](guide/tools.md) | what the original 27, the 24 VMD tools and the 2 workflow tools are, and who gets which |
 
-**Connect, check, build**
+**Choose a model** (`benchmarks/`), and **reference** (`reference/`)
 
 | Page | What is in it |
 |---|---|
-| [MCP clients](mcp.md) | use the tools from Claude Code, Claude Desktop or another client |
-| [Docker](docker.md) | the container routes, and what has not been run |
-| [The tool test set](tool-test-set.md) | a dataset and a case for every tool |
-| [The model benchmark](model-benchmark.md) | tasks per kind of functionality, to run on each language model |
-| [The benchmark's tasks and correct answers](model-benchmark-tasks.md) | every prompt, the tools that answer it and what a correct answer says |
-| [Development](development.md) | set up, test, reproduce, the benchmark |
-| [Architecture](architecture.md) | how the code fits together |
-| [Methods](methods.md) | how each measurement is computed |
-| [Security](security.md) | the sandbox, Tcl, downloads, containers |
-| [Research paper](RESEARCH.md) | the design, the preregistration draft, comparison with the original project |
+| [MCP clients](guide/mcp.md) | use the tools from Claude Code, Claude Desktop or another client |
+| [Docker](guide/docker.md) | the container routes, and what has not been run |
+| [The tool test set](benchmarks/tool-test-set.md) | a dataset and a case for every tool |
+| [The model benchmark](benchmarks/model-benchmark.md) | tasks per kind of functionality, to run on each language model |
+| [The benchmark's tasks and correct answers](benchmarks/model-benchmark-tasks.md) | every prompt, the tools that answer it and what a correct answer says |
+| [Development](reference/development.md) | set up, test, reproduce, the benchmark |
+| [Architecture](reference/architecture.md) | how the code fits together |
+| [Methods](reference/methods.md) | how each measurement is computed |
+| [Security](reference/security.md) | the sandbox, Tcl, downloads, containers |
+| [Research paper](reference/RESEARCH.md) | the design, the preregistration draft, comparison with the original project |
+| [Changelog](CHANGELOG.md) | what changed in each version |
+| [Notices](NOTICE.md) | third-party software, and VMD's and MDAnalysis' licences |

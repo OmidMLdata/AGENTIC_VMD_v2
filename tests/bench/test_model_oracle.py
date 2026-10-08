@@ -68,8 +68,8 @@ def _grade(task, run):
 
 
 def test_the_task_page_in_the_docs_is_the_page_the_code_makes():
-    page = open(os.path.join(ROOT, "docs", "model-benchmark-tasks.md"), encoding="utf-8").read()
-    assert page.strip() == B.reference_markdown().strip(), "docs/model-benchmark-tasks.md is out of date: regenerate it with model_bench.reference_markdown()"
+    page = open(os.path.join(ROOT, "docs", "benchmarks", "model-benchmark-tasks.md"), encoding="utf-8").read()
+    assert page.strip() == B.reference_markdown().strip(), "docs/benchmarks/model-benchmark-tasks.md is out of date: regenerate it with model_bench.reference_markdown()"
     assert all(f"`{t.id}`" in page for t in M.TASKS)
 
 

@@ -1,6 +1,6 @@
 # The tool test set
 
-A test set for **every one of the 53 [tools](tools.md)**: a small generated dataset whose properties are known by construction, and
+A test set for **every one of the 53 [tools](../guide/tools.md)**: a small generated dataset whose properties are known by construction, and
 one or more cases per tool that run the real tool on it and check the answer. It answers "does each tool still do what it says, on
 this computer, with this VMD?" and it is the quickest way to see what your setup can and cannot do.
 
@@ -18,12 +18,12 @@ took**. A case that needs something the computer lacks is skipped, never counted
 
 ## The dataset
 
-Written by [`tool_dataset.py`](../src/vmd_agent/tool_dataset.py) from NumPy, MDAnalysis and the bundled ffmpeg. Nothing is
+Written by [`tool_dataset.py`](../../src/vmd_agent/tool_dataset.py) from NumPy, MDAnalysis and the bundled ffmpeg. Nothing is
 downloaded and nothing is stored in the repository: you build it.
 
 | File | What it is, and what it was built to have |
 |---|---|
-| `protein.pdb`, `design.json` | one idealised chain ([`bench/synth.py`](../src/vmd_agent/bench/synth.py)) with a buried ligand and one disulfide; `design.json` records what was designed |
+| `protein.pdb`, `design.json` | one idealised chain ([`bench/synth.py`](../../src/vmd_agent/bench/synth.py)) with a buried ligand and one disulfide; `design.json` records what was designed |
 | `protein.dcd` | 20 frames: frame `i` is the structure moved 0.3 A x `i` along x, plus noise of 0.05 A per coordinate, in an 80 A cubic box. So the un-aligned RMSD after 19 frames is 5.7 A, the aligned RMSD is the noise (about 0.12 A), the radius of gyration does not change and the box never changes |
 | `moved.pdb`, `target.dx` | the protein turned and shifted by known amounts, and a density map simulated from the un-moved protein: the fit must put it back |
 | `blob.dx` | a Gaussian blob on a 24 x 24 x 24 grid with a known spacing and peak |
@@ -48,10 +48,10 @@ Some cases are **negative**: a wrong request must be refused, not answered with 
 The NAMD input is checked against the system it was written for, never run in NAMD; the SLURM script is checked for the resources you asked
 for, never run on a cluster. The three network cases (`search_pdb`, `fetch_structure`, `fetch_and_visualize`) talk to the live PDB and
 need a connection. Cases that need VMD were only run with VMD 1.9.4a57 on macOS. The dataset is small and idealised: it checks that the
-tools work, not that their answers are good on your real systems. For that, use your own data and the [benchmark](development.md). To test a *language model* on these tools, use the [model benchmark](model-benchmark.md).
+tools work, not that their answers are good on your real systems. For that, use your own data and the [benchmark](../reference/development.md). To test a *language model* on these tools, use the [model benchmark](model-benchmark.md).
 
 ## Adding a case
 
-A case is `Case(id, tool, args, check, needs, after)` in [`tool_cases.py`](../src/vmd_agent/tool_cases.py): `args` and `check`
+A case is `Case(id, tool, args, check, needs, after)` in [`tool_cases.py`](../../src/vmd_agent/tool_cases.py): `args` and `check`
 receive the dataset's context, `check` chains `.ok()`, `.eq()`, `.near()`, `.file()`, `.fails()` and friends and returns the problems
 found. Put a case after the cases whose output it uses (`after`). A test fails if any tool has no case.
