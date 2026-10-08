@@ -48,11 +48,50 @@ async function loadStatus() {
   const sel = $("#profile"); sel.textContent = "";
   for (const [k, n] of Object.entries(s.profiles)) sel.append(new Option(n ? `${k} (${n})` : `${k} (fits the question)`, k));
   sel.value = s.profile;
-  $("#banner").textContent = "";
-  if (!s.model_ready) { const b = el("div", "banner"); b.append(document.createTextNode("The chat needs a model and none answers right now: " + (s.model_problem || "") + " Viewing, files and whole jobs work without one. Run "), el("code", null, "vmd-agent setup"), document.createTextNode(" to choose a model.")); $("#banner").append(b); }
+  renderBanner(s);
   $("#about-text").textContent = `Version ${s.version}. Model: ${s.model}. VMD: ${s.vmd ? s.vmd + " (" + (s.vmd_version || "version unknown") + ")" : "not found"}. Files folder: ${s.data_dir}. ${s.n_tools} tools; the chat is offered ${s.tools_in_chat}.`;
   totals(s.clock);
 }
+function renderBanner(s) {
+  const box = $("#banner"); box.textContent = "";
+  if (s.model_ready) return;
+  const b = el("div", "banner"), why = s.model_state === "no_model" ? `The server answers but has no model called "${s.model}".` : `No model server answers at ${s.server}.`;
+  b.append(el("div", null, "The chat has no model to talk to. " + why + " The viewer, the files, the look buttons and the whole jobs work without one."));
+  const acts = el("div", "acts");
+  if (s.model_state === "no_server" && s.private_available) { const x = el("button", "btn small", "Start the local model server"); x.onclick = startLocal; acts.append(x); }
+  const m = el("button", "btn small", "Choose a model…"); m.onclick = openModel; const c = el("button", "btn small", "Check again"); c.onclick = loadStatus;
+  acts.append(m, c); b.append(acts); box.append(b);
+}
+async function startLocal() {
+  toast("Starting the local model server…", "");
+  const r = await (await api("/api/model/start", {})).json();
+  toast(r.error || (r.state === "ready" ? "The model server is running." : "The server started but the model is not there yet: choose one."), r.error ? "err" : "ok");
+  loadStatus();
+}
+// the Model dialog: the same choice as in setup (a free local model, or another server)
+function fillModel(info) {
+  $("#model-state").textContent = info.state === "ready" ? `Using ${info.model} at ${info.base_url}.` : `Not working: ${info.problem}.`;
+  const list = $("#model-list"); list.textContent = ""; (info.available || []).forEach(m => list.append(new Option(m, m)));
+  $("#model-start").hidden = !info.private_available;
+}
+async function openModel() {
+  const info = await getJSON("/api/model"), local = info.is_private || (!info.has_key && /^https?:\/\/(localhost|127\.0\.0\.1)/.test(info.base_url));
+  $$('input[name="msrc"]').forEach(r => { r.checked = r.value === (local ? "local" : "other"); });
+  $("#model-url").value = local ? "" : info.base_url; $("#model-key").value = ""; $("#model-name").value = info.model; $("#model-msg").textContent = "";
+  $("#model-other").hidden = local; fillModel(info); $("#modeldlg").showModal();
+}
+$$('input[name="msrc"]').forEach(r => r.onchange = () => { $("#model-other").hidden = $('input[name="msrc"]:checked').value === "local"; });
+$("#model-close").onclick = () => $("#modeldlg").close();
+$("#model-check").onclick = async () => { fillModel(await getJSON("/api/model")); loadStatus(); };
+$("#model-start").onclick = async () => { $("#model-msg").textContent = "Starting…"; const r = await (await api("/api/model/start", {})).json(); $("#model-msg").textContent = r.error || ""; fillModel(r); loadStatus(); };
+$("#model-use").onclick = async () => {
+  const local = $('input[name="msrc"]:checked').value === "local", body = { model: $("#model-name").value.trim(), remember: true, local };
+  if (!local) { body.base_url = $("#model-url").value.trim(); if ($("#model-key").value) body.api_key = $("#model-key").value; }
+  const r = await api("/api/model/use", body), j = await r.json();
+  if (!r.ok) { $("#model-msg").textContent = j.error; return; }
+  fillModel(j); $("#model-msg").textContent = j.state === "ready" ? "Saved. New conversation started with this model." : "Saved, but it does not answer yet: " + j.problem + ".";
+  $("#log").textContent = ""; $("#welcome").classList.remove("gone"); loadStatus();
+};
 $("#profile").onchange = async e => {
   const r = await api("/api/profile", { tools: e.target.value });
   if (r.ok) { $("#log").textContent = ""; $("#welcome").classList.remove("gone"); clog("job", `the chat now offers the "${e.target.value}" tools`); loadStatus(); } else { toast((await r.json()).error, "err"); loadStatus(); }
@@ -368,6 +407,10 @@ async function send(text) {
       think.remove(); show(textBlock(), ev.text);
       log.append(el("div", "clock", ev.line)); clog("ok", ev.line); loadStatus();
     }
+    else if (ev.type === "error" && ev.kind === "model") {
+      think.remove(); const n = el("div", "msg sys", ev.text), acts = el("div", "acts"), m = el("button", "btn small", "Choose a model…"), r = el("button", "btn small", "Ask again");
+      m.onclick = openModel; r.onclick = () => { $("#q").value = text; $("#q").focus(); }; acts.append(m, r); n.append(acts); place(n); clog("err", "✗ " + ev.text); loadStatus();
+    }
     else if (ev.type === "error") { think.remove(); show(textBlock(), "Something went wrong: " + ev.text); clog("err", "✗ " + ev.text); }
     toBottom();
   });
@@ -456,6 +499,7 @@ act("anim.play", "Animation", "Play or pause", () => (S.anim.timer ? stopAnim() 
 act("anim.next", "Animation", "Next frame", () => { const m = V.topMol; if (m) { stopAnim(); gotoFrame(m.frame + 1); } }, { key: "→" });
 act("anim.prev", "Animation", "Previous frame", () => { const m = V.topMol; if (m) { stopAnim(); gotoFrame(m.frame - 1); } }, { key: "←" });
 act("ext.palette", "Extensions", "Search actions…", () => openPalette(), { key: "Ctrl K" });
+act("ext.model", "Extensions", "Model…", () => openModel());
 act("ext.chat", "Extensions", "Chat with the agent", () => showTab("chat"), { key: "Ctrl J" });
 act("ext.jobs", "Extensions", "Whole jobs (workflows)…", () => showTab("jobs"));
 act("ext.console", "Extensions", "Go to the console", () => { $("#console").classList.remove("min"); $("#conin").focus(); }, { key: "/" });
@@ -464,7 +508,7 @@ act("help.console", "Help", "Console commands", () => { $("#console").classList.
 act("help.about", "Help", "About vmd-agent", () => $("#about").showModal());
 const MENUS = [["File", ["file.add", "file.save", "file.refresh"]], ["Molecule", ["mol.new", "mol.addfile", "-", "mol.toggle", "mol.inspect", "-", "mol.delete"]], ["Graphics", ["reps.open", "rep.add", "rep.delete"]],
                ["Display", ["proj.persp", "proj.ortho", "-", "display.depth", "display.axes", "-", "bg.black", "bg.gray", "bg.white", "-", "view.reset", "view.fit"]], ["Mouse", ["mouse.rotate", "mouse.translate", "mouse.scale", "mouse.pick"]],
-               ["Animation", ["anim.play", "anim.prev", "anim.next"]], ["Extensions", ["ext.palette", "-", "ext.chat", "ext.jobs", "ext.console"]], ["Help", ["help.shortcuts", "help.console", "help.about"]]];
+               ["Animation", ["anim.play", "anim.prev", "anim.next"]], ["Extensions", ["ext.palette", "ext.model", "-", "ext.chat", "ext.jobs", "ext.console"]], ["Help", ["help.shortcuts", "help.console", "help.about"]]];
 function closeMenus(except) { $$(".menu.open").forEach(m => { if (m === except) return; m.classList.remove("open"); const d = $(".dropdown", m); if (d) d.remove(); $("button", m).setAttribute("aria-expanded", "false"); }); }
 function buildMenus() {
   const nav = $("#menus"); nav.textContent = "";
@@ -564,4 +608,4 @@ renderMolecules(); refreshAnim(); updateCaption();
 clog("job", "vmd-agent ready. Type help for the console commands, or press Ctrl+K to search every action.");
 loadFiles().then(() => { const s = S.everything.filter(f => f.kind === "structure"); if (s.length === 1 && !V.mols.length) loadMolecule(s[0].path); });
 loadWorkflows(); loadStatus();
-setInterval(() => { if (!S.busy) loadFiles(); }, 15000);
+setInterval(() => { if (!S.busy) { loadFiles(); if (!S.status.model_ready) loadStatus(); } }, 15000);

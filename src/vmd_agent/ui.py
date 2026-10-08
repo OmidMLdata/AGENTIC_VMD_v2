@@ -132,13 +132,36 @@ class State:
         self.tools = profile
         self.session = agent_mod.Agent(self.base_url, self.model, self.api_key, tools=profile, echo=lambda m: None)
 
+    def reconnect(self, base_url: str, model: str, api_key: Optional[str]) -> None:
+        """Point the chat at another model or server (a new conversation: the old one was with the old model)."""
+        self.base_url, self.model, self.api_key = base_url, model, api_key
+        self.session = agent_mod.Agent(base_url, model, api_key, tools=self.tools, echo=lambda m: None)
+
+    def model_info(self, timeout: float = 4.0) -> dict:
+        """What the page needs to say about the model: where it is, whether it answers, which models the server has, and what can be done about it.
+        ``state`` is ``ready``, ``no_server`` (nothing answers at the address) or ``no_model`` (the server answers but does not have that model)."""
+        from vmd_agent import ollama_local
+        from vmd_agent.llm_client import LLMError, list_models
+        private = ollama_local.find_binary() is not None
+        info = {"base_url": self.base_url, "model": self.model, "has_key": bool(self.api_key), "available": [], "state": "ready", "problem": None,
+                "private_available": private, "is_private": self.base_url == ollama_local.url()}
+        try:
+            info["available"] = list_models(self.base_url, self.api_key, timeout=timeout)
+        except LLMError as e:
+            info.update(state="no_server", problem=str(e))
+            return info
+        if info["available"] and self.model not in info["available"]:
+            info.update(state="no_model", problem=f"the server has no model called '{self.model}'")
+        return info
+
     def status(self) -> dict:
         from vmd_agent import __version__
         from vmd_agent.environment import probe_environment
         env = probe_environment()
-        problem = agent_mod.check_connection(self.base_url, self.model, self.api_key)
+        mi = self.model_info()
         return {"version": __version__, "data_dir": self.root, "model": self.model, "server": self.base_url,
-                "model_ready": problem is None, "model_problem": " ".join(problem) if problem else None,
+                "model_ready": mi["state"] == "ready", "model_state": mi["state"], "model_problem": mi["problem"], "model_available": mi["available"],
+                "private_available": mi["private_available"], "is_private": mi["is_private"],
                 "vmd": env.get("vmd_path"), "vmd_version": env.get("vmd_version"), "tachyon": bool(env.get("tachyon_path")),
                 "ffmpeg": bool(env.get("ffmpeg")), "n_tools": len(toolset.library_tools()), "tools_in_chat": len(self.session.names), "profile": self.tools,
                 "profiles": {"all": len(toolset.ALL), "auto": 0},
@@ -215,6 +238,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._structure(url.path, parse_qs(url.query))
         elif url.path == "/api/status":
             self._json(self.state.status())
+        elif url.path == "/api/model":
+            self._json(self.state.model_info())
         elif url.path == "/api/files":
             sub = parse_qs(url.query).get("dir", [""])[0]
             try:
@@ -298,12 +323,51 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     return self._json({"error": "another job is still running; wait for it to finish"}, 409)
                 self.state.set_tools(profile)
                 return self._json(self.state.status())
+            if url.path == "/api/model/start":
+                return self._model_start()
+            if url.path == "/api/model/use":
+                return self._model_use(payload)
             if url.path == "/api/reset":
                 self.state.session.reset()
                 return self._json({"ok": True})
             self._send(404, b"not found", "text/plain")
         except (ValueError, json.JSONDecodeError) as e:
             self._json({"error": str(e)}, 400)
+
+    def _model_start(self) -> None:
+        """Start the private model server (the Ollama copy inside the vmd-agent folder), if there is one."""
+        from vmd_agent import ollama_local
+        if ollama_local.find_binary() is None:
+            return self._json({**self.state.model_info(), "error": "there is no private model server on this computer yet: run `vmd-agent setup` and choose the free local model"}, 409)
+        started = ollama_local.start()
+        info = self.state.model_info()
+        if not started:
+            info["error"] = "the private model server did not start"
+        self._json(info)
+
+    def _model_use(self, payload: dict) -> None:
+        """Choose the model: the free local one, or any server that speaks the common chat format. ``remember`` saves it for next time."""
+        from vmd_agent import ollama_local, settings
+        if self.state.busy.locked():
+            return self._json({"error": "another job is still running; wait for it to finish"}, 409)
+        model = str(payload.get("model") or "").strip()
+        if not model:
+            return self._json({"error": "name the model"}, 400)
+        if payload.get("local"):
+            private = ollama_local.find_binary() is not None
+            base_url, key, mode = (ollama_local.url() if private else agent_mod.DEFAULT_URL), None, ("private" if private else "system")
+        else:
+            base_url = str(payload.get("base_url") or "").strip().rstrip("/")
+            if not re.match(r"https?://[^\s]+$", base_url):
+                return self._json({"error": "the address must start with http:// or https:// (it usually ends in /v1)"}, 400)
+            key, mode = (str(payload["api_key"]) if payload.get("api_key") else self.state.api_key if base_url == self.state.base_url else None), None
+        self.state.reconnect(base_url, model, key)
+        if payload.get("remember"):
+            saved = {"llm_url": base_url, "llm_model": model, "llm_key": key}
+            if mode:
+                saved["ollama_mode"] = mode
+            settings.save(**saved)
+        self._json(self.state.model_info())
 
     def _upload(self, name: str) -> None:
         name = os.path.basename(unquote(name)).strip().lstrip(".")
@@ -374,6 +438,15 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if not text:
             return emit({"type": "error", "text": "type a question first"})
         s, root = self.state.session, self.state.root
+        problem = self.state.model_info()
+        if problem["state"] == "no_server" and problem["is_private"] and problem["private_available"]:
+            from vmd_agent import ollama_local
+            ollama_local.start()                                      # our own server may simply not be running yet
+            problem = self.state.model_info()
+        if problem["state"] != "ready":
+            return emit({"type": "error", "kind": "model", "state": problem["state"],
+                         "text": f"No model is answering ({problem['problem']}). Choose or start one with Extensions, Model. "
+                                 "The viewer, the files, the look buttons and the whole jobs work without one."})
 
         def on_event(ev: dict) -> None:
             if ev["type"] == "tool_end":
@@ -385,7 +458,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
             answer = s.ask(text, on_token=lambda tok: emit({"type": "token", "text": tok}))
             emit({"type": "answer", "text": answer, "streamed": bool(s.streamed), "clock": s.last_turn, "line": agent_mod.clock_line(s.last_turn)})
         except agent_mod.LLMError as e:
-            emit({"type": "error", "text": str(e)})
+            emit({"type": "error", "kind": "model", "text": f"The model stopped answering: {e}"})
         finally:
             s.on_event = None
 

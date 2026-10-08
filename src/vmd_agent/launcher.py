@@ -383,7 +383,7 @@ def doctor_text(info: Dict[str, object]) -> str:
                  models.recommend(info.get("ram_gb"), bool(info.get("nvidia_gpu")))),
              "Claude Code: " + ("not installed" if not info["claude_code"]["installed"] else
                                 "installed, vmd-agent is registered as an MCP server" if info["claude_code"]["registered"] else
-                                "installed; vmd-agent is not registered with it yet (run `vmd-agent setup`, or `vmd-agent mcp-config`)"),
+                                "installed; vmd-agent is not one of its tools (only needed if you want Claude Code, not a model here, to be the assistant: `vmd-agent mcp-config`)"),
              f"Docker:      installed {yes(d['installed'])}, running {yes(d['running'])}, "
              f"compose {yes(d['compose'])}, NVIDIA runtime {yes(d['nvidia_runtime'])}",
              f"GPU:         {info['nvidia_gpu'] or 'no NVIDIA GPU'}"

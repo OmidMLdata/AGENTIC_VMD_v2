@@ -1,8 +1,8 @@
 # Use it from an MCP client
 
-Setup offers to register vmd-agent with Claude Code for you when the `claude` command is installed; this page is the manual way and the details.
+Setup lists Claude Code and Claude Desktop as one of the choices of who answers; this page is the manual way and the details.
 
-Optional. The chat (`vmd-agent chat`) needs no MCP client; this is for people who already use Claude Code, Claude Desktop or another MCP client.
+Optional, and an alternative to a model run by vmd-agent: if a model runs on your computer (or you use an online service), you do not also need Claude Code here. This is for people who want Claude Code, Claude Desktop or another MCP client to be the assistant.
 
 The same tools are available to any MCP client (Claude Code, Claude Desktop and others) through an MCP server. The server exposes the 44 tools of the [library](tools.md) and the `run_workflow` call (the entry to the [workflows](workflows.md)) to an MCP client over stdio. This
 section is everything needed to run it on a **Linux machine that has VMD installed**.

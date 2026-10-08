@@ -38,6 +38,9 @@ remembered; double-click one to restore it), and the light/dark/automatic theme 
   chat ([How the chat keeps a model honest](models.md#how-the-chat-keeps-a-model-honest)).
 * **Assistant, Whole jobs.** Pick a [workflow](workflows.md), pick the files, run it, and read the verdict, the graded findings, the step table with seconds and the figures, with a link to the
   report. No model is needed for this tab.
+* **Model.** The page is connected to the model that setup chose. If none answers (the server is not running, or it lacks the model), a note says which of the two it is, with buttons to start the local
+  model server, to choose another model (**Extensions, Model…**: the free local one, or any server with the common chat interface such as an online service, Ollama, LM Studio or vLLM) and to check again; a question
+  asked meanwhile gets a plain explanation instead of an error, and the viewer, the files, the look buttons and the whole jobs keep working. The page checks again every 15 seconds.
 * **Status bar.** Whether the model answers, VMD's version, ffmpeg, the mouse mode, and a **chat tools** menu: `all` or `auto` (see [Does the model see all of them at once?](tools.md#does-the-model-see-all-of-them-at-once)).
   On a narrow window the columns stack.
 

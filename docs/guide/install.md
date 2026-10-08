@@ -31,8 +31,8 @@ system keeps it, then started once to prove it works), Ollama, Docker, and Claud
 * **Where things live and how they are run** follow the operating system (VMD's launcher, the settings folder, paths turned into what Tcl wants, Claude Desktop's config file).
 * **The suggested model fits the memory**: the 8B default from 16 GB or with an NVIDIA card, the 3B from 8 GB; below that setup says that a local model that can use tools is a poor fit and points to an online
   service or Claude. It suggests; you choose, and nothing is downloaded without asking.
-* **Claude Code**: if the `claude` command is installed and vmd-agent is not yet one of its MCP servers, setup offers to add it (`claude mcp add ...`, shown before it runs), so Claude Code can use the same tools through it.
-  `vmd-agent doctor` says whether it is registered.
+* **Claude Code and Claude Desktop**: setup notes whether they are installed and offers them as one of the choices of who answers (below). It never registers vmd-agent with them as an extra on top of a model
+  that runs here. `vmd-agent doctor` says whether Claude Code has vmd-agent registered.
 
 ## Answer the setup questions
 
@@ -55,9 +55,9 @@ next.
 
 | Choice | What it is | Good to know |
 |---|---|---|
-| **1. A free model on this computer** (recommended) | An open-source model run by a free program called Ollama. Works offline; your data never leaves the computer. | It asks before downloading anything. It keeps a **private copy of Ollama inside the vmd-agent folder** (about 0.2 GB on a Mac, 1.4 to 1.6 GB on Linux and Windows), checked against Ollama's published checksum, plus the model (2 to 18 GB, see below). If you already have Ollama it uses that instead. Downloads happen once. |
+| **1. A free model on this computer** (recommended; offered first unless you already saved an online service) | An open-source model run by a free program called Ollama. Works offline; your data never leaves the computer. | It asks before downloading anything. It keeps a **private copy of Ollama inside the vmd-agent folder** (about 0.2 GB on a Mac, 1.4 to 1.6 GB on Linux and Windows), checked against Ollama's published checksum, plus the model (2 to 18 GB, see below). If you already have Ollama it uses that instead. Downloads happen once. |
 | **2. An online model service** | Any service with the common "OpenAI-compatible" chat interface: you give a web address, a model name and your key. | The key is saved in a file only you can read. |
-| **3. Claude Desktop or Claude Code** | Connects the tools to an AI app you already use ([details](mcp.md#use-it-from-an-mcp-client)). | It edits that app's settings file only after you say yes, and keeps a backup. |
+| **3. Claude Code or Claude Desktop instead** | They do the thinking, and vmd-agent only supplies the tools ([details](mcp.md#use-it-from-an-mcp-client)). | It edits that app's settings file only after you say yes, and keeps a backup. vmd-agent's own chat and web page still need a model of their own. |
 | **4. Skip** | No chat. | Every other command still works. |
 
 A model on a computer without a graphics card can take a minute or more per answer. On a Mac, running Ollama directly (which setup

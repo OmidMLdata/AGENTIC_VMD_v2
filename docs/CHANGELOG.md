@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.25.0: the page is connected to the model and fails gracefully; Claude Code is a choice, not an extra
+
+* **The web page knows what is wrong with the model** (no server, or the server lacks the model), starts the private local server for you on request or when a question is asked, lets you choose another
+  model or server from the page (**Extensions, Model…**, remembered), and answers a question asked with no model with an explanation and the way out instead of an error. `/api/model`, `/api/model/start`, `/api/model/use`.
+* **Setup no longer offers to register Claude Code after choosing a model that runs here.** Claude Code or Desktop is one of the choices of who answers, an alternative to a model; the menu's "Connect the tools to
+  Claude" step is gone (`vmd-agent mcp-config` remains). The choices say what was found, and the free local model is offered first unless an online service is already saved; if an online service is chosen
+  and none is given, setup offers the local model instead.
+
 ## 0.24.1: the web page looks like VMD's windows
 
 * Flat grey faces, bevelled buttons, sunken white lists, small type, square corners and no accent colour: the Molecules list, a black display, Graphical Representations (Selected Atoms, Drawing Method,

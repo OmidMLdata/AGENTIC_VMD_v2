@@ -4,8 +4,8 @@ Ask questions about your molecular structures and simulations **in plain languag
 whether a statement about it is true. [VMD](https://www.ks.uiuc.edu/Research/vmd/) does the measuring and the drawing; vmd-agent is the **agent** in between, a language model
 that decides which VMD tools to use, runs them, and has every answer checked against what the tools actually returned.
 
-It works out for itself what computer it is on (Mac, Windows or Linux) and runs the model **on your own computer with a free open-source model by default**. If Claude Code
-is installed, the same tools are offered to it as well, like any other MCP server.
+It works out for itself what computer it is on (Mac, Windows or Linux) and runs the model **on your own computer with a free open-source model by default**. Prefer Claude Code or Claude Desktop as the assistant? Choose that
+in setup instead of a local model; vmd-agent then just supplies the tools, like any other MCP server.
 
 ## Highlights
 
@@ -50,7 +50,7 @@ choose who answers: a free model on your computer (recommended), an online servi
 | the **memory and graphics card** | suggests the model that fits: the 8B default from 16 GB (or with an NVIDIA card), the 3B from 8 GB, and says plainly when there is too little for a model that can use tools |
 | **VMD**: whether it is there, starts, and its version | uses it for pictures and the tools that run VMD; without it every other tool still works, with built-in pictures |
 | **Ollama** | runs the open-source model through a private copy kept inside the vmd-agent folder (or yours, if you have one), downloading a model only after asking |
-| **Claude Code** | if the `claude` command is installed, offers to register vmd-agent as an MCP server so Claude Code can use VMD through it |
+| **Claude Code or Desktop** | notes whether they are installed, and offers them as an *alternative* assistant in setup (the choice is yours; nothing is registered unless you pick it) |
 
 `vmd-agent doctor` prints all of this and what to do next.
 

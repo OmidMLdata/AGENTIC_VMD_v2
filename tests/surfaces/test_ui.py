@@ -210,3 +210,49 @@ def test_the_tools_the_chat_offers_can_be_changed_from_the_page(page):
     assert s == 200 and status["profile"] == "auto" and status["profiles"]["all"] == 45
     assert page.post("/api/profile", {"tools": "nonsense"})[0] == 400
     assert json.loads(page.post("/api/profile", {"tools": "all"})[1])["tools_in_chat"] == 45
+
+
+def _closed_port():
+    import socket
+    with socket.socket() as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
+def test_the_page_says_why_the_model_is_not_answering_and_the_chat_fails_gracefully(page):
+    dead = f"http://127.0.0.1:{_closed_port()}/v1"
+    s, body, _ = page.post("/api/model/use", {"base_url": dead, "model": "m"})
+    info = json.loads(body)
+    assert s == 200 and info["state"] == "no_server" and info["problem"]
+    status = json.loads(page.req("GET", "/api/status")[1])
+    assert status["model_ready"] is False and status["model_state"] == "no_server" and status["model_problem"]
+    events = page.events("/api/chat", {"message": "what is in 1ubq.pdb?"})
+    assert [e["type"] for e in events] == ["error"] and events[0]["kind"] == "model" and "No model is answering" in events[0]["text"]
+    assert "Model" in events[0]["text"] and "work without one" in events[0]["text"]                      # the way out, and what still works
+    assert page.post("/api/look", {"tool": "inspect_files", "path": "1ubq.pdb"})[0] == 200               # the rest of the page does not depend on a model
+
+
+def test_a_server_without_the_model_is_told_apart_from_no_server(page):
+    s, body, _ = page.post("/api/model/use", {"base_url": page.state.base_url, "model": "not-installed"})
+    info = json.loads(body)
+    assert s == 200 and info["state"] == "no_model" and "m" in info["available"] and "not-installed" in info["problem"]
+
+
+def test_the_model_can_be_chosen_from_the_page_and_remembered(page):
+    from vmd_agent import settings
+    s, body, _ = page.post("/api/model/use", {"base_url": page.state.base_url, "model": "m", "api_key": "sk-secret", "remember": True})
+    info = json.loads(body)
+    assert s == 200 and info["state"] == "ready" and info["has_key"] is True and "sk-secret" not in body.decode()           # the key is never sent back
+    assert settings.get("llm_model") == "m" and settings.get("llm_key") == "sk-secret"
+    events = page.events("/api/chat", {"message": "what is in 1ubq.pdb?"})
+    assert events[-1]["type"] == "answer"                                                    # the new connection really answers
+    assert page.post("/api/model/use", {"base_url": "ftp://x", "model": "m"})[0] == 400      # only http(s)
+    assert page.post("/api/model/use", {"base_url": page.state.base_url, "model": ""})[0] == 400
+    assert page.req("GET", "/api/model", cookie=False)[0] == 403
+
+
+def test_starting_the_private_model_server_says_so_when_there_is_none(page, monkeypatch):
+    from vmd_agent import ollama_local
+    monkeypatch.setattr(ollama_local, "find_binary", lambda root=None: None)
+    s, body, _ = page.post("/api/model/start", {})
+    assert s == 409 and "vmd-agent setup" in json.loads(body)["error"]

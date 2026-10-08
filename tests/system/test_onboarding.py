@@ -200,7 +200,7 @@ def test_status_shows_each_setting_and_whether_the_model_answers(tmp_path):
 
 # -------------------------------------------------------------------- the menu
 def test_the_menu_quits_and_offers_setup_on_a_first_visit():
-    io_ = Typed(["n", "9"])                              # no setup, quit
+    io_ = Typed(["n", "8"])                              # no setup, quit
     assert wizard.menu(io_) == 0
     assert "first time" in io_.text and "What would you like to do?" in io_.text
 
@@ -211,7 +211,7 @@ def test_the_menu_runs_a_real_check_of_a_statement(tmp_path):
     out = io.StringIO()
     real_stdout, sys.stdout = sys.stdout, out
     try:
-        wizard.menu(Typed(["5", "lysozyme.pdb", "It has 4 disulfide bridges", "9"]))
+        wizard.menu(Typed(["5", "lysozyme.pdb", "It has 4 disulfide bridges", "8"]))
     finally:
         sys.stdout = real_stdout
     assert "supported" in out.getvalue()                 # the real verifier ran
@@ -224,7 +224,7 @@ def test_the_menu_runs_a_real_analysis_on_files_in_the_users_folder(tmp_path):
     out = io.StringIO()
     real_stdout, sys.stdout = sys.stdout, out
     try:
-        wizard.menu(Typed(["4", "sample.pdb", "sample.dcd", "rgyr", "9"]))
+        wizard.menu(Typed(["4", "sample.pdb", "sample.dcd", "rgyr", "8"]))
     finally:
         sys.stdout = real_stdout
     assert "rgyr" in out.getvalue().lower()
@@ -238,7 +238,7 @@ def test_ending_the_input_stream_leaves_the_menu_cleanly(monkeypatch):
 
 def test_the_menu_never_shows_a_traceback_for_a_bad_file(tmp_path):
     settings.save(data_dir=str(tmp_path), setup_done=True)
-    io_ = Typed(["5", "missing.pdb", "It has a membrane", "9"])
+    io_ = Typed(["5", "missing.pdb", "It has a membrane", "8"])
     assert wizard.menu(io_) == 0
 
 
@@ -284,29 +284,28 @@ def test_the_readme_install_lines_point_at_files_that_exist():
 
 def test_the_menu_opens_the_web_page_first():
     seen = []
-    assert wizard.menu(Typed(["n", "1", "9"]), run_cli=lambda argv: seen.append(argv) or 0) == 0
+    assert wizard.menu(Typed(["n", "1", "8"]), run_cli=lambda argv: seen.append(argv) or 0) == 0
     assert seen == [["ui"]]
     assert wizard.MENU[0].startswith("The web page") and wizard.MENU[-1] == "Quit"
 
 
-def test_setup_offers_claude_code_when_it_is_installed_and_not_yet_connected(monkeypatch, tmp_path):
-    from vmd_agent import platform_info as P
-    ran = []
-    monkeypatch.setattr(P, "claude_code_status", lambda: {"installed": True, "path": "/x/claude", "registered": False})
-    monkeypatch.setattr(wizard, "_run", lambda cmd, *a, **k: ran.append(cmd) or type("R", (), {"returncode": 0})())
-    io_ = Typed(["y"])
-    assert wizard.offer_claude_code(io_, str(tmp_path)) is True
-    assert ran and ran[0][:3] == ["claude", "mcp", "add"] and "Claude Code is installed" in io_.text
-    ran.clear()
-    assert wizard.offer_claude_code(Typed(["n"]), str(tmp_path)) is False and ran == []                   # asked, declined: nothing run
+def test_claude_code_is_an_alternative_to_a_model_not_an_extra_step(monkeypatch):
+    """If a model runs here, nothing is registered with Claude Code unasked; Claude is one of the choices of who answers, and the menu has no step for it."""
+    assert not hasattr(wizard, "offer_claude_code")
+    assert not any("Claude" in item for item in wizard.MENU)
+    monkeypatch.setattr(wizard.shutil, "which", lambda name: "/x/claude" if name == "claude" else None)
+    labels, default = wizard.assistant_choices()
+    assert default == 1 and "recommended" in labels[0] and "found on this computer" in labels[2] and "instead" in labels[2]
 
 
-def test_setup_says_nothing_about_claude_code_when_it_is_absent_or_already_connected(monkeypatch, tmp_path):
-    from vmd_agent import platform_info as P
-    for st, want in (({"installed": False, "path": None, "registered": None}, False), ({"installed": True, "path": "/x", "registered": True}, True)):
-        monkeypatch.setattr(P, "claude_code_status", lambda st=st: st)
-        io_ = Typed([])
-        assert wizard.offer_claude_code(io_, str(tmp_path)) is want and io_.text == ""
+def test_the_free_local_model_is_offered_first_unless_an_online_service_is_already_saved():
+    labels, default = wizard.assistant_choices()
+    assert default == 1 and "need its web address" in labels[1]
+    settings.save(llm_url="https://api.example.com/v1", llm_model="m")
+    labels, default = wizard.assistant_choices()
+    assert default == 2 and "api.example.com" in labels[1]
+    settings.save(llm_url="http://localhost:11434/v1")                           # a server on this computer is not an online service
+    assert wizard.assistant_choices()[1] == 1
 
 
 def test_setup_names_the_computer_and_suggests_a_model_that_fits_it(monkeypatch, tmp_path):

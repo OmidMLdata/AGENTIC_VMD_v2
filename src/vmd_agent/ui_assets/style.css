@@ -293,3 +293,15 @@ dialog::backdrop { background: rgba(0, 0, 0, .25); }
 .mol.d1 { padding-left: 18px; } .mol.d2 { padding-left: 30px; } .mol.d3 { padding-left: 42px; } .mol.d4 { padding-left: 54px; } .mol.d5 { padding-left: 66px; }
 .linkrow { margin-top: 8px; }
 #runwf { margin-top: 8px; }
+
+/* ---- the model dialog and notes in the transcript */
+#modeldlg { width: 520px; }
+#modeldlg label { display: block; margin: 6px 0 1px; } #modeldlg label.opt { margin: 2px 0; } #modeldlg input[type=text], #modeldlg input[type=password] { width: 100%; }
+#modeldlg fieldset { margin: 6px 0; padding: 3px 8px 5px; border: 1px solid var(--lo); box-shadow: 1px 1px 0 var(--hi); }
+#model-state { margin: 0; } .note { color: var(--muted); margin: 6px 0 0; }
+.dlgbtns { display: flex; gap: 4px; margin-top: 10px; }
+.msg.sys { background: #fff4c2; color: #000; border-bottom: 1px solid #8a6d00; } .msg.sys::before { content: "Note"; }
+.msg.sys .acts { display: flex; gap: 4px; margin-top: 4px; }
+:root[data-theme="dark"] .msg.sys { background: #4a3f12; color: #fff; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .msg.sys { background: #4a3f12; color: #fff; } }
+#banner .acts { display: flex; gap: 4px; margin-top: 4px; }

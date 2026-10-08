@@ -62,7 +62,9 @@ keyframes and claim checking.
 
 See [Whole jobs](workflows.md).
 
-## 5. Connect other programs
+## 5. Claude Code or Claude Desktop as the assistant
+
+Only if you want one of them, rather than a model run by vmd-agent, to do the thinking.
 
 | Command | What it does | Flags worth knowing |
 |---|---|---|

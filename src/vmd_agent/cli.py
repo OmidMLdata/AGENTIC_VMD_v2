@@ -363,7 +363,7 @@ GROUPS = [
     ("2. Ask in plain language", ["ui", "chat", "menu"]),
     ("3. The tool library (every tool, one way to run it)", ["tools", "tool"]),
     ("4. Whole jobs that run several tools and write a report", ["workflow"]),
-    ("5. Connect other programs (Claude Code, Claude Desktop ...)", ["mcp-config", "mcp-check"]),
+    ("5. Use Claude Code or Claude Desktop as the assistant instead", ["mcp-config", "mcp-check"]),
     ("6. Benchmarks and cross-checks", ["bench"]),
 ]
 

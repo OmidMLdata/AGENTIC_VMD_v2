@@ -140,6 +140,21 @@
 <dialog id="palette" aria-label="Search actions"><input id="pal-in" type="search" placeholder="search actions" aria-label="Search actions" autocomplete="off"><ul id="pal-list" role="listbox"></ul></dialog>
 <dialog id="shortcuts" aria-label="Keyboard shortcuts"><div class="dlg"><h3>Keyboard shortcuts</h3><table id="sc-table"></table><form method="dialog"><button class="btn">Close</button></form></div></dialog>
 <dialog id="about" aria-label="About"><div class="dlg"><h3>vmd-agent</h3><p id="about-text"></p><form method="dialog"><button class="btn">Close</button></form></div></dialog>
+<dialog id="modeldlg" aria-label="Model"><div class="dlg">
+  <h3>Model</h3>
+  <p id="model-state"></p>
+  <fieldset><legend>Where the model runs</legend>
+    <label class="opt"><input type="radio" name="msrc" value="local"> A free model on this computer (the private Ollama that setup installs)</label>
+    <label class="opt"><input type="radio" name="msrc" value="other"> Another server: an online service you have access to, or your own Ollama, LM Studio, vLLM</label>
+  </fieldset>
+  <div id="model-other"><label for="model-url">Address (usually ends in /v1)</label><input id="model-url" type="text" spellcheck="false" autocomplete="off">
+    <label for="model-key">API key (leave empty if it needs none)</label><input id="model-key" type="password" autocomplete="off"></div>
+  <label for="model-name">Model name</label><input id="model-name" type="text" list="model-list" spellcheck="false" autocomplete="off"><datalist id="model-list"></datalist>
+  <p class="note" id="model-msg" role="status"></p>
+  <p class="note">To use Claude Code or Claude Desktop as the assistant instead of a model here, run <code>vmd-agent mcp-config</code> in a terminal.</p>
+  <div class="dlgbtns"><button class="btn" id="model-start" type="button">Start local server</button><button class="btn" id="model-check" type="button">Check</button><span class="grow"></span>
+    <button class="btn" id="model-use" type="button">Use this model</button><button class="btn" id="model-close" type="button">Close</button></div>
+</div></dialog>
 <dialog id="chooser" aria-label="Choose a file"><div class="dlg"><h3 id="chooser-title">Choose a file</h3><ul id="chooser-list" role="listbox"></ul><form method="dialog"><button class="btn">Cancel</button></form></div></dialog>
 <div id="toasts" aria-live="polite"></div>
 

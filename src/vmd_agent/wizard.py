@@ -13,6 +13,7 @@ available where this was written. The decisions and the file writes are tested.
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 import time
@@ -292,25 +293,13 @@ def setup_online_model(io: IO, url: Optional[str] = None, model: Optional[str] =
     return True
 
 
-def offer_claude_code(io: IO, data_dir: str, assume_yes: bool = False) -> bool:
-    """If Claude Code is installed and does not have vmd-agent yet, offer to add it as an MCP server (the same tools, through Claude Code)."""
-    from vmd_agent import mcp_check
-    st = P.claude_code_status()
-    if not st["installed"] or st["registered"]:
-        return bool(st["registered"])
-    cmd = mcp_check.build_mcp_config(roots=[data_dir])["claude_code_command"]
-    io.say("\n  Claude Code is installed on this computer. vmd-agent can also be one of its tools (an MCP server), so Claude Code can use VMD through it.")
-    if assume_yes or io.confirm("  Add it to Claude Code now? I would run: " + " ".join(cmd), default=True):
-        return _run(cmd).returncode == 0
-    return False
-
-
 def setup_ai_app(io: IO, data_dir: str, assume_yes: bool = False,
                  system_name: Optional[str] = None) -> bool:
-    """Connect the toolkit to Claude Desktop / Claude Code (any MCP client)."""
+    """Let Claude Desktop / Claude Code (any MCP client) be the assistant: they do the thinking, vmd-agent supplies the tools."""
     from vmd_agent import mcp_check
     cfg = mcp_check.build_mcp_config(roots=[data_dir], system_name=system_name)
-    io.say("\n  This connects the tools to an AI app you already use (through a standard called MCP).")
+    io.say("\n  Claude Code or Claude Desktop will do the thinking, and vmd-agent will be one of their tools (through a standard called MCP).")
+    io.say("  The chat and the web page of vmd-agent itself still need a model of their own; you can add one later (vmd-agent setup, or Extensions, Model in the web page).")
     path = cfg["claude_desktop_config"]
     done = False
     if path and (assume_yes or io.confirm(f"  Add it to Claude Desktop's settings now? ({path})")):
@@ -333,10 +322,24 @@ def setup_ai_app(io: IO, data_dir: str, assume_yes: bool = False,
 
 
 # ---------------------------------------------------------------- the whole setup
-MODEL_CHOICES = ["A free open-source model on this computer (recommended; works offline)",
-                 "An online model service I already have access to",
-                 "I already use Claude Desktop or Claude Code: connect the tools to it",
-                 "Skip for now (the commands still work without a chat)"]
+def _saved_online_service() -> Optional[str]:
+    """The address of an online (not on this computer) model service the user has already saved, if any."""
+    url = settings.get("llm_url")
+    if url and not re.match(r"https?://(localhost|127\.0\.0\.1|\[::1\])", url):
+        return url
+    return None
+
+
+def assistant_choices() -> tuple:
+    """The choices for who answers, and the one to offer first: the free local model, unless the user already has an online service saved.
+    Claude Code or Desktop is an alternative to a model here, never an extra step on top of one."""
+    online = _saved_online_service()
+    found = shutil.which("claude") is not None or bool(P.claude_desktop_config_path() and os.path.isdir(os.path.dirname(P.claude_desktop_config_path())))
+    labels = ["A free open-source model on this computer (recommended: works offline, nothing leaves your computer)",
+              "An online model service" + (f" (you already saved one: {online})" if online else " (you need its web address, a model name and usually an API key)"),
+              "Claude Code or Claude Desktop does the thinking instead; vmd-agent only supplies the tools" + (" (found on this computer)" if found else ""),
+              "Skip for now (the commands still work without a chat)"]
+    return labels, (2 if online else 1)
 
 
 def setup(io: Optional[IO] = None, assume_yes: bool = False, check_only: bool = False,
@@ -358,19 +361,21 @@ def setup(io: Optional[IO] = None, assume_yes: bool = False, check_only: bool = 
     folder = step_data_dir(io, data_dir, assume_yes)
 
     io.say("\nStep 3 of 4: Who will you talk to?")
-    pick = model_choice or (1 if assume_yes else io.choose("  Choose one", MODEL_CHOICES, default=1))
+    labels, default = assistant_choices()
+    pick = model_choice or (default if assume_yes else io.choose("  Choose one", labels, default=default))
     ready = False
     if pick == 1:
         ready = setup_local_model(io, sysname, model, assume_yes)
     elif pick == 2:
         ready = setup_online_model(io)
+        if not ready and (assume_yes or io.confirm("  No online service was set up. Use the free model on this computer instead?", True)):
+            pick = 1
+            ready = setup_local_model(io, sysname, model, assume_yes)
     elif pick == 3:
         ready = setup_ai_app(io, folder, assume_yes, sysname)
     else:
         io.say("  Skipped.")
 
-    if pick != 3:                                                 # option 3 already connected the AI apps
-        offer_claude_code(io, folder, assume_yes)
     io.say("\nStep 4 of 4: Finishing")
     settings.save(setup_done=True)
     io.say(f"  Your choices are saved ({settings.path()}).")
@@ -422,7 +427,6 @@ MENU = ["The web page: my files, the chat, whole jobs and pictures in one browse
         "Look at a structure (a PDB ID like 1UBQ, or one of my files): pictures and a description",
         "Analyse a simulation: RMSD, flexibility, size, contacts ...",
         "Check statements about a structure against its data",
-        "Connect the tools to Claude Desktop or Claude Code",
         "Show my settings and check everything works",
         "Run the setup again",
         "Quit"]
@@ -475,10 +479,8 @@ def menu(io: Optional[IO] = None, run_cli: Optional[Callable[[List[str]], int]] 
                 if top and claim:
                     run_cli(["tool", "verify_claims", _in_data(top), claim])
             elif pick == 6:
-                setup_ai_app(io, settings.get("data_dir") or os.getcwd())
-            elif pick == 7:
                 show_status(io)
-            elif pick == 8:
+            elif pick == 7:
                 setup(io)
             else:
                 return 0
