@@ -8,9 +8,13 @@ vmd-agent bench models --list                                   # the tasks, by 
 vmd-agent bench models --model granite4.1:8b                    # one model on Ollama or any OpenAI-compatible server
 vmd-agent bench models --model granite4.1:3b granite4.1:8b gemma4:e4b --repeats 3       # several, one after the other
 vmd-agent bench models --model granite4.1:8b --tools core       # offer 27 tools instead of 53 (see "Does the model see all 53 at once?")
+vmd-agent bench models --model granite4.1:8b --tools auto       # only the tools that fit each question; run it into the same --out-dir to see both side by side
+vmd-agent bench models --model granite4.1:8b --smoke            # the small set (one or two tasks per category): the quick check after changing something
 vmd-agent bench models --model m --categories trajectory decline --skip network         # a part of it
 vmd-agent bench models --summarize                              # rebuild summary.md from the records so far
 ```
+
+Rows in the summary are labelled with how the model was run, `model (all)`, `model (auto)`, `model (core, no guard)`, so the same model with different tool sets or without the guard sits side by side.
 
 Options: `--base-url`, `--api-key` (for a hosted service), `--data-dir` and `--out-dir` (where things go), `--only TASK ...`, `--repeats N`, `--max-turns N`,
 `--temperature T`, `--no-guard` (a raw model: no nudge to use a tool, no number check), `--skip vmd ffmpeg network`, `--force`.
@@ -57,7 +61,14 @@ With few tasks per category the intervals are wide; use `--repeats` (models vary
 
 ## Reading the results fairly
 
+* **Repeats need a temperature.** At `--temperature 0` (the default) a model usually gives the same answer to the same question every time, so `--repeats 3` is three copies of one sample, and the
+  intervals, which assume independent runs, are too narrow. To see how much a model varies, use a small temperature (for example `--temperature 0.4 --repeats 3`). The same goes for comparing tool sets: at
+  temperature 0 a model can pass a task with one set and fail it with another because the exact wording of the prompt changed, which says little about either set. Compare on many tasks or several samples.
 * **Same conditions.** Compare models with the same `--tools`, `--temperature`, `--max-turns` and guard setting. The records say which were used.
+* **What is being measured.** The model *and* the agent around it (routing, argument repair, compact results, the guard: see [Architecture](architecture.md#the-agent-and-what-surrounds-the-model)). To tell a model's
+  ability from the agent's help, run the same model with `--tools all --no-guard` and with the defaults.
+* **Comparing a change to the agent.** Run `--smoke` before and after into the same `--out-dir` (a change to the agent and a change to a grader are different things: the records do not say which graders
+  were in force, so re-run both sides after changing a task). One run of 23 tasks cannot tell a few points apart; use `--repeats`.
 * **The guard.** By default the chat's own safeguards are on (a model that answers a data question from memory is sent back once to use a tool; numbers are checked), so you measure
   the product. `--no-guard` measures the model alone.
 * **A slow answer is not a wrong one.** Time includes the model server's own load and your hardware. The first call of a model also loads it into memory.

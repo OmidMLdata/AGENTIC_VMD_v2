@@ -358,6 +358,7 @@ def structure_stats(topology: str, trajectory: Optional[str] = None,
         nuc_atoms = u.select_atoms("nucleic")
         if len(prot_atoms):
             out["n_protein_chains"] = _chain_ids(prot_atoms)
+            out["n_protein_residues"] = int(len(prot_atoms.residues))      # n_residues counts every residue: ligand, water, ions
         if len(nuc_atoms):
             out["n_nucleic_chains"] = _chain_ids(nuc_atoms)
         # chains of the polymer (protein + nucleic), or all chains if there is no polymer

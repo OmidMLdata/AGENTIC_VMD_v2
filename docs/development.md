@@ -40,6 +40,11 @@ Every other command is in [Every command](using.md#ways-to-work). The benchmark 
 
 * **Set up for development:** `pip install -e ".[dev]"` (the `dev` extra is pytest, hypothesis, pyyaml, ruff and vulture; `".[all]"` adds the optional parts).
 * **Check everything:** `ruff check src tests`, `vulture` and `pytest -q -rs` (lint, dead-code check, the whole suite with every skip listed; CI runs the same three).
+* **Testing with a real model:** the suite runs the real tools and the real code around the model but not a model (slow, varies from run to run, not installed everywhere). One lane does, and fails when a
+  change makes the agent worse: `VMD_AGENT_LIVE_LLM_MODEL=granite4.1:8b VMD_AGENT_LLM_URL=http://localhost:11434/v1 pytest tests/live -rs`. It runs the benchmark's small set
+  (`vmd-agent bench models --smoke`: one or two tasks per kind of functionality) through the agent with `VMD_AGENT_LIVE_TOOLS` (default `all`, what the chat uses; `auto` and `core` also work), and fails if the share passed falls below
+  `VMD_AGENT_LIVE_MIN_SUCCESS` (default 0.5; set it a little below what your model scores), if the server fails, or if a request that must be declined is answered with an invented result.
+  To compare a change, run `bench models --smoke` before and after into the same `--out-dir` and read `summary.md`.
 * **Test every tool:** `vmd-agent bench tools` runs all 53 tools on a generated dataset whose answers are known by construction, with the seconds each took ([the tool test set](tool-test-set.md)); the same cases run inside `pytest`.
 * **`.gitignore`** keeps out caches and build output, editor files, everything vmd-agent writes while running (`vmd_scripts/`, `vmd_agent_output/`,
   `pdb_cache/`, `/data/`), anything that could hold a key (`.env`, `settings.json`, `/config/`), and VMD itself (`docker/vmd-dist/*`, which UIUC's

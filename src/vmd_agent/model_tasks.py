@@ -25,7 +25,7 @@ from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional, Sequence
 
 from vmd_agent import tool_dataset as D
-from vmd_agent.chat import _numbers
+from vmd_agent.agent import numbers
 
 CATEGORIES = ["inspect", "claims", "trajectory", "vmd_measure", "files", "build", "maps", "render", "video", "workflows",
               "hand_off", "records", "network", "decline"]
@@ -91,7 +91,7 @@ _DECLINE = re.compile(r"\b(cannot|can't|can not|unable|not able|could not|couldn
 
 def has_number(text: str, value: float, tol: float, percent: bool = False) -> bool:
     """Does the answer state ``value`` (within ``tol``)? A fraction may also be written as a percentage."""
-    for v, _ in _numbers(text):
+    for v, _ in numbers(text):
         if abs(v - value) <= tol or (percent and abs(v - 100 * value) <= 100 * tol):
             return True
     return False
@@ -152,8 +152,7 @@ def _tasks() -> List[Task]:
 
     # ---- 2. claims: true and false statements
     add("claims_mixed", "claims", "Check these statements about protein.pdb and tell me which are true: (1) it has 1 disulfide bond, (2) it has 2 chains, (3) it contains a ligand.",
-        ("verify_claims",),
-        lambda r: first(mentions(r.text, r"(2 chains|two chains|statement \(?2\)?|\(2\))[^.\n]{0,120}(false|not true|incorrect|wrong|contradict|only (1|one)|doesn't|does not)|(false|not true|incorrect|wrong|contradict)[^.\n]{0,120}(2 chains|two chains|\(2\))")))
+        ("verify_claims",), lambda r: _claims_mixed(r))
     add("claims_water", "claims", "Does protein.pdb contain water molecules or ions?", ("detect_system", "verify_claims", "structure_stats"),
         lambda r: mentions(r.text, r"\b(no|not|neither|none|doesn't|does not|without)\b"))
 
@@ -204,7 +203,7 @@ def _tasks() -> List[Task]:
     add("merge", "build", "Merge the system made of dry.psf and dry.pdb with itself and write the result as two.", ("vmd_merge_structures",),
         lambda r: first(file_has(r, "two.psf")), needs=("vmd",))
     add("membrane", "build", "Build a POPC lipid bilayer patch of 40 by 40 A, written as membrane/mem. What is its thickness?", ("vmd_build_membrane",),
-        lambda r: None if any(30 <= v <= 45 for v, _ in _numbers(r.text)) else "no bilayer thickness between 30 and 45 A is stated", needs=("vmd",))
+        lambda r: None if any(30 <= v <= 45 for v, _ in numbers(r.text)) else "no bilayer thickness between 30 and 45 A is stated", needs=("vmd",))
     add("nanotube", "build", "Build a (6,6) carbon nanotube 2 nm long, written as tube.pdb. What is its radius?", ("vmd_build_nanotube",),
         lambda r: first(file_has(r, "tube.pdb"), None if has_number(r.text, r.truth["tube_radius"], 0.1) else "the radius (about 4.07 A) is not given"), needs=("vmd",))
     add("namd_input", "build", "Write a NAMD input file for the solvated system build/sys_ion.psf and build/sys_ion.pdb, written as eq.",
@@ -215,9 +214,8 @@ def _tasks() -> List[Task]:
         lambda r: first(None if has_number(r.text, 24, 0.01) else "grid size 24 is not stated", None if has_number(r.text, r.truth["blob_peak"], 0.05) else "the peak (about 4.80) is not stated"))
     add("map_scale", "maps", "Double every value of blob.dx and save it as blob2.dx. What is the new maximum?", ("vmd_map_arithmetic",),
         lambda r: first(file_has(r, "blob2.dx"), None if has_number(r.text, 2 * r.truth["blob_peak"], 0.1) else "the new maximum (about 9.59) is not stated"))
-    add("fit_map", "maps", "Fit moved.pdb into the cryo-EM style map target.dx at 8 A resolution and write fitted.pdb. How good is the fit?", ("vmd_fit_to_map",),
-        lambda r: first(file_has(r, "fitted.pdb"), None if (r.called("vmd_fit_to_map") and r.called("vmd_fit_to_map")["result"].get("correlation_after", 0) > 0.97) else "the fit did not reach a correlation above 0.97",
-                        None if has_number(r.text, r.called("vmd_fit_to_map")["result"]["correlation_after"], 0.02) else "the correlation after the fit is not reported") if r.called("vmd_fit_to_map") else "no fit was run")
+    add("fit_map", "maps", "Fit moved.pdb into the cryo-EM style map target.dx at 8 A resolution and write fitted.pdb. How good is the fit?", ("vmd_fit_to_map", "run_workflow"),
+        lambda r: _fit_map(r))
     add("density", "maps", "Make an occupancy density map of the ligand over protein.dcd (topology protein.pdb) and save it as lig.dx.", ("vmd_volmap",),
         lambda r: file_has(r, "lig.dx"), needs=("vmd",))
 
@@ -286,6 +284,31 @@ def _tasks() -> List[Task]:
     return T
 
 
+def _fit_map(r: Run) -> Optional[str]:
+    """The model fits directly (and the file is checked) or runs the whole-job route cryoem_fit (whose report holds the fitted model); either way the correlation it reports must be the tool's."""
+    direct = r.called("vmd_fit_to_map")
+    if direct:
+        res = direct["result"]
+        return first(file_has(r, "fitted.pdb"), None if res.get("correlation_after", 0) > 0.97 else "the fit did not reach a correlation above 0.97",
+                     None if has_number(r.text, res["correlation_after"], 0.02) else "the correlation after the fit is not reported")
+    wf = r.called("run_workflow")
+    if wf and wf["arguments"].get("name") == "cryoem_fit":
+        return None if any(0.97 <= v <= 1.0 for v, _ in numbers(r.text)) else "the correlation after the fit (above 0.97) is not reported"
+    return "no fit was run"
+
+
+def _claims_mixed(r: Run) -> Optional[str]:
+    """Statements 1 and 3 are true and 2 is false. Listing only the true ones is a fine answer; calling 2 true is not, and saying nothing about 1 and 3 is not."""
+    two_true = re.search(r"((2 chains|two chains|statement \(?2\)?|\(2\))[^.\n]{0,60}\b(true|supported|correct|holds)\b)", r.text, re.I)
+    two_false = re.search(r"(2 chains|two chains|statement \(?2\)?|\(2\))[^.\n]{0,120}(false|not true|incorrect|wrong|contradict|only (1|one)|doesn't|does not|not supported|unsupported)|(false|not true|incorrect|wrong|contradict)[^.\n]{0,120}(2 chains|two chains|\(2\))", r.text, re.I)
+    one_and_three = re.search(r"(1|one disulfide)", r.text) and re.search(r"(3|ligand)", r.text) and re.search(r"(true|supported|correct)", r.text, re.I)
+    if two_true and not two_false:
+        return "the answer calls the 2-chains statement true"
+    if two_false or one_and_three:
+        return None
+    return "the answer does not say which statements are true"
+
+
 def _environment(r: Run) -> Optional[str]:
     probe = r.results("probe_environment")
     if not probe:
@@ -344,6 +367,12 @@ NOT_ASKED: Dict[str, str] = {
     "interpret_video": "an alternative to 'probe_video' and 'stills', accepted by both",
     "vmd_volmap": "asked by 'density'",
 }
+
+
+#: a small, fast set (one or two tasks per category) for checking a change to the agent with a real model: ``--smoke``
+SMOKE: Sequence[str] = ("inspect_system", "stats", "claims_mixed", "rg", "rmsd_settled", "keyframes", "drift", "contacts", "secondary",
+                        "structure_check", "convert", "build_solvated", "volume_info", "fit_map", "render", "scene", "probe_video",
+                        "settled", "slurm", "provenance", "missing_file", "tcl_disabled", "no_such_measure")
 
 
 def by_category() -> Dict[str, List[Task]]:

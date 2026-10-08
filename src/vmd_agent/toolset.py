@@ -96,8 +96,29 @@ def detect_system(topology: str, trajectory: Optional[str] = None,
     """Load a LOCAL structure (and optional trajectory) and classify its components and overall type: protein chains,
     ligands, water, ions, lipids, nucleic acids, and the type of system."""
     r = detect_mod.detect_system(_p(topology), _p(trajectory))
+    r["summary"] = _detect_summary(r)
     _store(session_dir, "detection", r)
     return r
+
+
+def _detect_summary(r: dict) -> str:
+    """One plain sentence on what is in the system, for a reader (or a model) who would otherwise pick the wrong field."""
+    c = r.get("components", {})
+    parts = [f"{r.get('system_type', 'system')}: {r.get('n_atoms')} atoms, {r.get('n_frames')} frame(s)"]
+    prot = c.get("protein", {})
+    if prot.get("present"):
+        chains = prot.get("chains", [])
+        parts.append(f"protein: {prot.get('n_residues')} residues in {len(chains)} chain{'s' if len(chains) != 1 else ''} ({', '.join(chains)})")
+    other = c.get("ligands_or_other", {})
+    if other.get("present"):
+        parts.append(f"ligand or other: {', '.join(other.get('resnames', []))} ({other.get('n_atoms')} atoms)")
+    for key, label in (("water", "water"), ("ions", "ions"), ("lipid", "lipid"), ("nucleic", "nucleic acid")):
+        if c.get(key, {}).get("present"):
+            parts.append(f"{label}: present")
+    absent = [label for key, label in (("water", "water"), ("ions", "ions"), ("lipid", "lipid"), ("nucleic", "nucleic acid")) if not c.get(key, {}).get("present")]
+    if absent:
+        parts.append("no " + ", no ".join(absent))
+    return "; ".join(parts) + "."
 
 
 # ---- visualization --------------------------------------------------------
@@ -130,6 +151,9 @@ def structure_stats(topology: str, trajectory: Optional[str] = None,
     from vmd_agent.structure import stats as stats_mod
     st = stats_mod.structure_stats(_p(topology), _p(trajectory), frame=frame)
     st["caption_lines"] = stats_mod.stats_caption(st)
+    st["summary"] = (f"{st.get('n_atoms')} atoms; {st.get('n_protein_residues', 0)} protein residues in {st.get('n_protein_chains', 0)} protein chain(s); "
+                     f"{st.get('n_disulfide_bridges', 0)} disulfide bridge(s); {st.get('n_hydrogen_bonds', 0)} hydrogen bond(s) ({st.get('hbond_method')}); "
+                     f"{st.get('n_salt_bridges', 0)} salt bridge(s). n_residues ({st.get('n_residues')}) counts every residue, ligand and water included.")
     return st
 
 
@@ -436,7 +460,11 @@ def probe_video(video: str, count_frames: bool = False) -> dict:
     is rendered visual evidence, NOT a molecular trajectory: VMD cannot load an
     MP4 as coordinates, so route such input here, never to detect_system.
     """
-    return media.probe_video(_p(video), count_frames=count_frames)
+    r = media.probe_video(_p(video), count_frames=count_frames)
+    if r.get("ok") and r.get("width"):
+        r["summary"] = (f"{r.get('width')} x {r.get('height')} pixels (width x height), {r.get('fps')} frames per second, {r.get('n_frames')} frames, "
+                        f"{r.get('duration_s')} s long, {r.get('codec')}, file size {r.get('size_bytes')} bytes (not the picture size).")
+    return r
 
 
 @tool()

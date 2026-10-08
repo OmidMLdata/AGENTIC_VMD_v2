@@ -80,7 +80,7 @@ def test_a_good_transcript_passes_and_is_timed(prepared, tmp_path):
     rec = _ask(prepared, tmp_path, "inspect_system", [_call("detect_system", topology="protein.pdb"),
                                                       {"content": "protein.pdb has one protein chain (A) and a ligand, LIG."}])
     assert rec["success"] and rec["tool_ok"] and rec["answer_ok"] and rec["tools_called"] == ["detect_system"] and rec["grounded"] in (True, None)
-    assert rec["model_calls"] == 2 and rec["wall_s"] >= rec["model_s"] >= 0.5 and rec["tool_s"] > 0 and rec["tokens_in"] > 0
+    assert rec["model_calls"] == 2 and rec["wall_s"] >= rec["model_s"] >= 0.5 and rec["tool_s"] >= 0 and rec["n_tool_calls"] == 1 and rec["tokens_in"] > 0
 
 
 def test_answering_without_a_tool_fails_even_if_the_words_are_right(prepared, tmp_path):
@@ -142,12 +142,12 @@ def test_a_run_is_resumable_and_summarised(tmp_path):
     finally:
         srv.shutdown()
     records = B.load_records(out)
-    s = B.summarize(records)["scripted"]
+    s = B.summarize(records)["scripted (all)"]
     assert s["n"] == 3 and s["ci95"][0] <= s["success"] <= s["ci95"][1] and "inspect" in s["by_category"]
     path = B.write_summary(out)
     text = open(path).read()
-    assert "`scripted`" in text and "## By category" in text and "## By task" in text and "inspect_system" in text
-    assert json.load(open(os.path.join(out, "summary.json")))["scripted"]["n"] == 3
+    assert "`scripted (all)`" in text and "## By category" in text and "## By task" in text and "inspect_system" in text
+    assert json.load(open(os.path.join(out, "summary.json")))["scripted (all)"]["n"] == 3
 
 
 def test_the_interval_is_honest_for_small_samples():
@@ -181,3 +181,22 @@ def test_a_wrong_chain_or_residue_count_is_not_waved_through(prepared, tmp_path)
     off_by_one = _ask(prepared, tmp_path, "stats", [_call("structure_stats", topology="protein.pdb"),
                                                     {"content": "It has 1 disulfide bridge and 112 protein residues."}])
     assert not off_by_one["success"] and "residue" in off_by_one["reason"]
+
+
+def test_listing_only_the_true_statements_is_a_good_answer_and_calling_the_false_one_true_is_not(prepared, tmp_path):
+    call = _call("verify_claims", topology="protein.pdb", claims=["It has 1 disulfide bond", "It has 2 chains", "It contains a ligand"])
+    only_true = _ask(prepared, tmp_path, "claims_mixed", [call, {"content": "True: (1) one disulfide bond is supported and (3) the ligand is present."}])
+    assert only_true["success"], only_true["reason"]
+    says_false = _ask(prepared, tmp_path, "claims_mixed", [call, {"content": "(1) is true, (3) is true; (2) 2 chains is false, there is only 1 chain."}])
+    assert says_false["success"]
+    wrong = _ask(prepared, tmp_path, "claims_mixed", [call, {"content": "All three are true: (2) 2 chains is supported."}])
+    assert not wrong["success"] and "true" in wrong["reason"]
+
+
+def test_the_whole_job_route_counts_as_a_fit_when_it_reports_a_good_correlation(prepared, tmp_path):
+    folder, prep = prepared
+    run = M.Run("The fit reached a correlation of 0.99.", [{"name": "run_workflow", "arguments": {"name": "cryoem_fit"}, "result": {"ok": True}}], folder, prep["truth"])
+    task = next(t for t in M.TASKS if t.id == "fit_map")
+    assert task.grade(run) is None
+    assert task.grade(M.Run("It fitted well.", run.calls, folder, prep["truth"])) is not None
+    assert task.grade(M.Run("It fitted well.", [], folder, prep["truth"])) == "no fit was run"

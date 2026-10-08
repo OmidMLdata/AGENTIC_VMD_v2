@@ -19,21 +19,32 @@ were added: 27 + 24 + 2 = 53.
 ## Does the model see all 53 at once?
 
 **By default, yes.** `vmd-agent chat` and the web page send the description of every tool the model may use with *every* question, and with all 53
-that is about 32,000 characters, roughly **8,000 tokens**, before the model has read your question. The short sets are about half that:
+that is about 38,000 characters, roughly **9,500 tokens**, before the model has read your question. The short sets are about half that:
 
 | `--tools` | Tools | Descriptions sent with every question |
 |---|---|---|
-| `all` (default) | 53 | about 8,000 tokens |
-| `core` | 27 | about 3,900 tokens |
-| `vmd` | 28 | about 4,300 tokens |
+| `all` (default) | 53 | about 9,500 tokens |
+| `core` | 27 | about 4,400 tokens |
+| `vmd` | 28 | about 5,300 tokens |
+| `auto` | the ones that fit the question, plus `offer_tools` | well under `all` |
 
 (`vmd-agent tools --group all --size` measures this on your copy; 4 characters per token is a rough rule.) This matters for two reasons:
 
-* **Context.** The private Ollama keeps a 16,384-token context, so the descriptions take about half of it before anything else is said. A model with
+* **Context.** The private Ollama keeps a 16,384-token context, so the descriptions take more than half of it before anything else is said. A model with
   a small context, or a small model that picks worse from a long list, does better with `--tools core` or `--tools vmd`.
 * **Speed.** A model reads those tokens on every call, so the first answer is slower with all 53.
 
-The web page has a "chat tools" menu in its status bar to switch between the three without restarting. Which set suits which model is something the
+**`--tools auto`** offers only the tools that fit each question, plus one more, `offer_tools`, which lets the model ask for another group when it needs one:
+
+* The router ([`routing.py`](../src/vmd_agent/routing.py)) reads the question's wording and the kinds of files it names, adds the tools of each group it mentions (trajectory, interactions, checks,
+  files, build, maps, render, video, records, network, ...) to a small base set (look at files, describe a system, check a statement, run a whole job), and so usually offers well under half of the tools.
+  A question that matches nothing gets a wider set, never an empty menu.
+* **It is keyword matching, so it misses.** Questions worded differently from what its vocabulary expects can reach the model without the tool that would answer them (the tests keep two sets of such paraphrases, and every miss found was added as a new question). That is why `offer_tools` exists: a model that needs a tool it was not given asks for its group, and a model that calls a real tool it was not offered is allowed it (the agent says so). If
+  your model does not use `offer_tools`, `--tools all` is the safe choice.
+* Whether `auto` is better than `all` for your model is a measurement, not a given: run the [model benchmark](model-benchmark.md) with each (`--tools all`, then `--tools auto`) and compare; the summary puts
+  both side by side.
+
+The web page has a "chat tools" menu in its status bar to switch between them without restarting. Which set suits which model is something the
 [model benchmark](model-benchmark.md) can tell you: run it with `--tools all`, then `--tools core`, and compare. Nothing here chooses a subset for
 you per question yet; the chat only points the model at a whole-job workflow when the question clearly matches one.
 

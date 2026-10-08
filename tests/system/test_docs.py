@@ -67,10 +67,11 @@ def test_the_model_benchmark_page_lists_every_category_with_its_true_task_count(
 def test_the_docs_say_how_much_context_the_tool_descriptions_take():
     import json
     from vmd_agent import toolset
+    from vmd_agent import toolhints
     from vmd_agent.llm_client import to_openai_tools
     page = open(os.path.join(ROOT, "docs", "tools.md"), encoding="utf-8").read()
     said = {m.group(1): int(m.group(2).replace(",", "")) for m in re.finditer(r"^\| `(all|core|vmd)`[^|]*\| \d+ \| about ([\d,]+) tokens \|$", page, flags=re.M)}
     assert set(said) == {"all", "core", "vmd"}
     for profile, tokens_said in said.items():
-        tokens = len(json.dumps(to_openai_tools(toolset.tool_specs(list(toolset.PROFILES[profile]))))) / 4
+        tokens = len(json.dumps(to_openai_tools(toolhints.enrich(toolset.tool_specs(list(toolset.PROFILES[profile])))))) / 4
         assert abs(tokens - tokens_said) < 0.12 * tokens_said, f"{profile}: about {tokens:.0f} tokens now, the page says about {tokens_said}: update docs/tools.md"

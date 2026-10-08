@@ -209,7 +209,7 @@ def _start_model_server(io: IO, url: str) -> bool:
 def setup_local_model(io: IO, system_name: str, model: Optional[str] = None,
                       assume_yes: bool = False) -> bool:
     """Set up a free open-source model on this computer. True if it is ready to use."""
-    from vmd_agent.chat import DEFAULT_URL
+    from vmd_agent.agent import DEFAULT_URL
     from vmd_agent.llm_client import LLMError, list_models
     io.say("\n  A free, open-source model that runs on your computer, so your data never leaves it.")
     io.say(f"  As of {models.MODELS_CHECKED} these exist in the Ollama library and can call tools. Only granite4.1:8b")

@@ -33,7 +33,14 @@ src/vmd_agent/
   models.py       the dated catalogue of suggested open-source models + a live registry check
   ollama_local.py a private copy of Ollama inside the vmd-agent folder (checksum-verified download)
   server.py       MCP surface: registers the toolset with the MCP SDK
-  chat.py         `vmd-agent chat`: the tools given to an OpenAI-compatible model (local or hosted)
+  agent.py        THE AGENT: a model (any OpenAI-style server) using the tools: the loop, the guard, wall-clock, every call logged; prints nothing
+  routing.py      which tools to offer a model for a question (and `offer_tools`, the way to ask for more)
+  argfix.py       puts a model's unambiguous argument mistakes right, and says so
+  toolhints.py    what a parameter means and its allowed values, for the model only
+  chat.py         `vmd-agent chat`: the terminal front end of the agent
+  ui.py           `vmd-agent ui`: the web page, a front end of the agent and of the whole jobs
+  model_tasks.py  the model benchmark's tasks and graders;  model_bench.py runs them through the agent
+  tool_cases.py   the tool test set (no model);  tool_dataset.py its data
   llm_client.py   stdlib client for the OpenAI-style chat API (Ollama, llama.cpp, vLLM, LM Studio, hosted)
   mcp_check.py    `vmd-agent mcp-check`: starts the server and checks it with the real MCP client
   auto.py         one-call pipelines: fetch_and_visualize, visualize_and_interpret
@@ -73,7 +80,7 @@ ones; no cycles):
 
 | unit | may import |
 |---|---|
-| `inputs`, `llm_client`, `platform_info`, `settings`, `models`, `progress` | nothing else in the package |
+| `inputs`, `llm_client`, `platform_info`, `settings`, `models`, `progress`, `routing`, `argfix` | nothing else in the package |
 | `security` | `settings` (the saved files folder is the default sandbox) |
 | `ollama_local` | `platform_info`, `settings` |
 | `environment` | `platform_info`, `settings` |
@@ -83,7 +90,7 @@ ones; no cycles):
 | `evidence` | `inputs`, `structure`, `dynamics`, `environment`, `security` |
 | `vmdkit` | `inputs`, `structure`, `visual`, `environment`, `security`, `progress` |
 | `bench` | all of the above, `auto` and `llm_client` |
-| `auto.py`, `cli.py`, `server.py`, `toolset.py`, `vmd_tools.py`, `vmd_cli.py`, `workflows.py`, `reporting.py`, `chat.py`, `launcher.py`, `wizard.py`, `mcp_check.py`, `__init__.py` | anything: they are the only places that compose units |
+| `auto.py`, `cli.py`, `server.py`, `toolset.py`, `vmd_tools.py`, `vmd_cli.py`, `workflows.py`, `reporting.py`, `agent.py`, `toolhints.py`, `chat.py`, `ui.py`, `model_tasks.py`, `model_bench.py`, `tool_cases.py`, `tool_dataset.py`, `launcher.py`, `wizard.py`, `mcp_check.py`, `__init__.py` | anything: they are the only places that compose units |
 
 `dynamics` and `visual` are siblings and never import each other, which is why rendering the chosen keyframes
 (`auto.select_keyframes`) and the renderer inventory (`auto.probe_environment`) live in `auto.py`.
@@ -114,3 +121,20 @@ to see what did not run, and read a skip as "unverified here". Live model tests 
 independent NeRF builder validates DSSP; independent NumPy re-implementations cross-validate the analysis.
 
 ---
+
+
+## The agent, and what surrounds the model
+
+One module, [`agent.py`](../src/vmd_agent/agent.py), is where a model, the tools and the checks meet. Every front end is thin: the terminal chat prints, the web page draws,
+the [model benchmark](model-benchmark.md) records and grades, and none of them chooses a tool, runs one or checks an answer. So a benchmark result describes what a person
+gets, and a change to the agent shows up in the benchmark.
+
+```
+question ─► routing (auto: pick the tools that fit) ─► model ─► tool call ─► argfix (put the arguments right) ─► the real tool
+               ▲                                        │  ▲                                                        │
+               └── offer_tools: the model asks for more ┘  └── digest (what goes back to the model) ◄───────────────┘
+answer ─► guard: a data question answered without a tool is sent back once; numbers no tool returned are flagged
+```
+
+Each part around the model can be switched off to measure the model alone (`--tools all`, `repair=False`, `--no-guard`), and each is tested without a model (a scripted server in the
+chat API's wire format) and with one ([the live lane](development.md#contributing)).

@@ -32,7 +32,7 @@ async function loadStatus() {
               dot(s.ffmpeg ? "ok" : "warn", "ffmpeg", s.ffmpeg ? "ready" : "missing"));
   $("#folder").textContent = s.data_dir; $("#folder").title = s.data_dir;
   const sel = $("#profile"); sel.textContent = "";
-  for (const [k, n] of Object.entries(s.profiles)) sel.append(new Option(`${k} (${n})`, k));
+  for (const [k, n] of Object.entries(s.profiles)) sel.append(new Option(n ? `${k} (${n})` : `${k} (fits the question)`, k));
   sel.value = s.profile;
   $("#banner").textContent = "";
   if (!s.model_ready) $("#banner").append(el("div", "banner", "The chat needs a model and none answers right now: " + (s.model_problem || "") +

@@ -189,7 +189,7 @@ def _bench_agent(args):
 
 
 def _bench_models(args) -> int:
-    from vmd_agent import chat, model_bench, model_tasks
+    from vmd_agent import agent as agent_mod, model_bench, model_tasks
     if args.list:
         for cat, tasks in model_tasks.by_category().items():
             print(f"{cat} ({len(tasks)})")
@@ -203,13 +203,13 @@ def _bench_models(args) -> int:
     if not args.model:
         print("vmd-agent bench models: name the model(s) with --model (or use --list / --summarize)", file=sys.stderr)
         return 2
-    base_url, _, api_key = chat.resolve_connection(args.base_url, args.model[0], args.api_key)
-    problem = chat.check_connection(base_url, args.model[0], api_key)
+    base_url, _, api_key = agent_mod.resolve_connection(args.base_url, args.model[0], args.api_key)
+    problem = agent_mod.check_connection(base_url, args.model[0], api_key)
     if problem:
         print("\n".join(problem), file=sys.stderr)
         return 2
     try:
-        model_bench.run(args.model, args.data_dir, args.out_dir, base_url, api_key, args.categories, args.only, args.repeats, args.tools,
+        model_bench.run(args.model, args.data_dir, args.out_dir, base_url, api_key, args.categories, (list(model_tasks.SMOKE) if args.smoke else args.only), args.repeats, args.tools,
                         args.max_turns, args.temperature, not args.no_guard, args.skip, args.force, log=print)
     except ValueError as e:
         print(f"vmd-agent bench models: {e}", file=sys.stderr)
@@ -549,9 +549,10 @@ def build_parser():
                     help="do not check that the server lists the model")
     sp.add_argument("--no-stream", action="store_true",
                     help="show each answer when it is complete instead of as it is written")
-    sp.add_argument("--tools", choices=["all", "core", "vmd"], default="all",
-                    help="which tools the model gets: all (53), core (the original 27) or vmd (the 24 that drive "
-                         "VMD itself, the 2 workflow tools, inspect_files and probe_environment: 28); fewer tools suit small models better")
+    sp.add_argument("--tools", choices=["all", "core", "vmd", "auto"], default="all",
+                    help="which tools the model gets: all (53), core (the original 27), vmd (the 24 that drive "
+                         "VMD itself, the 2 workflow tools, inspect_files and probe_environment: 28), or auto (only the tools that fit each "
+                         "question, and a way to ask for more); fewer tools suit small models better")
     sp = sub.add_parser("ui", help="the toolkit in a web page on this computer: your files, the chat with the seconds each step "
                         "took, and the whole jobs (opens your browser)")
     sp.add_argument("--data-dir", help="the files folder (default: your saved setting, else the current folder)")
@@ -560,7 +561,7 @@ def build_parser():
     sp.add_argument("--base-url", help="model server address (default: your saved setting)")
     sp.add_argument("--model", help="model name (default: your saved setting)")
     sp.add_argument("--api-key", help="API key if the server needs one")
-    sp.add_argument("--tools", choices=["all", "core", "vmd"], default="all", help="which tools the chat gets")
+    sp.add_argument("--tools", choices=["all", "core", "vmd", "auto"], default="all", help="which tools the chat gets (auto: only those that fit each question)")
     sp = sub.add_parser("mcp-check", help="check an MCP server install the way a "
                         "real client uses it (needs the mcp SDK, Python >= 3.10)")
     sp.add_argument("--roots", nargs="+", help="allowed root directories to give the server")
@@ -684,8 +685,9 @@ def build_parser():
     b.add_argument("--out-dir", default="model_bench_out", help="where records.jsonl, summary.md and summary.json go")
     b.add_argument("--categories", nargs="+", help="only these categories (see --list)")
     b.add_argument("--only", nargs="+", metavar="TASK", help="only these tasks")
-    b.add_argument("--repeats", type=int, default=1, help="ask each task this many times (models vary from run to run)")
-    b.add_argument("--tools", choices=["all", "core", "vmd"], default="all", help="which tools the model is offered (see docs/tools.md)")
+    b.add_argument("--smoke", action="store_true", help="only the small set meant for checking a change to the agent (one or two tasks per category)")
+    b.add_argument("--repeats", type=int, default=1, help="ask each task this many times; at temperature 0 a model repeats itself, so also set --temperature (for example 0.4) to sample its variation")
+    b.add_argument("--tools", choices=["all", "core", "vmd", "auto"], default="all", help="which tools the model is offered: all, core, vmd, or auto (only those that fit the question; see docs/tools.md)")
     b.add_argument("--max-turns", type=int, default=12)
     b.add_argument("--temperature", type=float, default=0.0)
     b.add_argument("--no-guard", action="store_true", help="turn off the chat's checks (the nudge to use a tool, the number check): a raw model")
@@ -798,8 +800,9 @@ def main(argv=None):
             for spec in specs:
                 print(f"{spec['name']:<28} {spec['description'][:110]}")
             if args.size:
+                from vmd_agent import toolhints
                 from vmd_agent.llm_client import to_openai_tools
-                chars = len(json.dumps(to_openai_tools(specs)))
+                chars = len(json.dumps(to_openai_tools(toolhints.enrich(specs))))
                 print(f"\n{len(specs)} tools: their descriptions are {chars:,} characters, about {chars // 4:,} tokens, sent with every question "
                       "(4 characters per token is a rough rule; the chat keeps a 16,384-token context with the private Ollama)")
             return 0

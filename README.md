@@ -13,6 +13,8 @@ checks its work.
   checksums of your inputs.
 * **Four ways to work, one set of tools:** a web page with a molecule viewer, a menu, a chat, and plain commands. Everything is timed: you see how long every model call and
   every tool call took.
+* **The model is an agent, kept apart from every screen.** One module runs the model, the tools and the checks (routing so a model sees only the tools that fit, argument repair, a guard against
+  invented numbers); the chat, the web page and the benchmark are thin front ends on it ([architecture](docs/architecture.md#the-agent-and-what-surrounds-the-model)).
 * **Tested.** A [tool test set](docs/tool-test-set.md) checks every tool against data with known answers, and a [model benchmark](docs/model-benchmark.md) scores any language model on tasks for
   each kind of functionality.
 * **Contained.** One private folder, no administrator rights, nothing installed system-wide. Nothing is sent anywhere unless you choose an online model.
@@ -82,8 +84,8 @@ One project goes through the same stages whichever way you work. `vmd-agent --he
 | 7. Check and keep records | re-check hashes, videos, validation | `vmd-agent provenance`, `report`, `validate` | [Commands](docs/commands.md#7-check-and-keep-records) |
 
 Behind all of it are **53 tools**: the 27 original ones, the 24 that drive VMD, and 2 that run whole jobs ([the list](docs/tools.md)). The chat, the web page,
-the [MCP server](docs/mcp.md) and the commands all call the same functions. By default a chat model is offered **all 53 at once** (about 8,000 tokens of descriptions with every
-question); `--tools core` or `--tools vmd` offers about half, which suits small models ([details](docs/tools.md#does-the-model-see-all-53-at-once)).
+the [MCP server](docs/mcp.md) and the commands all call the same functions. By default a chat model is offered **all 53 at once** (about 9,500 tokens of descriptions with every
+question); `--tools core`, `--tools vmd` or `--tools auto` (only the tools that fit the question) offer fewer, which suits small models ([details](docs/tools.md#does-the-model-see-all-53-at-once)).
 
 ## What has and has not been verified
 
@@ -109,6 +111,7 @@ that wrote the benchmark must not run it. How to run it: [Development](docs/deve
 
 ## Contributing
 
-`pip install -e ".[dev]"`, then `ruff check src tests`, `vulture` and `pytest -rs` (what CI runs). See [Development](docs/development.md).
+`pip install -e ".[dev]"`, then `ruff check src tests`, `vulture` and `pytest -rs` (what CI runs). A separate lane runs the agent with a real model
+(`pytest tests/live`, when you name one). See [Development](docs/development.md).
 
 MIT licence ([LICENSE](LICENSE)). Third-party notes, including **VMD and MDAnalysis (GPL)**: [NOTICE.md](NOTICE.md).

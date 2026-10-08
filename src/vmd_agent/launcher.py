@@ -212,11 +212,10 @@ def run_docker(plan: dict, prompt: Optional[str], say: Callable = _say,
 
 def run_native(plan: dict, model: str, base_url: Optional[str], data_dir: str,
                prompt: Optional[str], info: Dict[str, object], say: Callable = _say) -> int:
-    from vmd_agent import chat
+    from vmd_agent import agent, chat, settings
     from vmd_agent.llm_client import LLMError, list_models
-    from vmd_agent import settings
     private = settings.get("ollama_mode") == "private" and ollama_local.find_binary() is not None
-    url = base_url or (ollama_local.url() if private else chat.DEFAULT_URL)
+    url = base_url or (ollama_local.url() if private else agent.DEFAULT_URL)
     private = private and url == ollama_local.url()
     if private:
         ollama_local.start()

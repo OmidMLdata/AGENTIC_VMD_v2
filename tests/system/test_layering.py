@@ -19,8 +19,8 @@ SRC = os.path.join(os.path.dirname(__file__), "..", "..", "src", "vmd_agent")
 FOUNDATION = ("environment", "security", "llm_client", "platform_info", "settings",
               "models", "ollama_local", "progress")
 
-COMPOSERS = ("auto", "cli", "server", "mcp_check", "toolset", "chat",
-             "launcher", "wizard", "vmd_tools", "vmd_cli", "workflows", "reporting", "ui", "tool_cases", "tool_dataset", "model_tasks", "model_bench", "__init__")
+COMPOSERS = ("auto", "cli", "server", "mcp_check", "toolset", "chat", "agent",
+             "launcher", "wizard", "vmd_tools", "vmd_cli", "workflows", "reporting", "ui", "tool_cases", "tool_dataset", "model_tasks", "model_bench", "toolhints", "__init__")
 
 ALLOWED = {
     "inputs": set(),

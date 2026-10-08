@@ -56,7 +56,7 @@ nothing in the repository records any.
 ## Chat commands
 
 Inside `vmd-agent chat`: `/tools` lists the tools, `/time` says where the time went, `/reset` starts over, `/help` shows this, `/quit` leaves.
-Options: `--model NAME`, `--base-url ADDRESS`, `--api-key KEY`, `--roots FOLDER ...`, `--tools all|core|vmd`, `--max-turns N`, `--temperature T`,
+Options: `--model NAME`, `--base-url ADDRESS`, `--api-key KEY`, `--roots FOLDER ...`, `--tools all|core|vmd|auto`, `--max-turns N`, `--temperature T`,
 `--no-stream`, `--no-check`.
 
 Things to ask (examples of what to type, not results): *"What is in 1ubq.pdb?"*, *"Draw it from the front and the side and tell me what each colour means."*,

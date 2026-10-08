@@ -19,7 +19,7 @@ import shutil
 import time
 from typing import Callable, Dict, List, Optional, Sequence
 
-from vmd_agent import chat, model_tasks as M, security, toolset, tool_dataset as D
+from vmd_agent import agent as agent_mod, model_tasks as M, security, toolset, tool_dataset as D
 from vmd_agent.llm_client import LLMError
 from vmd_agent.tool_cases import available
 
@@ -105,18 +105,20 @@ def run_task(task: M.Task, model: str, base_url: str, api_key: Optional[str], ba
     rec: dict = {"model": model, "task": task.id, "category": task.category, "tools_profile": tools, "guard": guard,
                  "success": False, "tool_ok": False, "answer_ok": False, "grounded": None, "reason": "", "tools_called": [],
                  "tool_errors": 0, "answer": "", "error": None}
-    session = chat.ChatSession(base_url, model, api_key, max_turns=max_turns, temperature=temperature, tools=tools, guard=guard,
+    session = agent_mod.Agent(base_url, model, api_key, max_turns=max_turns, temperature=temperature, tools=tools, guard=guard,
                                timeout=timeout)
     try:
         started = time.time()
         try:
-            text = session.ask(task.prompt)
+            result = session.run(task.prompt)
+            text, calls = result.answer, result.calls
         except LLMError as e:
-            text, rec["error"] = "", str(e)
+            text, calls, rec["error"] = "", [], str(e)
         wall = time.time() - started
-        calls = session.call_log
         rec["tools_called"] = [c["name"] for c in calls]
         rec["tool_errors"] = sum(1 for c in calls if isinstance(c["result"], dict) and c["result"].get("error"))
+        rec["repaired"] = sum(1 for c in calls if c.get("repairs"))
+        rec["widened"] = len(session.widened)
         answer = _strip_check(text)
         rec["answer"] = answer[:1500]
         run = M.Run(answer, calls, os.path.realpath(work), truth)
@@ -131,7 +133,7 @@ def run_task(task: M.Task, model: str, base_url: str, api_key: Optional[str], ba
             rec["answer_ok"] = why is None
             rec["reason"] = why or ""
         tool_texts = [json.dumps(c["result"], default=str) for c in calls]
-        rec["grounded"] = not chat.unsupported_numbers(answer, tool_texts) if calls else None
+        rec["grounded"] = not agent_mod.unsupported_numbers(answer, tool_texts) if calls else None
         rec["success"] = bool(rec["tool_ok"] and rec["answer_ok"])
         clock = session.clock
         rec.update({"wall_s": round(wall, 2), "model_s": round(clock["model_s"], 2), "tool_s": round(clock["tool_s"], 2),
@@ -208,11 +210,16 @@ def _rate(rows: Sequence[dict], key: str) -> Optional[float]:
     return sum(bool(v) for v in vals) / len(vals) if vals else None
 
 
+def label(r: dict) -> str:
+    """What a row of the summary is: the model and how it was run, so the same model with 53 tools and with routed tools sit side by side."""
+    return f"{r['model']} ({r.get('tools_profile', 'all')}{'' if r.get('guard', True) else ', no guard'})"
+
+
 def summarize(records: Sequence[dict]) -> dict:
-    """Per model: success overall and by category (with 95% intervals), tool choice, grounded numbers, and mean seconds."""
+    """Per model and way of running it: success overall and by category (with 95% intervals), tool choice, grounded numbers, and mean seconds."""
     out: Dict[str, dict] = {}
-    for model in sorted({r["model"] for r in records}):
-        rows = [r for r in records if r["model"] == model]
+    for model in sorted({label(r) for r in records}):
+        rows = [r for r in records if label(r) == model]
         n, k = len(rows), sum(bool(r["success"]) for r in rows)
         cats = {}
         for c in M.CATEGORIES:
@@ -257,7 +264,7 @@ def markdown(records: Sequence[dict]) -> str:
         task = next(t for t in M.TASKS if t.id == tid)
         cells = []
         for m in models:
-            rows = [r for r in records if r["model"] == m and r["task"] == tid]
+            rows = [r for r in records if label(r) == m and r["task"] == tid]
             cells.append(f"{sum(bool(r['success']) for r in rows)}/{len(rows)}" if rows else "-")
         lines.append(f"| {tid} | {task.category} | " + " | ".join(cells) + " |")
     lines += ["", "Success needs the right tool called without error (not for tasks that must be declined) and an answer and files that the "

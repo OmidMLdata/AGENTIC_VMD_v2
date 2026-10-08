@@ -26,7 +26,7 @@ import webbrowser
 from typing import Callable, Optional
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
-from vmd_agent import chat, progress, security, toolset
+from vmd_agent import agent as agent_mod, progress, security, toolset
 from vmd_agent.structure import viewer
 
 ASSETS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ui_assets")
@@ -114,7 +114,7 @@ class State:
         self.base_url, self.model, self.api_key, self.tools = base_url, model, api_key, tools
         self.token = secrets.token_urlsafe(24)
         self.busy = threading.Lock()
-        self.session = chat.ChatSession(base_url, model, api_key, tools=tools, echo=lambda m: None)
+        self.session = agent_mod.Agent(base_url, model, api_key, tools=tools, echo=lambda m: None)
         self.models: dict = {}                       # structures opened in the viewer, most recent last
         self.model_lock = threading.Lock()
 
@@ -130,18 +130,18 @@ class State:
 
     def set_tools(self, profile: str) -> None:
         self.tools = profile
-        self.session = chat.ChatSession(self.base_url, self.model, self.api_key, tools=profile, echo=lambda m: None)
+        self.session = agent_mod.Agent(self.base_url, self.model, self.api_key, tools=profile, echo=lambda m: None)
 
     def status(self) -> dict:
         from vmd_agent import __version__
         from vmd_agent.environment import probe_environment
         env = probe_environment()
-        problem = chat.check_connection(self.base_url, self.model, self.api_key)
+        problem = agent_mod.check_connection(self.base_url, self.model, self.api_key)
         return {"version": __version__, "data_dir": self.root, "model": self.model, "server": self.base_url,
                 "model_ready": problem is None, "model_problem": " ".join(problem) if problem else None,
                 "vmd": env.get("vmd_path"), "vmd_version": env.get("vmd_version"), "tachyon": bool(env.get("tachyon_path")),
                 "ffmpeg": bool(env.get("ffmpeg")), "n_tools": len(toolset.TOOLS), "tools_in_chat": len(self.session.names), "profile": self.tools,
-                "profiles": {k: len(v) for k, v in toolset.PROFILES.items()},
+                "profiles": {**{k: len(v) for k, v in toolset.PROFILES.items()}, "auto": 0},
                 "clock": self.session.clock}
 
 
@@ -292,8 +292,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return self._look(payload)
             if url.path == "/api/profile":
                 profile = str(payload.get("tools") or "")
-                if profile not in toolset.PROFILES:
-                    return self._json({"error": f"tools must be one of {', '.join(toolset.PROFILES)}"}, 400)
+                if profile != "auto" and profile not in toolset.PROFILES:
+                    return self._json({"error": f"tools must be one of {', '.join(list(toolset.PROFILES) + ['auto'])}"}, 400)
                 if self.state.busy.locked():
                     return self._json({"error": "another job is still running; wait for it to finish"}, 409)
                 self.state.set_tools(profile)
@@ -382,8 +382,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         s.on_event = on_event
         try:
             answer = s.ask(text, on_token=lambda tok: emit({"type": "token", "text": tok}))
-            emit({"type": "answer", "text": answer, "streamed": bool(s.streamed), "clock": s.last_turn, "line": chat.clock_line(s.last_turn)})
-        except chat.LLMError as e:
+            emit({"type": "answer", "text": answer, "streamed": bool(s.streamed), "clock": s.last_turn, "line": agent_mod.clock_line(s.last_turn)})
+        except agent_mod.LLMError as e:
             emit({"type": "error", "text": str(e)})
         finally:
             s.on_event = None
@@ -407,7 +407,7 @@ class Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
 def make_server(data_dir: str, port: int = 0, base_url: Optional[str] = None, model: Optional[str] = None,
                 api_key: Optional[str] = None, tools: str = "all") -> Server:
     """The server, bound to this computer only (port 0 picks a free one). ``server.state.token`` is the one-time key."""
-    base_url, model, api_key = chat.resolve_connection(base_url, model, api_key)
+    base_url, model, api_key = agent_mod.resolve_connection(base_url, model, api_key)
     state = State(data_dir, base_url, model, api_key, tools)
     handler = type("BoundHandler", (Handler,), {"state": state})
     srv = Server(("127.0.0.1", port), handler)

@@ -4,7 +4,7 @@ import os
 
 import pytest
 
-from vmd_agent import progress
+from vmd_agent import agent, progress
 
 DATA = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data")
 PDB, DCD = os.path.join(DATA, "ubq_md", "protein.pdb"), os.path.join(DATA, "ubq_md", "protein.dcd")
@@ -49,11 +49,10 @@ def test_progress_written_by_a_running_vmd_reaches_the_listener():
 @pytest.mark.requires_vmd
 def test_the_chat_shows_a_tools_progress_under_the_call(tmp_path, monkeypatch):
     import shutil
-    from vmd_agent import chat
     monkeypatch.setenv("VMD_AGENT_ALLOWED_ROOTS", str(tmp_path))
     for f in (PDB, DCD):
         shutil.copy(f, tmp_path)
     lines = []
-    s = chat.ChatSession("http://127.0.0.1:1/v1", "m", echo=lines.append)
+    s = agent.Agent("http://127.0.0.1:1/v1", "m", echo=lines.append)
     s.run_tool({"id": "1", "name": "vmd_measure", "arguments": {"topology": "protein.pdb", "trajectory": "protein.dcd", "kind": "rgyr"}})
     assert any("frame 25 of 50" in m for m in lines) and lines[0].lstrip().startswith("->")

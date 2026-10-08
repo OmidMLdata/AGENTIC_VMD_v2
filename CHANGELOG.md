@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.21.0: the agent is its own layer, with routing, argument repair and a test lane that uses a model
+
+* **`agent.py`**: the language model as a tool-calling agent, separate from any screen. The loop, the guard, the wall-clock and every tool call's arguments and result live there
+  (`Agent.run()` returns them as a `Result`); the terminal chat, the web page and the model benchmark are thin front ends on it, so a benchmark result describes what a person gets.
+  `chat.py` is now only the terminal.
+* **Routing** (`--tools auto`, `routing.py`): only the tools that fit the question are offered, plus `offer_tools` to ask for another group; a real tool the model calls that was not offered is
+  allowed. It is keyword matching and misses some differently worded questions (two paraphrase sets are kept in the tests); `--tools all` remains.
+* **Argument repair** (`argfix.py`): wrong types, case and punctuation of a choice, known aliases, a file name without its folder, the trajectory given as the topology, a required file left out
+  when the folder has exactly one that fits: corrected, and the result carries `note_on_arguments`. Ambiguous cases are left to the tool.
+* **What the model reads**: results lose bookkeeping fields (`digest`), `detect_system` and `structure_stats` begin with a plain `summary` sentence (and `structure_stats` has `n_protein_residues`:
+  a model read the all-residue count as the protein's), and parameters whose names do not say what they do (`align`, `step`, `solvate`...) and choices with fixed values are described (`toolhints.py`).
+  Numbers the user wrote in the question are no longer flagged as invented.
+* **Grounding is enforced, not only flagged**: an answer that states a number no tool returned is sent back once (where it is not being streamed); a list of statements to be judged is pointed at
+  `verify_claims`. Both were added after the benchmark showed a model estimating a binding free energy that no tool can measure, and judging a statement from the wrong field.
+* **A test lane with a real model** (`tests/live`, skipped unless `VMD_AGENT_LIVE_LLM_MODEL` is set): the benchmark's small set (`bench models --smoke`) through the agent, failing below a threshold you set
+  for your model, or when a request that must be declined is answered with an invented result.
+* **The model benchmark**: summary rows are labelled with how the model was run (`model (all)`, `model (auto)`), so tool sets compare side by side; the claims task accepts an answer that lists only the
+  true statements.
+
 ## 0.20.0: a workbench page with a molecule viewer, and a model benchmark
 
 * **The web page is a workbench laid out like VMD's own windows**: molecules (files; the drawn one is marked T), a black display with a viewer, the assistant (chat and whole jobs), and a
