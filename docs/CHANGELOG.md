@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.30.2: the page no longer freezes on a streaming table
+
+* **Fixed a freeze**: when a model's answer streamed a Markdown table, the header row arrived before its separator row and the page's renderer looped forever on it (the chat stayed busy, the page stopped responding).
+  A table row without its separator is now plain text until the separator arrives. Found by driving the real page in a browser; a test streams a table one character at a time.
+
 ## 0.30.1: dead code removed, models cannot be committed
 
 * **Removed** what nothing used: the window's label commands (`label_add`, `label_clear`: the bridge now accepts 21 commands) and two helpers (`group_of` in `routing.py` and `toolset.py`) that only a test called.

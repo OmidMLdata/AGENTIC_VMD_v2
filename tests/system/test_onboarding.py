@@ -356,6 +356,7 @@ def test_setup_can_keep_its_data_in_this_folder_and_carries_earlier_choices_over
     work.mkdir()
     monkeypatch.chdir(work)
     settings.save(vmd_path="/some/vmd")
+    monkeypatch.setattr(wizard, "step_vmd", lambda *a, **k: None)        # whether this computer has a VMD must not matter here
     io_ = Typed()
     wizard.setup(io_, assume_yes=True, home="here", data_dir=str(work), model_choice=4)
     assert (work / ".vmd-agent" / "config" / "settings.json").is_file()
@@ -394,6 +395,7 @@ def test_setup_moves_the_model_and_settings_into_the_working_folder_only_when_ag
     work.mkdir()
     monkeypatch.setenv(settings.ENV_INSTALL, str(inst))
     monkeypatch.chdir(work)
+    monkeypatch.setattr(wizard, "_server_running", lambda: False)       # a model server running on this computer must not matter here
     no = Typed(["1", "n"])                                   # "in this folder", then decline the move
     wizard.step_home(no)
     assert (inst / "ollama").is_dir() and not (work / ".vmd-agent" / "ollama").exists()

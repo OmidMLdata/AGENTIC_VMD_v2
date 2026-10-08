@@ -27,6 +27,14 @@ def test_markdown_cannot_inject_html():
     assert "<img" not in html and "<strong>b</strong>" in html and "<code>c</code>" in html and "<a " not in html
 
 
+def test_markdown_never_hangs_on_a_table_that_is_still_streaming():
+    """While an answer streams, a table header can arrive before its separator row. That once made the renderer loop forever and froze the page."""
+    out = node("""const full='Verdict\\n\\n| Level | Finding |\\n|---|---|\\n| Note | RMSD 2.36 |\\n| OK | box |\\n\\nConclusion';
+      const t=Date.now(); const seen=[]; for (let n=1;n<=full.length;n++) seen.push(M.render(full.slice(0,n)).length>0);
+      console.log(JSON.stringify({ok:seen.every(Boolean), ms:Date.now()-t, table:M.render(full).includes('<table>'), partial:M.render('| Level |').includes('Level')}))""")
+    assert out["ok"] and out["ms"] < 2000 and out["table"] and out["partial"]
+
+
 def test_terminal_lines_are_sent_to_the_real_command_line():
     out = node("console.log(JSON.stringify(['tool detect_system a.pdb','tools','vmd-agent tool inspect_files a.pdb','workflow','workflow equilibration_check a.psf a.dcd'].map(C.parse)))")
     assert [c["cmd"] for c in out] == ["terminal", "terminal", "terminal", "terminal", "workflow"]
