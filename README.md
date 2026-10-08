@@ -58,7 +58,7 @@ choose who answers: a free model on your computer (recommended), an online servi
 
 | Way | What it is | Start it |
 |---|---|---|
-| **The web page** | A workbench laid out like VMD in your browser: menus and a command palette, a molecule list, a display with **representations** (VMD's selection language, drawing and colouring methods, several molecules), animation, a console that takes VMD's commands, the chat with every tool call shown with its progress and seconds, and a tab that runs whole jobs | `vmd-agent ui` |
+| **The web page** | A workbench laid out like VMD in your browser: menus and a command palette, a molecule list, a display with **representations** (VMD's selection language, drawing and colouring methods, several molecules), animation, a console that takes VMD's commands, the chat with every tool call shown with its progress and seconds, **a form for every tool** (drop-downs, check boxes, buttons), a tab that runs whole jobs, and a terminal for developers | `vmd-agent ui` |
 | **The menu** | Numbered choices in plain words: look at a structure, analyse a simulation, check a statement, connect an AI app | `vmd-agent` |
 | **The chat** | Ask in plain language in the terminal; answers stream as they are written, with the time each step took | `vmd-agent chat` |
 | **The command line** | Scripts and batches without any model: any tool of the library, with flags made from its parameters | `vmd-agent tool NAME ...` |

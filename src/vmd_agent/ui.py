@@ -26,7 +26,7 @@ import webbrowser
 from typing import Callable, Optional
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
-from vmd_agent import agent as agent_mod, progress, security, toolset, workflows as workflows_mod
+from vmd_agent import agent as agent_mod, progress, security, toolform, toolset, workflows as workflows_mod
 from vmd_agent.structure import viewer
 
 ASSETS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ui_assets")
@@ -80,6 +80,27 @@ def all_files(root: str) -> list:
                 full = os.path.join(base, n)
                 out.append({"path": os.path.relpath(full, root).replace(os.sep, "/"), "kind": kind_of(n)})
     return out[:2000]
+
+
+def files_in(result, root: str, found: Optional[list] = None) -> list:
+    """Files below ``root`` that a tool result names (as paths inside it), so the page can link to what a tool wrote."""
+    found = [] if found is None else found
+    if isinstance(result, dict):
+        for v in result.values():
+            files_in(v, root, found)
+    elif isinstance(result, list):
+        for v in result[:100]:
+            files_in(v, root, found)
+    elif isinstance(result, str) and len(result) < 400 and len(found) < 30 and ("/" in result or "." in result):
+        try:
+            full = os.path.realpath(result if os.path.isabs(result) else os.path.join(root, result))
+            if os.path.isfile(full) and security.is_within(full, root):
+                rel = os.path.relpath(full, root).replace(os.sep, "/")
+                if rel not in found:
+                    found.append(rel)
+        except Exception:
+            pass
+    return found
 
 
 def images_in(result, root: str, found: Optional[list] = None) -> list:
@@ -144,15 +165,33 @@ class State:
         from vmd_agent.llm_client import LLMError, list_models
         private = ollama_local.find_binary() is not None
         info = {"base_url": self.base_url, "model": self.model, "has_key": bool(self.api_key), "available": [], "state": "ready", "problem": None,
-                "private_available": private, "is_private": self.base_url == ollama_local.url()}
+                "private_available": private, "is_private": self.base_url == ollama_local.url(),
+                "local_models": ollama_local.installed_models() if private else [], "local_url": ollama_local.url(), "found": []}
         try:
             info["available"] = list_models(self.base_url, self.api_key, timeout=timeout)
         except LLMError as e:
-            info.update(state="no_server", problem=str(e))
+            info.update(state="no_server", problem=str(e), found=self.discover())
             return info
         if info["available"] and self.model not in info["available"]:
             info.update(state="no_model", problem=f"the server has no model called '{self.model}'")
         return info
+
+    def discover(self) -> list:
+        """Other model servers that answer on this computer (the private Ollama, a system Ollama, llama.cpp, LM Studio, vLLM), with their models."""
+        from vmd_agent import ollama_local
+        from vmd_agent.llm_client import LLMError, list_models
+        urls = [ollama_local.url(), agent_mod.DEFAULT_URL, "http://localhost:8080/v1", "http://localhost:1234/v1", "http://localhost:8000/v1"]
+        found, seen = [], {self.base_url.rstrip("/")}
+        for u in urls:
+            if u.rstrip("/") in seen:
+                continue
+            seen.add(u.rstrip("/"))
+            try:
+                models = list_models(u, None, timeout=0.8)
+            except LLMError:
+                continue
+            found.append({"base_url": u, "models": models})
+        return found
 
     def status(self) -> dict:
         from vmd_agent import __version__
@@ -161,6 +200,7 @@ class State:
         mi = self.model_info()
         return {"version": __version__, "data_dir": self.root, "model": self.model, "server": self.base_url,
                 "model_ready": mi["state"] == "ready", "model_state": mi["state"], "model_problem": mi["problem"], "model_available": mi["available"],
+                "local_models": mi["local_models"], "found_servers": mi["found"],
                 "private_available": mi["private_available"], "is_private": mi["is_private"],
                 "vmd": env.get("vmd_path"), "vmd_version": env.get("vmd_version"), "tachyon": bool(env.get("tachyon_path")),
                 "ffmpeg": bool(env.get("ffmpeg")), "n_tools": len(toolset.library_tools()), "tools_in_chat": len(self.session.names), "profile": self.tools,
@@ -240,6 +280,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._json(self.state.status())
         elif url.path == "/api/model":
             self._json(self.state.model_info())
+        elif url.path == "/api/tools":
+            self._json(toolform.catalogue())
         elif url.path == "/api/files":
             sub = parse_qs(url.query).get("dir", [""])[0]
             try:
@@ -323,6 +365,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     return self._json({"error": "another job is still running; wait for it to finish"}, 409)
                 self.state.set_tools(profile)
                 return self._json(self.state.status())
+            if url.path == "/api/tool":
+                return self._stream(lambda emit: self._tool(payload, emit))
+            if url.path == "/api/terminal":
+                return self._terminal(payload)
             if url.path == "/api/model/start":
                 return self._model_start()
             if url.path == "/api/model/use":
@@ -356,6 +402,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if payload.get("local"):
             private = ollama_local.find_binary() is not None
             base_url, key, mode = (ollama_local.url() if private else agent_mod.DEFAULT_URL), None, ("private" if private else "system")
+            if private:
+                ollama_local.start()                                  # choosing the local model also starts its server
         else:
             base_url = str(payload.get("base_url") or "").strip().rstrip("/")
             if not re.match(r"https?://[^\s]+$", base_url):
@@ -461,6 +509,28 @@ class Handler(http.server.BaseHTTPRequestHandler):
             emit({"type": "error", "kind": "model", "text": f"The model stopped answering: {e}"})
         finally:
             s.on_event = None
+
+    def _tool(self, payload: dict, emit: Callable[[dict], None]) -> None:
+        """Run one tool from its form: progress as it goes, then the result, the pictures and files it made, and the equivalent command."""
+        name = str(payload.get("name") or "")
+        args = toolform.coerce(name, payload.get("args") or {})
+        started = time.time()
+        with progress.listen(lambda m, f=None: emit({"type": "tool_progress", "name": name, "text": str(m), "fraction": f})):
+            result = toolset.TOOLS[name](**args)
+        emit({"type": "tool_result", "name": name, "seconds": round(time.time() - started, 3), "result": result,
+              "images": images_in(result, self.state.root), "files": files_in(result, self.state.root), "command": toolform.command_for(name, args)})
+
+    def _terminal(self, payload: dict) -> None:
+        """A line typed into the page's terminal: the real command line's ``tool`` and ``tools``, run in the files folder."""
+        if not self.state.busy.acquire(blocking=False):
+            return self._json({"ok": False, "output": "another job is still running; wait for it to finish"}, 409)
+        try:
+            ok, text = toolform.run_line(str(payload.get("line") or ""))
+        except Exception as e:
+            ok, text = False, f"{type(e).__name__}: {e}"
+        finally:
+            self.state.busy.release()
+        self._json({"ok": ok, "output": text})
 
     def _workflow(self, payload: dict, emit: Callable[[dict], None]) -> None:
         name, files = str(payload.get("name") or ""), [os.path.join(self.state.root, f) for f in payload.get("files") or []]

@@ -14,7 +14,7 @@ const store = {
   get(k, d) { try { const v = localStorage.getItem("vmd-agent." + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
   set(k, v) { try { localStorage.setItem("vmd-agent." + k, JSON.stringify(v)); } catch (e) { /* storage may be blocked */ } },
 };
-const S = { everything: [], open: new Set(), selected: null, status: {}, busy: false, figures: [], repIndex: 0, history: [], histAt: 0, anim: { timer: null, dir: 1, fps: 8, style: "loop" } };
+const S = { cat: null, everything: [], open: new Set(), selected: null, status: {}, busy: false, figures: [], repIndex: 0, history: [], histAt: 0, anim: { timer: null, dir: 1, fps: 8, style: "loop" } };
 let V;
 
 // ------------------------------------------------------------------------------------------------ small things
@@ -57,6 +57,8 @@ function renderBanner(s) {
   if (s.model_ready) return;
   const b = el("div", "banner"), why = s.model_state === "no_model" ? `The server answers but has no model called "${s.model}".` : `No model server answers at ${s.server}.`;
   b.append(el("div", null, "The chat has no model to talk to. " + why + " The viewer, the files, the look buttons and the whole jobs work without one."));
+  if ((s.local_models || []).length && s.model_state === "no_server") b.append(el("div", null, `${s.local_models.length} models are downloaded on this computer (${s.local_models.join(", ")}): start the local server and pick one.`));
+  if ((s.found_servers || []).length) b.append(el("div", null, "A model server does answer at " + s.found_servers.map(f => f.base_url).join(", ") + ": choose it under Choose a model…"));
   const acts = el("div", "acts");
   if (s.model_state === "no_server" && s.private_available) { const x = el("button", "btn small", "Start the local model server"); x.onclick = startLocal; acts.append(x); }
   const m = el("button", "btn small", "Choose a model…"); m.onclick = openModel; const c = el("button", "btn small", "Check again"); c.onclick = loadStatus;
@@ -72,20 +74,29 @@ async function startLocal() {
 function fillModel(info) {
   $("#model-state").textContent = info.state === "ready" ? `Using ${info.model} at ${info.base_url}.` : `Not working: ${info.problem}.`;
   const list = $("#model-list"); list.textContent = ""; (info.available || []).forEach(m => list.append(new Option(m, m)));
+  const loc = $("#model-local"); loc.textContent = "";
+  (info.local_models || []).forEach(m => loc.append(new Option(m, m))); if (!(info.local_models || []).length) loc.append(new Option(info.private_available ? "no model downloaded yet: run vmd-agent setup" : "no private model server yet: run vmd-agent setup", ""));
+  if ((info.local_models || []).includes(info.model)) loc.value = info.model;
+  const fs = $("#model-found"); fs.textContent = ""; fs.append(new Option((info.found || []).length ? "choose one…" : "none found", ""));
+  (info.found || []).forEach(f => fs.append(new Option(`${f.base_url}  (${f.models.length} models)`, f.base_url)));
+  fs.onchange = () => { const f = (info.found || []).find(x => x.base_url === fs.value); if (f) { $("#model-url").value = f.base_url; if (f.models.length) $("#model-name").value = f.models[0]; list.textContent = ""; f.models.forEach(m => list.append(new Option(m, m))); } };
   $("#model-start").hidden = !info.private_available;
 }
+function modelSource() { return $('input[name="msrc"]:checked').value; }
+function showModelSource() { const local = modelSource() === "local"; $("#model-other").hidden = local; $("#model-local-box").hidden = !local; }
 async function openModel() {
-  const info = await getJSON("/api/model"), local = info.is_private || (!info.has_key && /^https?:\/\/(localhost|127\.0\.0\.1)/.test(info.base_url));
+  const info = await getJSON("/api/model"), local = info.is_private || (!info.has_key && /^https?:\/\/(localhost|127\.0\.0\.1)/.test(info.base_url) && info.private_available);
   $$('input[name="msrc"]').forEach(r => { r.checked = r.value === (local ? "local" : "other"); });
   $("#model-url").value = local ? "" : info.base_url; $("#model-key").value = ""; $("#model-name").value = info.model; $("#model-msg").textContent = "";
-  $("#model-other").hidden = local; fillModel(info); $("#modeldlg").showModal();
+  fillModel(info); showModelSource(); $("#modeldlg").showModal();
 }
-$$('input[name="msrc"]').forEach(r => r.onchange = () => { $("#model-other").hidden = $('input[name="msrc"]:checked').value === "local"; });
+$$('input[name="msrc"]').forEach(r => r.onchange = showModelSource);
 $("#model-close").onclick = () => $("#modeldlg").close();
 $("#model-check").onclick = async () => { fillModel(await getJSON("/api/model")); loadStatus(); };
 $("#model-start").onclick = async () => { $("#model-msg").textContent = "Starting…"; const r = await (await api("/api/model/start", {})).json(); $("#model-msg").textContent = r.error || ""; fillModel(r); loadStatus(); };
 $("#model-use").onclick = async () => {
-  const local = $('input[name="msrc"]:checked').value === "local", body = { model: $("#model-name").value.trim(), remember: true, local };
+  const local = modelSource() === "local", body = { model: local ? $("#model-local").value : $("#model-name").value.trim(), remember: true, local };
+  if (local && !body.model) { $("#model-msg").textContent = "No model is downloaded yet: run vmd-agent setup."; return; }
   if (!local) { body.base_url = $("#model-url").value.trim(); if ($("#model-key").value) body.api_key = $("#model-key").value; }
   const r = await api("/api/model/use", body), j = await r.json();
   if (!r.ok) { $("#model-msg").textContent = j.error; return; }
@@ -306,6 +317,7 @@ async function runCommand(line) {
     case "files": return S.everything.forEach(f => clog("t", `${f.path}   (${f.kind})`));
     case "ask": showTab("chat"); return send(c.text);
     case "look": return look(c.tool, c.file);
+    case "terminal": return terminal(c.line);
     case "workflow": showTab("jobs"); return runWorkflow(c.name, c.files);
     case "mol.new": return loadMolecule(c.file);
     case "mol.addfile": return addTrajectory(c.file, c.id);
@@ -339,6 +351,116 @@ $("#conin").onkeydown = e => {
 $("#clear").onclick = () => $("#consolelog").replaceChildren();
 $("#console-fold").onclick = () => { const c = $("#console"); c.classList.toggle("min"); $("#console-fold").textContent = c.classList.contains("min") ? "▴" : "▾"; document.documentElement.style.setProperty("--console", c.classList.contains("min") ? "32px" : (store.get("console", 190) + "px")); };
 
+async function terminal(line) {                         // the real command line (tool, tools, workflow), run on the server in the files folder
+  const r = await api("/api/terminal", { line }), j = await r.json();
+  (j.output || "").split("\n").forEach(l => clog(j.ok ? "t" : "err", l));
+}
+
+// ------------------------------------------------------------------------------------------------ the Tools tab: a form for every tool
+const ROLE_KIND = { structure: "structure", trajectory: "trajectory", map: "map", video: "video", image: "image", any: null };
+async function loadTools() {
+  S.cat = await getJSON("/api/tools");
+  const box = $("#tl"); box.textContent = "";
+  const gl = el("label", null, "Group"), gs = el("select"), tl = el("label", null, "Tool"), ts = el("select"), head = el("div", "toolhead"), form = el("div"), run = el("button", "btn", "Run"), out = el("div", "res");
+  gs.id = "tl-group"; ts.id = "tl-tool"; gl.htmlFor = gs.id; tl.htmlFor = ts.id; run.type = "button"; form.id = "tl-form"; out.id = "tl-out";
+  S.cat.groups.forEach((g, i) => gs.append(new Option(g.name, i)));
+  const fillTools = () => { ts.textContent = ""; S.cat.groups[Number(gs.value)].tools.forEach(t => ts.append(new Option(t.name, t.name))); showForm(); };
+  const toolNamed = n => S.cat.groups.flatMap(g => g.tools).find(t => t.name === n);
+  const showForm = () => {
+    const t = toolNamed(ts.value); head.textContent = ""; head.append(document.createTextNode(t.summary), el("span", "needs", t.needs === "yes" ? "  (needs VMD)" : t.needs === "optional" ? "  (VMD, or the built-in drawing)" : ""));
+    form.textContent = ""; out.textContent = ""; buildForm(form, t);
+  };
+  gs.onchange = fillTools; ts.onchange = showForm;
+  run.onclick = () => runTool(toolNamed(ts.value), form, out, run);
+  box.append(gl, gs, tl, ts, head, form, run, out); fillTools();
+}
+function fileOptions(role) { const kind = ROLE_KIND[role]; return S.everything.filter(f => kind === null || f.kind === kind); }
+function widget(t, p) {
+  const id = "tlp-" + p.name, wrap = el("div");
+  const label = el("label", null, p.name.replace(/_/g, " ")); label.htmlFor = id; if (p.required) label.append(el("span", "req", " *"));
+  let input;
+  if (p.kind === "boolean") { input = el("input"); input.type = "checkbox"; input.checked = !!p.default; label.textContent = ""; const l2 = el("label", null, " " + p.name.replace(/_/g, " ")); l2.prepend(input); l2.htmlFor = id; input.id = id; wrap.append(l2); }
+  else if (p.options) { input = el("div", "checks"); input.id = id; p.options.forEach(o => { const l = el("label", null, " " + o), c = el("input"); c.type = "checkbox"; c.value = o; c.checked = ["rmsd", "rgyr", "front", "side"].includes(o) && p.required; l.prepend(c); input.append(l); }); wrap.append(label, input); }
+  else if (p.enum) { input = el("select"); input.id = id; if (!p.required) input.append(new Option("(default" + (p.default ? ": " + p.default : "") + ")", "")); p.enum.forEach(v => input.append(new Option(v, v))); wrap.append(label, input); }
+  else if (p.role && p.role !== "output" && fileOptions(p.role).length && p.kind === "string") {
+    input = el("select"); input.id = id; if (!p.required) input.append(new Option("(none)", ""));
+    fileOptions(p.role).forEach(f => input.append(new Option(f.path, f.path)));
+    if (p.name === "topology" || p.name === "model") { const m = V.topMol; if (m && m.path) input.value = m.path; }
+    wrap.append(label, input);
+  } else if (p.role === "any" && p.kind === "array") {
+    input = el("select"); input.id = id; input.multiple = true; input.size = 4; fileOptions("any").forEach(f => input.append(new Option(f.path, f.path))); wrap.append(label, input);
+  } else if (p.kind === "object") {
+    input = el("textarea"); input.id = id; input.placeholder = '{"reps": [{"selection": "protein", "style": "NewCartoon", "color": "Structure"}]}'; input.spellcheck = false;
+    const js = S.everything.filter(f => f.kind === "data" && f.path.endsWith(".json")), pick = el("select"); pick.append(new Option("load from a .json file…", ""));
+    js.forEach(f => pick.append(new Option(f.path, f.path))); pick.onchange = async () => { if (pick.value) input.value = await (await fetch(url(pick.value))).text(); };
+    wrap.append(label, input); if (js.length) wrap.append(pick);
+  } else if (p.kind === "array") { input = el("textarea"); input.id = id; input.spellcheck = false; input.placeholder = p.name === "claims" ? "one statement per line" : "words, separated by spaces"; wrap.append(label, input); }
+  else if (p.kind === "integer" || p.kind === "number") { input = el("input"); input.type = "number"; input.step = p.kind === "integer" ? "1" : "any"; input.id = id; input.placeholder = p.default === null ? "" : String(p.default); wrap.append(label, input); }
+  else { input = el("input"); input.type = "text"; input.id = id; input.spellcheck = false; input.autocomplete = "off"; if (p.role === "output" && p.default) input.value = p.default; else input.placeholder = p.default === null || p.default === undefined ? "" : String(p.default); wrap.append(label, input); }
+  if (p.help && p.help !== p.name.replace(/_/g, " ")) wrap.append(el("div", "hint", p.help));
+  wrap.dataset.param = p.name; wrap.input = input; return wrap;
+}
+function buildForm(form, t) {
+  const main = el("div"), more = el("details"), ms = el("summary", null, "More options");
+  more.append(ms); let nmore = 0;
+  t.params.forEach(p => { const w = widget(t, p), simple = p.required || p.role || p.enum || p.options || p.kind === "object"; (simple ? main : (nmore++, more)).append(w); });
+  form.append(main); if (nmore) form.append(more);
+  form.params = t.params;
+  const top = $("[data-param=topology]", form), trj = $("[data-param=trajectory]", form);          // choosing a structure picks the trajectory that goes with it
+  if (top && trj && top.input.tagName === "SELECT" && trj.input.tagName === "SELECT") {
+    const stem = p => p.replace(/\.[^./]+$/, ""), match = () => { const o = [...trj.input.options].find(x => x.value && stem(x.value) === stem(top.input.value)); if (o) trj.input.value = o.value; };
+    top.input.addEventListener("change", match); match();
+  }
+}
+function readForm(form) {
+  const args = {};
+  $$("[data-param]", form).forEach(w => {
+    const p = form.params.find(x => x.name === w.dataset.param), i = w.input;
+    if (p.kind === "boolean") args[p.name] = i.checked;
+    else if (p.options) { const v = $$("input:checked", i).map(c => c.value); if (v.length) args[p.name] = v; }
+    else if (i.multiple) { const v = [...i.selectedOptions].map(o => o.value); if (v.length) args[p.name] = v; }
+    else if (i.value.trim()) args[p.name] = i.value.trim();
+  });
+  return args;
+}
+function resultView(r) {                               // a tool's result for a person: the summary, the facts, the details, the files it made
+  const d = el("div");
+  if (r && typeof r === "object" && !Array.isArray(r)) {
+    if (r.ok === false || r.error) d.append(el("div", "banner", String(r.error || "the tool reported a problem")));
+    if (typeof r.summary === "string") d.append(el("p", null, r.summary));
+    const kv = el("dl", "kv"), deep = {};
+    for (const [k, v] of Object.entries(r)) {
+      if (k === "summary" || k === "error") continue;
+      if (v === null || ["string", "number", "boolean"].includes(typeof v)) { if (String(v).length < 300) { kv.append(el("dt", null, k), el("dd", null, String(v))); continue; } }
+      deep[k] = v;
+    }
+    if (kv.children.length) d.append(kv);
+    if (Object.keys(deep).length) { const det = el("details"); det.append(el("summary", null, "Details"), el("pre", null, JSON.stringify(deep, null, 1).slice(0, 12000))); d.append(det); }
+  } else d.append(el("pre", null, JSON.stringify(r, null, 1).slice(0, 12000)));
+  return d;
+}
+async function runTool(t, form, out, button) {
+  if (S.busy) return toast("Another job is still running.", "err");
+  const args = readForm(form); out.textContent = ""; S.busy = true; button.disabled = true;
+  const prog = el("div", "hint", "starting…"), bar = el("div", "bar"); bar.append(el("div")); bar.hidden = true; out.append(prog, bar);
+  clog("cmd", "tool " + t.name + " " + JSON.stringify(args));
+  await stream("/api/tool", { name: t.name, args }, ev => {
+    if (ev.type === "tool_progress") { prog.textContent = ev.text; clog("job", "  " + ev.text); if (ev.fraction != null) { bar.hidden = false; bar.firstChild.style.width = Math.round(ev.fraction * 100) + "%"; } }
+    else if (ev.type === "error") { prog.remove(); bar.remove(); out.append(el("div", "banner", ev.text)); clog("err", "✗ " + ev.text); }
+    else if (ev.type === "tool_result") {
+      prog.remove(); bar.remove(); const bad = ev.result && ev.result.ok === false;
+      out.append(el("div", "toolhead", `${bad ? "✗" : "✓"} ${t.name}  ${fmt(ev.seconds)}`), resultView(ev.result));
+      const cmd = el("div", "cmd", ev.command), cp = el("button", "btn small", "Copy command"); cp.type = "button"; cp.onclick = () => navigator.clipboard && navigator.clipboard.writeText(ev.command).then(() => toast("Copied", "ok"));
+      out.append(el("div", "hint", "the same from a terminal:"), cmd, cp);
+      if (ev.images && ev.images.length) out.append(figs(ev.images));
+      const others = (ev.files || []).filter(f => !(ev.images || []).includes(f));
+      if (others.length) { const ul = el("ul", "made"); others.forEach(f => { const li = el("li"), a = el("a", null, f); a.href = url(f); a.target = "_blank"; a.rel = "noopener"; li.append(a); ul.append(li); }); out.append(el("div", "hint", "files it wrote or read:"), ul); }
+      clog(bad ? "err" : "ok", `${bad ? "✗" : "✓"} ${t.name}  ${fmt(ev.seconds)}`); loadFiles();
+    }
+  });
+  S.busy = false; button.disabled = false;
+}
+
 // ------------------------------------------------------------------------------------------------ uploads
 const drop = $("#drop");
 async function upload(list) { for (const f of list) { const r = await fetch("/api/upload?name=" + encodeURIComponent(f.name), { method: "POST", body: f }), j = await r.json(); j.error ? toast(f.name + ": " + j.error, "err") : (clog("ok", "✓ added " + j.path), toast("Added " + j.path, "ok")); } loadFiles(); }
@@ -360,7 +482,7 @@ async function stream(path, body, on) {
     let i; while ((i = buf.indexOf("\n\n")) >= 0) { const chunk = buf.slice(0, i); buf = buf.slice(i + 2); if (chunk.startsWith("data: ")) on(JSON.parse(chunk.slice(6))); }
   }
 }
-function showTab(p) { $$(".tab").forEach(t => { const on = t.dataset.p === p; t.classList.toggle("on", on); t.setAttribute("aria-selected", on); }); $$("#chat,#jobs").forEach(x => x.classList.toggle("on", x.id === p)); if (p === "chat") $("#q").focus(); }
+function showTab(p) { $$(".tab").forEach(t => { const on = t.dataset.p === p; t.classList.toggle("on", on); t.setAttribute("aria-selected", on); }); $$("#chat,#jobs,#tools").forEach(x => x.classList.toggle("on", x.id === p)); if (p === "chat") $("#q").focus(); if (p === "tools" && !S.cat) loadTools(); }
 $$(".tab").forEach(t => t.onclick = () => showTab(t.dataset.p));
 
 // ------------------------------------------------------------------------------------------------ chat
@@ -500,6 +622,7 @@ act("anim.next", "Animation", "Next frame", () => { const m = V.topMol; if (m) {
 act("anim.prev", "Animation", "Previous frame", () => { const m = V.topMol; if (m) { stopAnim(); gotoFrame(m.frame - 1); } }, { key: "←" });
 act("ext.palette", "Extensions", "Search actions…", () => openPalette(), { key: "Ctrl K" });
 act("ext.model", "Extensions", "Model…", () => openModel());
+act("ext.tools", "Extensions", "Tools (forms)…", () => showTab("tools"));
 act("ext.chat", "Extensions", "Chat with the agent", () => showTab("chat"), { key: "Ctrl J" });
 act("ext.jobs", "Extensions", "Whole jobs (workflows)…", () => showTab("jobs"));
 act("ext.console", "Extensions", "Go to the console", () => { $("#console").classList.remove("min"); $("#conin").focus(); }, { key: "/" });
@@ -508,7 +631,7 @@ act("help.console", "Help", "Console commands", () => { $("#console").classList.
 act("help.about", "Help", "About vmd-agent", () => $("#about").showModal());
 const MENUS = [["File", ["file.add", "file.save", "file.refresh"]], ["Molecule", ["mol.new", "mol.addfile", "-", "mol.toggle", "mol.inspect", "-", "mol.delete"]], ["Graphics", ["reps.open", "rep.add", "rep.delete"]],
                ["Display", ["proj.persp", "proj.ortho", "-", "display.depth", "display.axes", "-", "bg.black", "bg.gray", "bg.white", "-", "view.reset", "view.fit"]], ["Mouse", ["mouse.rotate", "mouse.translate", "mouse.scale", "mouse.pick"]],
-               ["Animation", ["anim.play", "anim.prev", "anim.next"]], ["Extensions", ["ext.palette", "ext.model", "-", "ext.chat", "ext.jobs", "ext.console"]], ["Help", ["help.shortcuts", "help.console", "help.about"]]];
+               ["Animation", ["anim.play", "anim.prev", "anim.next"]], ["Extensions", ["ext.palette", "ext.model", "-", "ext.chat", "ext.tools", "ext.jobs", "ext.console"]], ["Help", ["help.shortcuts", "help.console", "help.about"]]];
 function closeMenus(except) { $$(".menu.open").forEach(m => { if (m === except) return; m.classList.remove("open"); const d = $(".dropdown", m); if (d) d.remove(); $("button", m).setAttribute("aria-expanded", "false"); }); }
 function buildMenus() {
   const nav = $("#menus"); nav.textContent = "";

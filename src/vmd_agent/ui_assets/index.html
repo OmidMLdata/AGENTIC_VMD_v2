@@ -103,6 +103,7 @@
   <aside class="pane" id="right" aria-label="Assistant">
     <div class="tabs" role="tablist">
       <button class="tab on" role="tab" aria-selected="true" aria-controls="chat" data-p="chat" id="tab-chat">Chat</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="tools" data-p="tools" id="tab-tools">Tools</button>
       <button class="tab" role="tab" aria-selected="false" aria-controls="jobs" data-p="jobs" id="tab-jobs">Whole jobs</button>
     </div>
     <div id="chat" role="tabpanel" aria-labelledby="tab-chat" class="on">
@@ -115,6 +116,7 @@
         <button type="submit" class="btn" id="send">Send</button>
       </form>
     </div>
+    <div id="tools" role="tabpanel" aria-labelledby="tab-tools"><div class="scroll" id="tl"></div></div>
     <div id="jobs" role="tabpanel" aria-labelledby="tab-jobs"><div class="scroll" id="wf"></div></div>
   </aside>
 
@@ -147,9 +149,11 @@
     <label class="opt"><input type="radio" name="msrc" value="local"> A free model on this computer (the private Ollama that setup installs)</label>
     <label class="opt"><input type="radio" name="msrc" value="other"> Another server: an online service you have access to, or your own Ollama, LM Studio, vLLM</label>
   </fieldset>
-  <div id="model-other"><label for="model-url">Address (usually ends in /v1)</label><input id="model-url" type="text" spellcheck="false" autocomplete="off">
-    <label for="model-key">API key (leave empty if it needs none)</label><input id="model-key" type="password" autocomplete="off"></div>
-  <label for="model-name">Model name</label><input id="model-name" type="text" list="model-list" spellcheck="false" autocomplete="off"><datalist id="model-list"></datalist>
+  <div id="model-local-box"><label for="model-local">Models downloaded on this computer</label><select id="model-local"></select></div>
+  <div id="model-other"><label for="model-found">Servers found on this computer</label><select id="model-found"></select>
+    <label for="model-url">Address (usually ends in /v1)</label><input id="model-url" type="text" spellcheck="false" autocomplete="off">
+    <label for="model-key">API key (leave empty if it needs none)</label><input id="model-key" type="password" autocomplete="off">
+    <label for="model-name">Model name</label><input id="model-name" type="text" list="model-list" spellcheck="false" autocomplete="off"><datalist id="model-list"></datalist></div>
   <p class="note" id="model-msg" role="status"></p>
   <p class="note">To use Claude Code or Claude Desktop as the assistant instead of a model here, run <code>vmd-agent mcp-config</code> in a terminal.</p>
   <div class="dlgbtns"><button class="btn" id="model-start" type="button">Start local server</button><button class="btn" id="model-check" type="button">Check</button><span class="grow"></span>

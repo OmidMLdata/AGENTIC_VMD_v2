@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.26.0: every tool as a form, a terminal for developers, and local models found on disk
+
+* **A Tools tab**: every tool of the library as a form built from its own signature (`toolform.py`): drop-downs for files (by kind) and fixed choices, check boxes, number and text boxes, a box for a scene's JSON;
+  results as a summary, facts, pictures and the files written, with the equivalent `vmd-agent tool ...` command. `/api/tools`, `/api/tool`.
+* **A terminal in the console**: `tools`, `tool NAME ...`, `tool NAME --help`, `workflow` run the real command line in the files folder (`/api/terminal`), beside VMD's viewer commands.
+* **The Model dialog lists the models downloaded on this computer** (read from the private model folder, so it works while the server is off), the model servers found answering on this computer, and choosing a local
+  model starts its server.
+* **Numbers in an answer are read better by the number check**: "127 906" is 127906, and hex-like words and paths no longer produce phantom numbers (`2e408...` was read as infinity).
+
 ## 0.25.0: the page is connected to the model and fails gracefully; Claude Code is a choice, not an extra
 
 * **The web page knows what is wrong with the model** (no server, or the server lacks the model), starts the private local server for you on request or when a question is asked, lets you choose another

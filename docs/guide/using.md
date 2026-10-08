@@ -36,6 +36,11 @@ remembered; double-click one to restore it), and the light/dark/automatic theme 
 * **Assistant, Chat.** The model's answer is written as Markdown (headings, lists, tables, code; never raw HTML), every tool call is a collapsible card with its arguments, result, a progress bar and
   **the seconds it took**, each model call is timed, and a line under every answer says where the time went. The numbers in an answer are checked against the tools' results exactly as in the terminal
   chat ([How the chat keeps a model honest](models.md#how-the-chat-keeps-a-model-honest)).
+* **Assistant, Tools.** Every tool of the [library](tools.md) as a form, for people who prefer to click: pick a group and a tool, then fill in drop-downs (your files, filtered by kind: structures, trajectories, maps, videos, images;
+  fixed choices such as `kind` or `fmt`), check boxes (`analyses`, yes/no options), number and text boxes (with the default shown), and a box for a scene's JSON (with a drop-down to load one from your files). The result is
+  shown as a summary, the facts, the pictures and the files it made, with **the same command for a terminal** to copy.
+* **Terminal.** The console also takes the real command line, for developers: `tools`, `tool NAME --flags`, `tool NAME --help`, `workflow` (a leading `vmd-agent` is accepted), run in your files folder, next to VMD's
+  own viewer commands (`mol new`, `animate goto`).
 * **Assistant, Whole jobs.** Pick a [workflow](workflows.md), pick the files, run it, and read the verdict, the graded findings, the step table with seconds and the figures, with a link to the
   report. No model is needed for this tab.
 * **Model.** The page is connected to the model that setup chose. If none answers (the server is not running, or it lacks the model), a note says which of the two it is, with buttons to start the local

@@ -267,3 +267,10 @@ def test_a_grounded_answer_is_not_sent_back():
     finally:
         srv.shutdown()
     assert len(requests) == 2 and answer == "QuickSurf and Surf draw surfaces."
+
+
+def test_numbers_written_with_thousands_groups_or_inside_hex_like_words_are_read_correctly():
+    assert agent.unsupported_numbers("The file is 127 906 bytes.", ['{"size": 127906}']) == []
+    assert agent.unsupported_numbers("It holds 1,280 atoms.", ['{"n_atoms": 1280}']) == []
+    assert agent.unsupported_numbers("See /tmp/0e6e9e2f-ba40-444e-845d-2e408ce50b16/x.pdb", ["{}"]) == []                    # no 2e408 = infinity
+    assert agent.unsupported_numbers("There are 4 000 atoms.", ['{"n_atoms": 1280}']) == ["4000"]                              # a wrong number is still caught

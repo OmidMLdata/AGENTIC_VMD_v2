@@ -70,13 +70,19 @@ _DATA_WORDS = re.compile(
     r"render|draw|plot|build|solvate|mutate|trajector(?:y|ies)|simulations?|runs?|frames?|disulfides?|ligands?|box|density|plugins?)\b",
     re.I)
 
-_NUM = re.compile(r"(?<![\w.])-?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?")
+#: a number, with thousands groups ("127 906", "1,280", written with a space, comma or narrow space) read as one number; an exponent only when no letter follows it
+#: (a hex-like word such as 2e408ce5 is not 2 x 10^408)
+_NUM = re.compile(r"(?<![\w.])-?(?:\d{1,3}(?:[ ,\u202f\u00a0]\d{3})+(?![\d])(?:\.\d+)?|\d+(?:\.\d+)?(?:[eE][-+]?\d+(?![A-Za-z\d]))?)")
+
+
+#: what is not a claim about a measurement: a path (anything with a slash) and an identifier made of hex groups
+_NOT_NUMBERS = re.compile(r"\S*[/\\]\S*|\b[0-9a-fA-F]{6,}(?:-[0-9a-fA-F]{2,})+\b")
 
 
 def numbers(text: str):
     out = []
-    for m in _NUM.finditer(text):
-        tok = m.group(0)
+    for m in _NUM.finditer(_NOT_NUMBERS.sub(" ", text)):
+        tok = re.sub(r"[ ,\u202f\u00a0](?=\d{3})", "", m.group(0)) if re.search(r"\d[ ,\u202f\u00a0]\d{3}", m.group(0)) else m.group(0)
         try:
             out.append((float(tok), len(tok.split(".")[1].split("e")[0].split("E")[0]) if "." in tok else 0))
         except ValueError:

@@ -217,6 +217,24 @@ def install(confirm_size: Optional[Callable[[str, int], bool]] = None,
     return binary
 
 
+def installed_models(root: Optional[str] = None) -> List[str]:
+    """The models downloaded into the private folder, read from the files themselves (the server need not be running): ``name:tag``."""
+    base = os.path.join(root or models_dir(), "manifests")
+    found: List[str] = []
+    if not os.path.isdir(base):
+        return found
+    for host in sorted(os.listdir(base)):
+        for ns in sorted(os.listdir(os.path.join(base, host))):
+            nsdir = os.path.join(base, host, ns)
+            if not os.path.isdir(nsdir):
+                continue
+            for name in sorted(os.listdir(nsdir)):
+                ndir = os.path.join(nsdir, name)
+                if os.path.isdir(ndir):
+                    found += [(f"{name}:{tag}" if ns == "library" else f"{ns}/{name}:{tag}") for tag in sorted(os.listdir(ndir)) if not tag.startswith(".")]
+    return found
+
+
 def running(timeout: float = 2.0) -> bool:
     try:
         _get(f"http://127.0.0.1:{port()}/api/version", timeout)

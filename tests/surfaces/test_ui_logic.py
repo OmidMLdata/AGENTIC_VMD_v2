@@ -48,3 +48,9 @@ def test_console_commands_parse_to_actions():
 def test_markdown_cannot_inject_html():
     html = node("console.log(JSON.stringify(M.render('<img src=x onerror=1> **b** `c`\\n\\n[x](javascript:alert(1))')))")
     assert "<img" not in html and "<strong>b</strong>" in html and "<code>c</code>" in html and "<a " not in html
+
+
+def test_terminal_lines_are_sent_to_the_real_command_line():
+    out = node("console.log(JSON.stringify(['tool detect_system a.pdb','tools','vmd-agent tool inspect_files a.pdb','workflow','workflow equilibration_check a.psf a.dcd'].map(C.parse)))")
+    assert [c["cmd"] for c in out] == ["terminal", "terminal", "terminal", "terminal", "workflow"]
+    assert out[2]["line"] == "vmd-agent tool inspect_files a.pdb" and out[3]["line"] == "workflow"

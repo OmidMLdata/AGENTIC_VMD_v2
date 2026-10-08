@@ -22,6 +22,7 @@
     "Display      display projection Perspective|Orthographic | display depthcue on|off | display resetview | axes location Off|LowerLeft",
     "             color Display Background black|white|gray | rotate x|y|z by DEGREES | scale by FACTOR | scale to FACTOR",
     "Agent        files | look TOOL FILE | workflow NAME FILE... | ask QUESTION... | clear | help",
+    "Terminal     tools | tool NAME [flags] | tool NAME --help | workflow     (the real command line, run in your files folder; a leading vmd-agent is accepted)",
     "Selections   protein, nucleic, water, backbone, sidechain, hydrogen, all; name CA, resname LIG, chain A, resid 1 to 20, index 0 to 99, element C;",
     "             within 5 of (resname LIG), same residue as (...), and / or / not, ( ).  Names may use * as a wildcard.",
   ];
@@ -37,7 +38,8 @@
       case "files": return { cmd: "files" };
       case "ask": return t.length > 1 ? { cmd: "ask", text: t.slice(1).join(" ") } : bad("ask what? (ask Which residues touch the ligand?)");
       case "look": return t.length >= 3 ? { cmd: "look", tool: t[1], file: t[2] } : bad("usage: look TOOL FILE   (tools: inspect_files, detect_system, structure_stats, probe_video)");
-      case "workflow": return t.length >= 3 ? { cmd: "workflow", name: t[1], files: t.slice(2) } : bad("usage: workflow NAME FILE...   (for example: workflow equilibration_check run.psf run.dcd)");
+      case "tool": case "tools": case "vmd-agent": return { cmd: "terminal", line: String(line).trim() };
+      case "workflow": return t.length < 2 ? { cmd: "terminal", line: "workflow" } : t.length >= 3 ? { cmd: "workflow", name: t[1], files: t.slice(2) } : bad("usage: workflow NAME FILE...   (for example: workflow equilibration_check run.psf run.dcd)");
       case "mol": switch (B) {
         case "new": return t[2] ? { cmd: "mol.new", file: t[2] } : bad("usage: mol new FILE");
         case "addfile": return t[2] ? { cmd: "mol.addfile", file: t[2], id: num(t[3]) } : bad("usage: mol addfile TRAJECTORY [ID]");

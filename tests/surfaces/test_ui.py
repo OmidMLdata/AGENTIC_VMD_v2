@@ -256,3 +256,53 @@ def test_starting_the_private_model_server_says_so_when_there_is_none(page, monk
     monkeypatch.setattr(ollama_local, "find_binary", lambda root=None: None)
     s, body, _ = page.post("/api/model/start", {})
     assert s == 409 and "vmd-agent setup" in json.loads(body)["error"]
+
+
+def test_every_tool_is_described_for_a_form_and_can_be_run_from_it(page):
+    from vmd_agent import toolset
+    cat = json.loads(page.req("GET", "/api/tools")[1])
+    names = [t["name"] for g in cat["groups"] for t in g["tools"]]
+    assert names == toolset.library_tools() and len(cat["groups"]) == 10
+    detect = next(t for g in cat["groups"] for t in g["tools"] if t["name"] == "detect_system")
+    topo = next(p for p in detect["params"] if p["name"] == "topology")
+    assert topo["required"] and topo["role"] == "structure" and topo["kind"] == "string" and all(p["name"] != "vmd_path" for p in detect["params"])
+    meas = next(t for g in cat["groups"] for t in g["tools"] if t["name"] == "measure_with_vmd")
+    assert "rgyr" in next(p for p in meas["params"] if p["name"] == "kind")["enum"]                   # a drop-down, from the tool's own choices
+    events = page.events("/api/tool", {"name": "detect_system", "args": {"topology": "1ubq.pdb", "trajectory": ""}})
+    done = next(e for e in events if e["type"] == "tool_result")
+    assert done["result"]["n_atoms"] > 100 and done["command"] == "vmd-agent tool detect_system 1ubq.pdb" and "1ubq.pdb" in done["files"]
+    bad = page.events("/api/tool", {"name": "detect_system", "args": {}})
+    assert bad[-1]["type"] == "error" and "topology" in bad[-1]["text"]
+    assert page.events("/api/tool", {"name": "no_such_tool", "args": {}})[-1]["type"] == "error"
+    assert page.post("/api/tool", {"name": "detect_system", "args": {}}, cookie=False)[0] == 403
+
+
+def test_the_command_for_a_form_is_the_command_the_command_line_would_parse():
+    from vmd_agent import cli, toolform
+    p, _ = cli.build_parser()
+    cmd = toolform.command_for("measure_with_vmd", {"topology": "a.pdb", "trajectory": "a.dcd", "kind": "rmsd", "align": False, "step": 5})
+    a = p.parse_args(cmd.split()[1:])
+    assert (a.topology, a.trajectory, a.kind, a.align, a.step) == ("a.pdb", "a.dcd", "rmsd", False, 5)
+
+
+def test_the_page_terminal_runs_the_real_command_line(page):
+    s, body, _ = page.post("/api/terminal", {"line": "vmd-agent tool detect_system 1ubq.pdb"})
+    out = json.loads(body)
+    assert s == 200 and out["ok"] and '"n_atoms"' in out["output"]
+    listing = json.loads(page.post("/api/terminal", {"line": "tools"})[1])["output"]
+    assert "Draw" in listing and "measure_with_vmd" in listing
+    assert "usage" in json.loads(page.post("/api/terminal", {"line": "tool detect_system --help"})[1])["output"]
+    bad = json.loads(page.post("/api/terminal", {"line": "tool detect_system"})[1])
+    assert bad["ok"] is False and ("required" in bad["output"] or "arguments" in bad["output"])
+    assert json.loads(page.post("/api/terminal", {"line": "rm -rf /"})[1])["ok"] is False
+    assert page.post("/api/terminal", {"line": "tools"}, cookie=False)[0] == 403
+
+
+def test_local_models_on_disk_are_listed_even_when_no_server_runs(tmp_path):
+    from vmd_agent import ollama_local
+    for ref in ("registry.ollama.ai/library/granite4.1/8b", "registry.ollama.ai/library/gemma4/e4b", "registry.ollama.ai/someone/custom/latest"):
+        d = tmp_path / "manifests" / os.path.dirname(ref)
+        d.mkdir(parents=True, exist_ok=True)
+        (tmp_path / "manifests" / ref).write_text("{}")
+    assert ollama_local.installed_models(str(tmp_path)) == ["gemma4:e4b", "granite4.1:8b", "someone/custom:latest"]
+    assert ollama_local.installed_models(str(tmp_path / "nothing")) == []
