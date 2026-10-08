@@ -5,6 +5,9 @@ It is a different test from [the tool test set](tool-test-set.md), which runs ea
 
 ```bash
 vmd-agent bench models --list                                   # the tasks, by kind of functionality
+vmd-agent bench models --oracle                                 # no model: do every task perfectly with the real tools, to check the benchmark itself
+vmd-agent bench models --list --reference                       # every prompt, the tools that answer it and what a correct answer says
+vmd-agent bench models --catalogue --pull                       # every suggested model (`vmd-agent models`), downloading the missing ones, each unloaded when done
 vmd-agent bench models --model granite4.1:8b                    # one model on Ollama or any OpenAI-compatible server
 vmd-agent bench models --model granite4.1:3b granite4.1:8b gemma4:e4b --repeats 3       # several, one after the other
 vmd-agent bench models --model granite4.1:8b --tools core       # offer 27 tools instead of 53 (see "Does the model see all 53 at once?")
@@ -15,6 +18,9 @@ vmd-agent bench models --summarize                              # rebuild summar
 ```
 
 Rows in the summary are labelled with how the model was run, `model (all)`, `model (auto)`, `model (core, no guard)`, so the same model with different tool sets or without the guard sits side by side.
+
+`--catalogue` runs the models of the suggested list one after another; without `--pull` it skips the ones the server does not have, with `--pull` it downloads them first (several GB each: 2 to 18 GB; into the private Ollama if setup chose that). A
+model too big for your memory may be very slow or fail: the records say so (`error`), and a failed run is not a pass.
 
 Options: `--base-url`, `--api-key` (for a hosted service), `--data-dir` and `--out-dir` (where things go), `--only TASK ...`, `--repeats N`, `--max-turns N`,
 `--temperature T`, `--no-guard` (a raw model: no nudge to use a tool, no number check), `--skip vmd ffmpeg network`, `--force`.
@@ -46,7 +52,7 @@ the records. Nothing is stored in the repository: you run it on your models and 
 | `network` | search the PDB, download an entry | 2 |
 | `decline` | requests that cannot or must not be done: a missing file, a path outside the folder, Tcl that is disabled, a quantity no tool measures, data that do not match | 5 |
 
-`vmd-agent bench models --list` prints every prompt. Tasks that need VMD, ffmpeg or the network are skipped (with the reason) when the computer lacks them, and are not counted.
+Every prompt, the tools that answer it and **what a correct answer says** are in [the task list](model-benchmark-tasks.md); `vmd-agent bench models --list --reference` prints it, and `vmd-agent bench models --oracle` does every task perfectly with the real tools and grades that (no model), so a task that a perfect agent cannot pass shows up as a bug in the task. Tasks that need VMD, ffmpeg or the network are skipped (with the reason) when the computer lacks them, and are not counted.
 A test checks that every tool is asked for by some task or excused with a reason.
 
 ## What is measured

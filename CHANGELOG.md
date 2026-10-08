@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.22.0: the computer decides, the benchmark checks itself, and every suggested model can be tested in one command
+
+* **It reads the computer** (`platform_info.py`, `models.recommend`): memory on macOS, Linux and Windows, an NVIDIA card, Claude Code (installed? already registered as an MCP server?). Setup names the computer and
+  suggests the model that fits its memory (the default from 16 GB or with an NVIDIA card, the small one from 8 GB, and a plain warning below that), offers to register vmd-agent with Claude Code when `claude`
+  is installed, and `vmd-agent doctor` shows all of it.
+* **The benchmark has correct answers** (`model_oracle.py`, `docs/model-benchmark-tasks.md`): for each of the 58 tasks, the tool calls a perfect agent makes and the answer it gives, from what the dataset was
+  built to contain. `vmd-agent bench models --oracle` does every task perfectly with the real tools and grades that with the task's own grader, so a task that cannot be passed is found as a bug in the task;
+  `--list --reference` prints each prompt with its expected tools and facts; the task page in the docs is generated from the code and a test keeps them equal.
+* **`bench models --catalogue [--pull]`** runs every suggested model one after another (downloading missing ones into the private Ollama when asked, unloading each when done).
+* **A test no longer downloads into your home folder**: the first version of a setup test reached the install step and installed the private Ollama and a model into the developer's real data folder. Tests now
+  run with `VMD_AGENT_HOME` pointed at a temporary folder.
+
 ## 0.21.0: the agent is its own layer, with routing, argument repair and a test lane that uses a model
 
 * **`agent.py`**: the language model as a tool-calling agent, separate from any screen. The loop, the guard, the wall-clock and every tool call's arguments and result live there

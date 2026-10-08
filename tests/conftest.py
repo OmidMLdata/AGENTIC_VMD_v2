@@ -229,8 +229,10 @@ def real_tachyon(real_vmd):
 
 @pytest.fixture(autouse=True)
 def _isolated_settings(tmp_path, monkeypatch):
-    """Never read or write the developer's real vmd-agent settings."""
+    """Never read or write the developer's real vmd-agent settings, or download into the folder where a real install keeps its private model server and models
+    (a test that reaches the install step must land in a temporary folder, not in the developer's home)."""
     monkeypatch.setenv("VMD_AGENT_CONFIG_DIR", str(tmp_path / "_vmd_agent_config"))
+    monkeypatch.setenv("VMD_AGENT_HOME", str(tmp_path / "_vmd_agent_home"))
 
 
 @pytest.fixture(autouse=True)
@@ -246,11 +248,19 @@ def _clean_env(monkeypatch):
 DELAY = 0.25
 
 
-def scripted_server(replies):
+def scripted_server(replies, models=("m",)):
     """Answers each POST with the next of ``replies`` (a dict: content and/or tool_calls) after DELAY seconds, as plain JSON."""
     calls = []
 
     class H(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):                                     # the list of models the server has
+            body = json.dumps({"object": "list", "data": [{"id": m, "object": "model"} for m in models]}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
         def do_POST(self):
             calls.append(json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0)))))
             time.sleep(DELAY)

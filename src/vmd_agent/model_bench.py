@@ -19,7 +19,7 @@ import shutil
 import time
 from typing import Callable, Dict, List, Optional, Sequence
 
-from vmd_agent import agent as agent_mod, model_tasks as M, security, toolset, tool_dataset as D
+from vmd_agent import agent as agent_mod, model_oracle, model_tasks as M, security, toolset, tool_dataset as D
 from vmd_agent.llm_client import LLMError
 from vmd_agent.tool_cases import available
 
@@ -147,6 +147,92 @@ def run_task(task: M.Task, model: str, base_url: str, api_key: Optional[str], ba
             os.environ[security.ENV_ROOTS] = previous
         shutil.rmtree(work, ignore_errors=True)
     return rec
+
+
+# ------------------------------------------------------------ the benchmark checked against itself
+def oracle_run(task: M.Task, base: str, truth: dict, work: str) -> dict:
+    """Do the task perfectly (the oracle's tool calls on the real tools, then the reference answer) and grade that with the task's own grader.
+    A task whose perfect run does not pass is a bug in the task."""
+    if os.path.exists(work):
+        shutil.rmtree(work)
+    shutil.copytree(base, work)
+    oracle = model_oracle.ORACLE[task.id]
+    previous = os.environ.get(security.ENV_ROOTS)
+    os.environ[security.ENV_ROOTS] = os.path.realpath(work)
+    cwd = os.getcwd()
+    os.chdir(work)
+    calls: List[dict] = []
+    try:
+        for name, args in oracle.plan(truth):
+            try:
+                result = toolset.TOOLS[name](**args)
+            except Exception as e:                      # a refusal is an error result, as in the agent
+                result = {"error": f"{type(e).__name__}: {e}"}
+            calls.append({"name": name, "arguments": args, "result": result})
+        answer = oracle.answer(truth, [c["result"] for c in calls])
+        run = M.Run(answer, calls, os.path.realpath(work), truth)
+        try:
+            why = task.grade(run)
+        except Exception as e:
+            why = f"grader error: {type(e).__name__}: {e}"
+        wanted = True if task.decline else bool(run.called(*task.tools))
+    finally:
+        os.chdir(cwd)
+        if previous is None:
+            os.environ.pop(security.ENV_ROOTS, None)
+        else:
+            os.environ[security.ENV_ROOTS] = previous
+        shutil.rmtree(work, ignore_errors=True)
+    return {"task": task.id, "category": task.category, "passed": why is None and wanted, "reason": why or ("" if wanted else "the plan calls none of the task's tools"),
+            "answer": answer, "tools_called": [c["name"] for c in calls]}
+
+
+def run_oracle(data_dir: str, categories: Optional[Sequence[str]] = None, only: Optional[Sequence[str]] = None, skip: Sequence[str] = (),
+               log: Callable[[str], None] = lambda m: None) -> List[dict]:
+    """The oracle on every selected task this computer can run (the others are listed as skipped, with the reason)."""
+    prepared = prepare(os.path.join(data_dir, "base"), log)
+    base, truth, extras = prepared["info"]["folder"], prepared["truth"], prepared["extras"]
+    unmet: Dict[str, Optional[str]] = {}
+    out: List[dict] = []
+    for task in select(categories, only):
+        reason = skip_reason(task, extras, skip, unmet)
+        if reason:
+            out.append({"task": task.id, "category": task.category, "passed": None, "reason": reason, "answer": "", "tools_called": []})
+            log(f"skip  {task.id:20s} {reason}")
+            continue
+        rec = oracle_run(task, base, truth, os.path.join(data_dir, "runs", f"oracle_{task.id}"))
+        out.append(rec)
+        log(f"{'pass ' if rec['passed'] else 'FAIL '} {task.id:20s}" + ("" if rec["passed"] else "  " + rec["reason"][:120]))
+    return out
+
+
+def reference_text(truth: dict) -> str:
+    """Every task with its expected tools and the reference answer, as plain text."""
+    lines = []
+    for task in M.TASKS:
+        o = model_oracle.ORACLE[task.id]
+        lines += [f"[{task.category}] {task.id}", f"  prompt:   {task.prompt}", f"  tools:    {', '.join(task.tools) if task.tools else '(none: it must be declined)'}",
+                  f"  expected: {o.expected}", ""]
+    return "\n".join(lines)
+
+
+def reference_markdown() -> str:
+    """The task list as a documentation page: every prompt, the tools that answer it, and what a correct answer says."""
+    out = ["# The benchmark's tasks and their correct answers", "",
+           "Generated from [`model_tasks.py`](../src/vmd_agent/model_tasks.py) and [`model_oracle.py`](../src/vmd_agent/model_oracle.py) (a test keeps this page in step with them). Each task is a plain-language request about the",
+           "files of the generated dataset ([the tool test set](tool-test-set.md)); the **correct answer** is what a perfect agent finds with the tools. The values below are facts of how the dataset was built or",
+           "are computed from its files with MDAnalysis, independently of the toolkit; on your computer `vmd-agent bench models --list --reference` prints the same, and `vmd-agent bench models --oracle` runs every",
+           "task's perfect plan through the real tools and grades it, to check that the benchmark itself can be passed. A model may word its answer differently: the graders accept any wording that states the facts.", "",
+           "A task marked *needs VMD / ffmpeg / network* is skipped (and not counted) on a computer without it.", ""]
+    for category in M.CATEGORIES:
+        tasks = [t for t in M.TASKS if t.category == category]
+        out += [f"## {category}", "", "| Task | Prompt | Tools that answer it | A correct answer says |", "|---|---|---|---|"]
+        for t in tasks:
+            needs = f" *(needs {', '.join(t.needs)})*" if t.needs else ""
+            tools = ", ".join(f"`{x}`" for x in t.tools) if t.tools else "none: it must be declined"
+            out.append(f"| `{t.id}`{needs} | {t.prompt.replace('|', '/')} | {tools} | {model_oracle.ORACLE[t.id].expected.replace('|', '/')} |")
+        out.append("")
+    return "\n".join(out)
 
 
 # ------------------------------------------------------------------ the whole run

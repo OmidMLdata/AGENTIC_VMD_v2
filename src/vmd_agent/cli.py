@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 import sys
 
 from vmd_agent import auto as auto_mod
@@ -190,6 +191,15 @@ def _bench_agent(args):
 
 def _bench_models(args) -> int:
     from vmd_agent import agent as agent_mod, model_bench, model_tasks
+    if args.oracle:
+        results = model_bench.run_oracle(args.data_dir, args.categories, (list(model_tasks.SMOKE) if args.smoke else args.only), args.skip, log=print)
+        bad = [r for r in results if r["passed"] is False]
+        print(f"\n{sum(r['passed'] is True for r in results)} passed, {len(bad)} failed, {sum(r['passed'] is None for r in results)} skipped")
+        return 1 if bad else 0
+    if args.list and args.reference:
+        from vmd_agent import model_oracle  # noqa: F401
+        print(model_bench.reference_text({}))
+        return 0
     if args.list:
         for cat, tasks in model_tasks.by_category().items():
             print(f"{cat} ({len(tasks)})")
@@ -200,20 +210,46 @@ def _bench_models(args) -> int:
     if args.summarize:
         print(model_bench.write_summary(args.out_dir))
         return 0
-    if not args.model:
-        print("vmd-agent bench models: name the model(s) with --model (or use --list / --summarize)", file=sys.stderr)
+    if args.catalogue:
+        from vmd_agent import models as models_mod
+        wanted = [m.tag for m in models_mod.CATALOGUE]
+    else:
+        wanted = list(args.model or [])
+    if not wanted:
+        print("vmd-agent bench models: name the model(s) with --model, or use --catalogue (or --list / --summarize / --oracle)", file=sys.stderr)
         return 2
-    base_url, _, api_key = agent_mod.resolve_connection(args.base_url, args.model[0], args.api_key)
-    problem = agent_mod.check_connection(base_url, args.model[0], api_key)
-    if problem:
-        print("\n".join(problem), file=sys.stderr)
-        return 2
+    base_url, _, api_key = agent_mod.resolve_connection(args.base_url, wanted[0], args.api_key)
+    from vmd_agent import ollama_local
+    from vmd_agent.llm_client import LLMError, list_models
     try:
-        model_bench.run(args.model, args.data_dir, args.out_dir, base_url, api_key, args.categories, (list(model_tasks.SMOKE) if args.smoke else args.only), args.repeats, args.tools,
-                        args.max_turns, args.temperature, not args.no_guard, args.skip, args.force, log=print)
-    except ValueError as e:
+        have = list_models(base_url, api_key)
+    except LLMError as e:
         print(f"vmd-agent bench models: {e}", file=sys.stderr)
         return 2
+    private = base_url == ollama_local.url()
+    for tag in wanted:
+        if have and tag not in have:
+            if args.catalogue and args.pull:
+                print(f"== downloading {tag}", flush=True)
+                ok = ollama_local.pull(tag) if private else subprocess.run(["ollama", "pull", tag]).returncode == 0
+                if not ok:
+                    print(f"== {tag}: the download failed; skipped", flush=True)
+                    continue
+            else:
+                problem = agent_mod.check_connection(base_url, tag, api_key)
+                print("\n".join(problem or [f"the model '{tag}' is not on the server"]), file=sys.stderr)
+                if not args.catalogue:
+                    return 2
+                print(f"== {tag}: not on the server (add --pull to download it); skipped", flush=True)
+                continue
+        try:
+            model_bench.run([tag], args.data_dir, args.out_dir, base_url, api_key, args.categories, (list(model_tasks.SMOKE) if args.smoke else args.only), args.repeats, args.tools,
+                            args.max_turns, args.temperature, not args.no_guard, args.skip, args.force, log=print)
+        except ValueError as e:
+            print(f"vmd-agent bench models: {e}", file=sys.stderr)
+            return 2
+        if args.catalogue and private:
+            ollama_local.unload(tag)
     print("\nsummary: " + model_bench.write_summary(args.out_dir))
     return 0
 
@@ -679,6 +715,8 @@ def build_parser():
     b = bsub.add_parser("models", help="put language models in front of the tools: tasks per kind of functionality, graded by a program, "
                         "with the seconds each took")
     b.add_argument("--model", nargs="+", help="the model(s) to test, as the server names them (several = one after the other)")
+    b.add_argument("--catalogue", action="store_true", help="test every model of the suggested list (vmd-agent models), one after another, each unloaded when done")
+    b.add_argument("--pull", action="store_true", help="with --catalogue: download the models that are not on the server yet (several GB each; into the private Ollama if that is what setup chose)")
     b.add_argument("--base-url", help="OpenAI-style address (default: your saved setting, else Ollama at http://localhost:11434/v1)")
     b.add_argument("--api-key", help="API key if the server needs one")
     b.add_argument("--data-dir", default="model_bench_data", help="where the dataset and the temporary working copies go")
@@ -694,6 +732,8 @@ def build_parser():
     b.add_argument("--skip", nargs="+", default=[], choices=["vmd", "ffmpeg", "network"], help="leave out tasks that need these")
     b.add_argument("--force", action="store_true", help="ask again even if the record is already in --out-dir")
     b.add_argument("--list", action="store_true", help="list the tasks by category, and run nothing")
+    b.add_argument("--reference", action="store_true", help="with --list: also print what a correct answer says (the tools to call and the facts)")
+    b.add_argument("--oracle", action="store_true", help="no model: do every task perfectly with the real tools and grade that, to check the benchmark itself")
     b.add_argument("--summarize", action="store_true", help="only rebuild summary.md from the records already in --out-dir")
     b = bsub.add_parser("dataset", help="write the tool test set's files (a protein, a trajectory, maps, a video) and stop")
     b.add_argument("folder")

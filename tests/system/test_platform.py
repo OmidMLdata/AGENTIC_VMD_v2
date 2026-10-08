@@ -275,3 +275,42 @@ def test_writing_creates_a_missing_config_and_refuses_a_broken_one(tmp_path):
     with pytest.raises(ValueError, match="not valid JSON"):
         mcp_check.write_claude_desktop_config(str(broken), block)
     assert broken.read_text() == "{not json"                  # untouched
+
+
+# ---------------------------------------------------- memory, the model that suits it, and Claude Code
+def test_linux_memory_is_read_from_meminfo_text():
+    assert P.parse_meminfo("MemTotal:       16384000 kB\nMemFree: 1 kB\n") == 15.6
+    assert P.parse_meminfo("nothing useful") is None and P.parse_meminfo("MemTotal: lots kB") is None
+
+
+def test_this_computers_memory_is_read_and_is_plausible():
+    gb = P.memory_gb()
+    assert gb is None or 0.5 < gb < 8192
+    assert P.detect(docker="no-such-docker-binary")["ram_gb"] == gb
+
+
+@pytest.mark.parametrize("ram,gpu,want", [(4, False, None), (8, False, "granite4.1:3b"), (12, False, "granite4.1:3b"), (16, False, "granite4.1:8b"),
+                                           (64, False, "granite4.1:8b"), (None, False, "granite4.1:8b"), (8, True, "granite4.1:8b")])
+def test_the_suggested_model_follows_the_memory_and_is_never_bigger_than_the_default(ram, gpu, want):
+    from vmd_agent import models
+    got = models.recommend(ram, gpu)
+    assert (got.tag if got else None) == want
+
+
+def test_every_catalogue_model_states_the_memory_it_suits_as_a_number():
+    from vmd_agent import models
+    for m in models.CATALOGUE:
+        assert m.min_ram_gb > 0 and f"{m.min_ram_gb} GB" in m.suits, m.tag
+
+
+def test_claude_code_is_reported_whether_or_not_it_is_installed():
+    st = P.claude_code_status()
+    assert set(st) == {"installed", "path", "registered"} and isinstance(st["installed"], bool)
+    assert st["registered"] is None or st["installed"]
+
+
+def test_the_doctor_says_the_memory_the_suggested_model_and_claude_code(capsys):
+    from vmd_agent import launcher
+    text = launcher.doctor_text({**P.detect("no-such-docker-binary"), "repo": None, "next_steps": [], "chat_model": {"url": None, "model": None, "private": False, "reachable": None, "downloaded": False},
+                                 "vmd": {"path": None, "tachyon": None, "ffmpeg": None, "self_test": None}})
+    assert "Memory:" in text and "Claude Code:" in text

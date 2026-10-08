@@ -17,7 +17,7 @@ from __future__ import annotations
 import json
 import urllib.error
 import urllib.request
-from typing import Dict, List, NamedTuple
+from typing import Dict, List, NamedTuple, Optional
 
 MODELS_CHECKED = "2026-10-06"
 REGISTRY = "https://registry.ollama.ai/v2/library"
@@ -30,18 +30,30 @@ class Model(NamedTuple):
     gb: float           # download size reported by the registry on MODELS_CHECKED
     licence: str
     suits: str          # what computer it suits (a rough guide, not a measurement)
+    min_ram_gb: int = 0  # the memory the "suits" line asks for, as a number (used to pick one for this computer)
 
 
 CATALOGUE: List[Model] = [
-    Model("granite4.1:3b", "Small and fast", 2.10, "Apache 2.0", "8 GB of memory"),
-    Model("granite4.1:8b", "Recommended", 5.35, "Apache 2.0", "16 GB of memory, or a graphics card"),
-    Model("gemma4:e4b", "Recommended, alternative", 6.58, "Apache 2.0", "16 GB of memory, or a graphics card"),
-    Model("lfm2.5:8b", "Fast on a plain CPU", 5.16, "LFM Open License v1.0 (read it; it is not Apache)", "16 GB of memory"),
-    Model("gemma4:12b", "Larger", 8.02, "Apache 2.0", "32 GB of memory, or a good graphics card"),
-    Model("gpt-oss:20b", "Larger", 13.79, "Apache 2.0", "32 GB of memory, or a 16 GB graphics card"),
-    Model("qwen3.8:27b", "Largest listed", 17.74, "Apache 2.0", "48 GB of memory, or a 24 GB graphics card"),
+    Model("granite4.1:3b", "Small and fast", 2.10, "Apache 2.0", "8 GB of memory", 8),
+    Model("granite4.1:8b", "Recommended", 5.35, "Apache 2.0", "16 GB of memory, or a graphics card", 16),
+    Model("gemma4:e4b", "Recommended, alternative", 6.58, "Apache 2.0", "16 GB of memory, or a graphics card", 16),
+    Model("lfm2.5:8b", "Fast on a plain CPU", 5.16, "LFM Open License v1.0 (read it; it is not Apache)", "16 GB of memory", 16),
+    Model("gemma4:12b", "Larger", 8.02, "Apache 2.0", "32 GB of memory, or a good graphics card", 32),
+    Model("gpt-oss:20b", "Larger", 13.79, "Apache 2.0", "32 GB of memory, or a 16 GB graphics card", 32),
+    Model("qwen3.8:27b", "Largest listed", 17.74, "Apache 2.0", "48 GB of memory, or a 24 GB graphics card", 48),
 ]
 DEFAULT_MODEL = "granite4.1:8b"
+
+
+def recommend(ram_gb: Optional[float], nvidia_gpu: bool = False) -> Optional[Model]:
+    """The model to suggest for a computer with ``ram_gb`` of memory: the default if it fits, else the small one, else None (too little memory to
+    run a model that can use tools: an online service or Claude is the way). Unknown memory gets the default, which `vmd-agent doctor` then checks.
+    The default is the suggestion, not the biggest that fits: bigger models are slower, and the benchmark (``vmd-agent bench models``) says which is better for you."""
+    by_tag = {m.tag: m for m in CATALOGUE}
+    if ram_gb is None or nvidia_gpu or ram_gb >= by_tag[DEFAULT_MODEL].min_ram_gb:
+        return by_tag[DEFAULT_MODEL]
+    small = by_tag["granite4.1:3b"]
+    return small if ram_gb >= small.min_ram_gb else None
 
 
 def _split(tag: str):

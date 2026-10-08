@@ -200,3 +200,52 @@ def test_the_whole_job_route_counts_as_a_fit_when_it_reports_a_good_correlation(
     assert task.grade(run) is None
     assert task.grade(M.Run("It fitted well.", run.calls, folder, prep["truth"])) is not None
     assert task.grade(M.Run("It fitted well.", [], folder, prep["truth"])) == "no fit was run"
+
+
+def test_the_catalogue_option_runs_the_models_the_server_has_and_skips_the_rest(tmp_path, capsys):
+    from vmd_agent import cli, models
+    have = models.CATALOGUE[1].tag
+    srv, url, requests = _server([_call("list_workflows"), {"content": "The workflows are structure_overview, equilibration_check, interaction_report, compare_runs, prepare_simulation and cryoem_fit."}],
+                                 models=(have,))
+    try:
+        code = cli.main(["bench", "models", "--catalogue", "--base-url", url, "--only", "which_workflows", "--data-dir", str(tmp_path / "d"), "--out-dir", str(tmp_path / "o")])
+    finally:
+        srv.shutdown()
+    out = capsys.readouterr().out
+    assert code == 0 and f"pass  {have}  which_workflows" in out
+    assert out.count("not on the server (add --pull to download it); skipped") == len(models.CATALOGUE) - 1
+    assert {r["model"] for r in B.load_records(str(tmp_path / "o"))} == {have}
+
+
+def test_without_a_model_or_the_catalogue_the_command_says_what_to_give(capsys):
+    from vmd_agent import cli
+    assert cli.main(["bench", "models"]) == 2
+    assert "--catalogue" in capsys.readouterr().err
+
+
+def test_unloading_a_model_asks_the_server_to_free_it(monkeypatch):
+    import json as _json
+    import threading
+    import http.server
+    from vmd_agent import ollama_local
+    seen = []
+
+    class H(http.server.BaseHTTPRequestHandler):
+        def do_POST(self):
+            seen.append((self.path, _json.loads(self.rfile.read(int(self.headers["Content-Length"])))))
+            self.send_response(200)
+            self.send_header("Content-Length", "2")
+            self.end_headers()
+            self.wfile.write(b"{}")
+
+        def log_message(self, *a):
+            pass
+    srv = http.server.HTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    monkeypatch.setattr(ollama_local, "port", lambda: srv.server_port)
+    try:
+        assert ollama_local.unload("granite4.1:8b") is True
+    finally:
+        srv.shutdown()
+    assert seen == [("/api/generate", {"model": "granite4.1:8b", "keep_alive": 0})]
+    assert ollama_local.unload("x", timeout=1) is False                              # no server there any more: False, not an exception

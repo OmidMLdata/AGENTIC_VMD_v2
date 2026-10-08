@@ -288,3 +288,34 @@ def test_the_menu_opens_the_web_page_first():
     assert wizard.menu(Typed(["n", "1", "9"]), run_cli=lambda argv: seen.append(argv) or 0) == 0
     assert seen == [["ui"]]
     assert wizard.MENU[0].startswith("The web page") and wizard.MENU[-1] == "Quit"
+
+
+def test_setup_offers_claude_code_when_it_is_installed_and_not_yet_connected(monkeypatch, tmp_path):
+    from vmd_agent import platform_info as P
+    ran = []
+    monkeypatch.setattr(P, "claude_code_status", lambda: {"installed": True, "path": "/x/claude", "registered": False})
+    monkeypatch.setattr(wizard, "_run", lambda cmd, *a, **k: ran.append(cmd) or type("R", (), {"returncode": 0})())
+    io_ = Typed(["y"])
+    assert wizard.offer_claude_code(io_, str(tmp_path)) is True
+    assert ran and ran[0][:3] == ["claude", "mcp", "add"] and "Claude Code is installed" in io_.text
+    ran.clear()
+    assert wizard.offer_claude_code(Typed(["n"]), str(tmp_path)) is False and ran == []                   # asked, declined: nothing run
+
+
+def test_setup_says_nothing_about_claude_code_when_it_is_absent_or_already_connected(monkeypatch, tmp_path):
+    from vmd_agent import platform_info as P
+    for st, want in (({"installed": False, "path": None, "registered": None}, False), ({"installed": True, "path": "/x", "registered": True}, True)):
+        monkeypatch.setattr(P, "claude_code_status", lambda st=st: st)
+        io_ = Typed([])
+        assert wizard.offer_claude_code(io_, str(tmp_path)) is want and io_.text == ""
+
+
+def test_setup_names_the_computer_and_suggests_a_model_that_fits_it(monkeypatch, tmp_path):
+    from vmd_agent import platform_info as P
+    monkeypatch.setattr(P, "memory_gb", lambda s=None: 8.0)
+    monkeypatch.setattr(P, "nvidia_gpu", lambda: None)
+    monkeypatch.setattr(wizard, "_have_ollama", lambda: False)                  # stop after the choice: nothing is installed or started
+    monkeypatch.setattr(wizard, "_install_ollama", lambda *a, **k: False)
+    io_ = Typed([""])
+    wizard.setup_local_model(io_, "linux")
+    assert "8.0 GB of memory" in io_.text and "granite4.1:3b" in io_.text

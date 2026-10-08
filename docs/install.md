@@ -23,6 +23,17 @@ administrator password, no changes to your PATH or to any file outside that fold
 The two installers (`install.sh`, `install.ps1`) are separate files only because a Mac's shell and PowerShell cannot read each
 other's language, and they must run before Python exists; they do the same thing.
 
+## What it works out by itself
+
+Setup and `vmd-agent doctor` read the computer: the operating system and CPU (macOS, Linux, Windows, WSL, a container; Apple Silicon or not), the memory, an NVIDIA card, VMD (found where that
+system keeps it, then started once to prove it works), Ollama, Docker, and Claude Code. From that:
+
+* **Where things live and how they are run** follow the operating system (VMD's launcher, the settings folder, paths turned into what Tcl wants, Claude Desktop's config file).
+* **The suggested model fits the memory**: the 8B default from 16 GB or with an NVIDIA card, the 3B from 8 GB; below that setup says that a local model that can use tools is a poor fit and points to an online
+  service or Claude. It suggests; you choose, and nothing is downloaded without asking.
+* **Claude Code**: if the `claude` command is installed and vmd-agent is not yet one of its MCP servers, setup offers to add it (`claude mcp add ...`, shown before it runs), so Claude Code can use the same tools through it.
+  `vmd-agent doctor` says whether it is registered.
+
 ## Answer the setup questions
 
 The installer starts `vmd-agent setup`. It explains each step and asks four things:

@@ -1,5 +1,7 @@
 # Use it from an MCP client
 
+Setup offers to register vmd-agent with Claude Code for you when the `claude` command is installed; this page is the manual way and the details.
+
 Optional. The chat (`vmd-agent chat`) needs no MCP client; this is for people who already use Claude Code, Claude Desktop or another MCP client.
 
 The same 53 tools are available to any MCP client (Claude Code, Claude Desktop and others) through an MCP server. The server exposes the 53 tools below to an MCP client (Claude Code, Claude Desktop, or any other) over stdio. This

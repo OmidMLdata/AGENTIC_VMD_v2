@@ -378,6 +378,12 @@ def doctor_text(info: Dict[str, object]) -> str:
              + (" (WSL)" if info["wsl"] else "")
              + (" (inside a container)" if info["in_container"] else ""),
              f"Python:      {info['python']}",
+             f"Memory:      {info['ram_gb'] if info.get('ram_gb') else 'could not be read'} GB"
+             + (lambda m: f" (suggested model: {m.tag})" if m else " (too little for a model that can use tools: use an online model or Claude)")(
+                 models.recommend(info.get("ram_gb"), bool(info.get("nvidia_gpu")))),
+             "Claude Code: " + ("not installed" if not info["claude_code"]["installed"] else
+                                "installed, vmd-agent is registered as an MCP server" if info["claude_code"]["registered"] else
+                                "installed; vmd-agent is not registered with it yet (run `vmd-agent setup`, or `vmd-agent mcp-config`)"),
              f"Docker:      installed {yes(d['installed'])}, running {yes(d['running'])}, "
              f"compose {yes(d['compose'])}, NVIDIA runtime {yes(d['nvidia_runtime'])}",
              f"GPU:         {info['nvidia_gpu'] or 'no NVIDIA GPU'}"

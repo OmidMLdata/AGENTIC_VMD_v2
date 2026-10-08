@@ -225,6 +225,18 @@ def running(timeout: float = 2.0) -> bool:
         return False
 
 
+def unload(tag: str, timeout: float = 60.0) -> bool:
+    """Ask the model server to free the memory a model holds (a benchmark of several models runs them one after another). True if it answered."""
+    import json as _json
+    req = urllib.request.Request(f"http://127.0.0.1:{port()}/api/generate", data=_json.dumps({"model": tag, "keep_alive": 0}).encode(),
+                                 headers={"Content-Type": "application/json"})
+    try:
+        urllib.request.urlopen(req, timeout=timeout).read()
+        return True
+    except Exception:
+        return False
+
+
 def start(wait: float = 20.0) -> bool:
     """Start the private server if it is not already answering. True once it answers."""
     if running():

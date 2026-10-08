@@ -219,7 +219,16 @@ def setup_local_model(io: IO, system_name: str, model: Optional[str] = None,
         labels = [f"{m.tag}: {m.label}, download {m.gb:.1f} GB; suits {m.suits}; {m.licence}"
                   for m in models.CATALOGUE]
         labels.append("I know the model name I want")
-        default = 1 + [m.tag for m in models.CATALOGUE].index(models.DEFAULT_MODEL)
+        ram, gpu = P.memory_gb(system_name), bool(P.nvidia_gpu())
+        suggested = models.recommend(ram, gpu)
+        if suggested is None:
+            io.say(f"  This computer has {ram} GB of memory, which is little for a model that can use tools. The smallest one below may be slow or fail;")
+            io.say("  an online service (setup option 2) or Claude (option 3) is the easier route.")
+            suggested = models.CATALOGUE[0]
+        else:
+            io.say(f"  For this computer ({f'{ram} GB of memory' if ram else 'memory not read'}{', NVIDIA graphics card' if gpu else ''}) "
+                   f"the suggestion is {suggested.tag}.")
+        default = 1 + [m.tag for m in models.CATALOGUE].index(suggested.tag)
         pick = default if assume_yes else io.choose("  Which one?", labels, default=default)
         model = (models.CATALOGUE[pick - 1].tag if pick <= len(models.CATALOGUE)
                  else io.ask("  Model name (as in the Ollama library, e.g. granite4.1:8b)"))
@@ -283,6 +292,19 @@ def setup_online_model(io: IO, url: Optional[str] = None, model: Optional[str] =
     return True
 
 
+def offer_claude_code(io: IO, data_dir: str, assume_yes: bool = False) -> bool:
+    """If Claude Code is installed and does not have vmd-agent yet, offer to add it as an MCP server (the same tools, through Claude Code)."""
+    from vmd_agent import mcp_check
+    st = P.claude_code_status()
+    if not st["installed"] or st["registered"]:
+        return bool(st["registered"])
+    cmd = mcp_check.build_mcp_config(roots=[data_dir])["claude_code_command"]
+    io.say("\n  Claude Code is installed on this computer. vmd-agent can also be one of its tools (an MCP server), so Claude Code can use VMD through it.")
+    if assume_yes or io.confirm("  Add it to Claude Code now? I would run: " + " ".join(cmd), default=True):
+        return _run(cmd).returncode == 0
+    return False
+
+
 def setup_ai_app(io: IO, data_dir: str, assume_yes: bool = False,
                  system_name: Optional[str] = None) -> bool:
     """Connect the toolkit to Claude Desktop / Claude Code (any MCP client)."""
@@ -327,6 +349,8 @@ def setup(io: Optional[IO] = None, assume_yes: bool = False, check_only: bool = 
     if check_only:
         return show_status(io)
     io.say("Welcome to vmd-agent.")
+    ram = P.memory_gb(sysname)
+    io.say(f"This computer: {sysname}, {P.arch()}" + (f", {ram} GB of memory" if ram else "") + ".")
     io.say("It lets you ask questions about your molecular structures and simulations in plain "
            "language, and works out the answers with real measurements. This takes a few minutes, "
            "asks a few questions, and installs nothing without asking you.")
@@ -345,6 +369,8 @@ def setup(io: Optional[IO] = None, assume_yes: bool = False, check_only: bool = 
     else:
         io.say("  Skipped.")
 
+    if pick != 3:                                                 # option 3 already connected the AI apps
+        offer_claude_code(io, folder, assume_yes)
     io.say("\nStep 4 of 4: Finishing")
     settings.save(setup_done=True)
     io.say(f"  Your choices are saved ({settings.path()}).")

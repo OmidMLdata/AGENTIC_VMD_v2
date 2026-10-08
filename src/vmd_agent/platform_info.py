@@ -122,6 +122,55 @@ def nvidia_gpu() -> Optional[str]:
     return line.split(" (UUID")[0].strip() or None
 
 
+def parse_meminfo(text: str) -> Optional[float]:
+    """GB of memory from the contents of Linux's /proc/meminfo (``MemTotal:  16384000 kB``)."""
+    for line in text.splitlines():
+        if line.startswith("MemTotal:"):
+            try:
+                return round(int(line.split()[1]) / 1048576, 1)       # kB -> GB
+            except (IndexError, ValueError):
+                return None
+    return None
+
+
+def memory_gb(system_name: Optional[str] = None) -> Optional[float]:
+    """Installed memory in GB on this computer, or None if it cannot be read (never raises)."""
+    s = system(system_name)
+    try:
+        if s == MACOS:
+            rc, out = run(["sysctl", "-n", "hw.memsize"])
+            return round(int(out.strip()) / 1073741824, 1) if rc == 0 and out.strip().isdigit() else None
+        if s == LINUX:
+            with open("/proc/meminfo") as fh:
+                return parse_meminfo(fh.read())
+        if s == WINDOWS:
+            import ctypes
+
+            class _Mem(ctypes.Structure):
+                _fields_ = [("length", ctypes.c_ulong), ("load", ctypes.c_ulong), ("total", ctypes.c_ulonglong), ("avail", ctypes.c_ulonglong),
+                            ("tpage", ctypes.c_ulonglong), ("apage", ctypes.c_ulonglong), ("tvirt", ctypes.c_ulonglong), ("avirt", ctypes.c_ulonglong),
+                            ("ext", ctypes.c_ulonglong)]
+            m = _Mem()
+            m.length = ctypes.sizeof(_Mem)
+            ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(m))       # type: ignore[attr-defined]
+            return round(m.total / 1073741824, 1)
+    except (OSError, ValueError, AttributeError):
+        return None
+    return None
+
+
+def claude_code_status() -> Dict[str, object]:
+    """Is the ``claude`` command (Claude Code) installed here, and is vmd-agent already registered with it as an MCP server?
+    ``registered`` is None when that could not be asked."""
+    exe = shutil.which("claude")
+    st: Dict[str, object] = {"installed": exe is not None, "path": exe, "registered": None}
+    if exe:
+        rc, out = run([exe, "mcp", "list"], timeout=20)
+        if rc == 0:
+            st["registered"] = "vmd-agent" in out
+    return st
+
+
 def ollama_installed() -> bool:
     return shutil.which("ollama") is not None
 
@@ -205,8 +254,8 @@ def detect(docker: str = "docker") -> Dict[str, object]:
         "python": platform.python_version(),
         "apple_silicon": s == MACOS and a == "arm64",
         "docker": d, "docker_platform": docker_platform(),
-        "nvidia_gpu": nvidia_gpu(), "ollama": ollama_installed(),
-        "claude_desktop_config": claude_desktop_config_path(),
+        "nvidia_gpu": nvidia_gpu(), "ollama": ollama_installed(), "ram_gb": memory_gb(s),
+        "claude_desktop_config": claude_desktop_config_path(), "claude_code": claude_code_status(),
     }
 
 
