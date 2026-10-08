@@ -4,10 +4,16 @@
 configured again: the chat, the MCP server and the other commands read these values as
 their defaults. Flags and environment variables always win over what is stored.
 
-The file lives in the usual per-user place for each OS (``~/Library/Application
-Support/vmd-agent`` on macOS, ``%APPDATA%\\vmd-agent`` on Windows, ``~/.config/vmd-agent``
-elsewhere) and is readable by the user only where the OS allows it, because it may hold
-an API key. Set ``VMD_AGENT_CONFIG_DIR`` to use a different folder.
+Where vmd-agent keeps its own data (these settings, the link to your VMD window, a private
+copy of the model server and its models) is decided in this order:
+
+1. ``VMD_AGENT_CONFIG_DIR`` (settings only) or ``VMD_AGENT_HOME`` (everything, in ``$VMD_AGENT_HOME``);
+2. a ``.vmd-agent`` folder in the current folder or one above it: the **working folder** keeps its own data
+   (``vmd-agent setup`` offers to create it), so the project can be moved or deleted as one piece;
+3. the usual per-user place for each OS (``~/Library/Application Support/vmd-agent`` on macOS,
+   ``%APPDATA%\\vmd-agent`` on Windows, ``~/.config/vmd-agent`` elsewhere).
+
+The settings file is readable by the user only where the OS allows it, because it may hold an API key.
 
 Nothing here imports the rest of the package, and reading never raises.
 """
@@ -19,8 +25,42 @@ from typing import Any, Dict, Optional
 
 ENV_DIR = "VMD_AGENT_CONFIG_DIR"
 ENV_HOME = "VMD_AGENT_HOME"
+LOCAL = ".vmd-agent"                           # the folder a working folder keeps its own data in
 KEYS = ("data_dir", "vmd_path", "llm_url", "llm_model", "llm_key", "setup_done",
         "ollama_mode", "ollama_port")
+
+
+def local_home(start: Optional[str] = None) -> Optional[str]:
+    """The ``.vmd-agent`` folder of the working folder: in ``start`` (default: the current folder) or the
+    nearest folder above it that has one; ``None`` if there is none."""
+    try:
+        d = os.path.realpath(start or os.getcwd())
+    except OSError:
+        return None
+    while True:
+        cand = os.path.join(d, LOCAL)
+        if os.path.isdir(cand):
+            return cand
+        up = os.path.dirname(d)
+        if up == d:
+            return None
+        d = up
+
+
+def make_local(folder: str) -> str:
+    """Create ``<folder>/.vmd-agent`` (private to the user, and ignored by Git because it holds settings that
+    may include an API key, the window link's token and downloaded models) and return its path."""
+    d = os.path.join(os.path.abspath(folder), LOCAL)
+    os.makedirs(d, exist_ok=True)
+    try:
+        os.chmod(d, 0o700)
+    except OSError:
+        pass
+    ignore = os.path.join(d, ".gitignore")
+    if not os.path.exists(ignore):
+        with open(ignore, "w") as fh:
+            fh.write("*\n")
+    return d
 
 
 def config_dir(system_name: Optional[str] = None, home: Optional[str] = None,
@@ -31,6 +71,8 @@ def config_dir(system_name: Optional[str] = None, home: Optional[str] = None,
         return env[ENV_DIR]
     if env.get(ENV_HOME):                      # a contained install keeps everything in one folder
         return os.path.join(env[ENV_HOME], "config")
+    if env is os.environ and local_home():     # the working folder keeps its own settings
+        return os.path.join(local_home(), "config")
     import platform
     name = (system_name or platform.system()).lower()
     home = home if home is not None else os.path.expanduser("~")
@@ -52,6 +94,8 @@ def home_dir(system_name: Optional[str] = None, home: Optional[str] = None,
     env = os.environ if env is None else env
     if env.get(ENV_HOME):
         return env[ENV_HOME]
+    if env is os.environ and local_home():
+        return local_home()
     import platform
     name = (system_name or platform.system()).lower()
     home = home if home is not None else os.path.expanduser("~")

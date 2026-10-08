@@ -40,6 +40,7 @@ The installer starts `vmd-agent setup`. It explains each step and asks four thin
 
 | Step | What happens | What you answer |
 |---|---|---|
+| 0. Where it keeps its data | asks whether vmd-agent's own data (settings, the link to your VMD window, the free model) goes in a `.vmd-agent` folder **inside the folder you are in**, or in one place for your account. Skipped when the installer's folder is in use. | 1 or 2 (`--home here\|user`) |
 | 1. VMD | looks for VMD, **starts it once to prove it works**, and tells you its version | nothing, unless it cannot find it (then: the folder VMD is in, or Enter to skip) |
 | 2. Your files | makes a folder, by default `~/vmd-agent-data`. The AI can **only see this folder**. | Enter to accept, or type another |
 | 3. The AI | you choose who answers (below) | a number from 1 to 4 |
@@ -68,7 +69,9 @@ does) uses the Mac's graphics chip and is much faster than running it inside Doc
 The installer puts **everything** in one folder, by default `~/vmd-agent`: the helper tool, Python, the program and its packages
 (including ffmpeg), your settings, and, if you choose a free local model, a private copy of Ollama and its models. It uses no
 administrator rights, installs nothing system-wide and does not edit your shell's startup files. Your own data folder
-(`~/vmd-agent-data`) and VMD itself are separate and are never touched. **Update:** run the install line again. **Uninstall:** delete
+(`~/vmd-agent-data`) and VMD itself are separate and are never touched.
+
+**Keeping vmd-agent's data in your working folder.** Outside the installer's folder, `vmd-agent setup` offers to create a `.vmd-agent` folder in the folder you run it from (or `vmd-agent setup --home here`). From then on, any vmd-agent command run in that folder or below it uses it: your settings (which may hold an API key), the link to your VMD window, and a private Ollama with its models (a few GB). Git ignores it (it contains its own `.gitignore`), the tools can never read or write it even when it sits inside your files folder, and moving or deleting the project takes it along. Nothing is moved or deleted from the old place; earlier settings are copied. The order of precedence is: `VMD_AGENT_HOME` / `VMD_AGENT_CONFIG_DIR`, then a `.vmd-agent` folder here or above, then the per-user folder. **Update:** run the install line again. **Uninstall:** delete
 the `~/vmd-agent` folder. (If you used Docker, `vmd-agent start --down` stops it and `docker compose down -v` removes its model
 volume.)
 

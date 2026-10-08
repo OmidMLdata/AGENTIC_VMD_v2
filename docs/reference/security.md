@@ -4,6 +4,8 @@ An MCP server lets a model read paths, write paths, download files and run Tcl o
 controls limit the damage; none is a complete sandbox. **The container is the real boundary.**
 
 ## Path sandbox
+
+vmd-agent's own data folder (settings with any API key, the window link's token, downloaded models) is refused by every path check even when it lies inside an allowed root, so a model cannot read it through a tool.
 `VMD_AGENT_ALLOWED_ROOTS` (an `os.pathsep`-separated list) confines every path the **server tools** read
 or write. Paths are resolved through symlinks, so `..`, symlink escapes and prefix-sibling tricks
 (`/data-evil` vs `/data`) are blocked. Unset = unrestricted (fine for a single-user local install). The

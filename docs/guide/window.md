@@ -40,7 +40,7 @@ vmd-agent tool window_view --action center --selection "resname LIG"
 vmd-agent tool window_snapshot --out view.png
 ```
 
-Each of those is a separate command, and they act on the same window: vmd-agent remembers it (in `live/link.json` in its folder, readable only by you).
+Each of those is a separate command, and they act on the same window: vmd-agent remembers it (in `live/link.json` inside vmd-agent's data folder, readable only by you; with a `.vmd-agent` working folder that is `.vmd-agent/live/link.json`).
 
 ## Everything else the toolkit does, in your VMD window
 

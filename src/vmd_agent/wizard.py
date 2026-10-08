@@ -127,11 +127,42 @@ def step_vmd(io: IO, vmd_hint: Optional[str] = None, assume_yes: bool = False) -
     return None
 
 
+def step_home(io: IO, where: Optional[str] = None, assume_yes: bool = False) -> str:
+    """Where vmd-agent keeps its own data. ``where`` is 'here' (a .vmd-agent folder in this folder) or 'user'
+    (the per-user folder); None asks. Returns the folder in use. Nothing is moved or deleted."""
+    if os.environ.get(settings.ENV_HOME) or os.environ.get(settings.ENV_DIR):
+        io.say(f"\nvmd-agent's own data folder was chosen by the environment: {settings.home_dir()}")
+        return settings.home_dir()
+    existing = settings.local_home()
+    if existing:
+        io.say(f"\nvmd-agent keeps its own data in {existing} (it belongs to this working folder).")
+        return existing
+    here = os.path.join(os.getcwd(), settings.LOCAL)
+    if where is None:
+        if assume_yes:
+            where = "user"
+        else:
+            io.say("\nWhere should vmd-agent keep its own data (your settings, the link to your VMD window, and the free model if you use one)?")
+            pick = io.choose("  Choose one", [f"In this folder: {here} (recommended: delete or move the folder and everything goes with it; the model needs a few GB here)",
+                                              f"In one place for your whole account: {settings.home_dir()}"], default=1)
+            where = "here" if pick == 1 else "user"
+    if where != "here":
+        io.say(f"  vmd-agent keeps its own data in {settings.home_dir()}.")
+        return settings.home_dir()
+    before = settings.load()                               # carry earlier choices over; nothing is deleted from the old place
+    folder = settings.make_local(os.getcwd())
+    if before and not settings.load():
+        settings.save(**{k: v for k, v in before.items() if k in settings.KEYS})
+    io.say(f"  vmd-agent keeps its own data in {folder} (Git ignores it).")
+    return folder
+
+
 def step_data_dir(io: IO, data_dir: Optional[str] = None, assume_yes: bool = False) -> str:
     io.say("\nStep 2 of 4: Your files")
     io.say("  Put your structures and trajectories (PDB, PSF, DCD, XTC ...) in one folder. The AI "
            "can only see that folder, nothing else on your computer.")
-    default = data_dir or settings.get("data_dir") or DEFAULT_DATA
+    local = settings.local_home()
+    default = data_dir or settings.get("data_dir") or (os.path.dirname(local) if local else DEFAULT_DATA)
     chosen = default if assume_yes else io.ask("  Which folder?", default)
     folder = os.path.abspath(os.path.expanduser(chosen))
     os.makedirs(folder, exist_ok=True)
@@ -345,7 +376,7 @@ def assistant_choices() -> tuple:
 def setup(io: Optional[IO] = None, assume_yes: bool = False, check_only: bool = False,
           data_dir: Optional[str] = None, vmd: Optional[str] = None,
           model_choice: Optional[int] = None, model: Optional[str] = None,
-          system_name: Optional[str] = None) -> int:
+          system_name: Optional[str] = None, home: Optional[str] = None) -> int:
     """The guided setup. Returns a process exit code (0 = finished)."""
     io = io or IO()
     sysname = P.system(system_name)
@@ -357,6 +388,7 @@ def setup(io: Optional[IO] = None, assume_yes: bool = False, check_only: bool = 
     io.say("It lets you ask questions about your molecular structures and simulations in plain "
            "language, and works out the answers with real measurements. This takes a few minutes, "
            "asks a few questions, and installs nothing without asking you.")
+    step_home(io, home, assume_yes)
     step_vmd(io, vmd, assume_yes)
     folder = step_data_dir(io, data_dir, assume_yes)
 

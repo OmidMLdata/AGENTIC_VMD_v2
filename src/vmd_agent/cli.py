@@ -397,6 +397,9 @@ def build_parser():
     sp.add_argument("--check", action="store_true", help="only show the settings and whether they work")
     sp.add_argument("--data-dir", help="the folder with your files (the AI can only see this folder)")
     sp.add_argument("--vmd", help="where VMD is installed (default: found automatically)")
+    sp.add_argument("--home", choices=["here", "user"],
+                    help="where vmd-agent keeps its own data (settings, VMD window link, local model): here = a .vmd-agent folder "
+                         "in the current folder; user = one folder for your account (default: you are asked)")
     sp.add_argument("--use", choices=["local", "online", "app", "skip"],
                     help="local = free model on this computer; online = an online model service; "
                          "app = Claude Desktop/Code; skip")
@@ -656,7 +659,7 @@ def main(argv=None):
         if args.cmd == "setup":
             from vmd_agent import wizard
             return wizard.setup(assume_yes=args.yes, check_only=args.check,
-                                data_dir=args.data_dir, vmd=args.vmd, model=args.model,
+                                data_dir=args.data_dir, vmd=args.vmd, model=args.model, home=args.home,
                                 model_choice={"local": 1, "online": 2, "app": 3,
                                               "skip": 4}.get(args.use))
         if args.cmd == "ui":

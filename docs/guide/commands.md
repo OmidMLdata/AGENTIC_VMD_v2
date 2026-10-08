@@ -7,7 +7,7 @@ There are few commands, and no command that does what a tool already does: **eve
 
 | Command | What it does | Flags worth knowing |
 |---|---|---|
-| `vmd-agent setup` | first-time setup: finds VMD, picks your files folder, sets up the AI | `--yes` accept defaults · `--check` only show the settings · `--use local\|online\|app\|skip` · `--model NAME` · `--data-dir FOLDER` · `--vmd PATH` |
+| `vmd-agent setup` | first-time setup: finds VMD, picks your files folder, sets up the AI | `--yes` accept defaults · `--check` only show the settings · `--use local\|online\|app\|skip` · `--model NAME` · `--data-dir FOLDER` · `--vmd PATH` · `--home here\|user` (where vmd-agent keeps its own data) |
 | `vmd-agent doctor` | what this computer has, whether VMD really starts, which chat model is ready, what to do next | none |
 | `vmd-agent models` | the suggested free models, with the date they were checked | `--check` ask the Ollama library again |
 | `vmd-agent start ["question"]` | the Docker route: picks native or Docker from the facts and starts the chat | `--mode auto\|docker\|native` · `--model` · `--data-dir` · `--base-url` · `--print-plan` (show, run nothing) · `--down` (stop the containers) |

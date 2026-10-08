@@ -79,6 +79,9 @@ def check_path(path: Optional[str]) -> Optional[str]:
     if not os.path.isabs(expanded):
         path = expanded = os.path.join(roots[0], expanded)
     real = os.path.realpath(expanded)
+    from vmd_agent import settings
+    if is_within(real, os.path.realpath(settings.home_dir())):      # the settings (API key), the window link's token and the models
+        raise SecurityError(f"path '{path}' is vmd-agent's own data folder, which tools may not read or write.")
     for r in roots:
         if is_within(real, r):
             return path

@@ -317,3 +317,61 @@ def test_setup_names_the_computer_and_suggests_a_model_that_fits_it(monkeypatch,
     io_ = Typed([""])
     wizard.setup_local_model(io_, "linux")
     assert "8.0 GB of memory" in io_.text and "granite4.1:3b" in io_.text
+
+
+# ------------------------------------------- vmd-agent's own data can live in the working folder
+@pytest.fixture
+def bare(monkeypatch):
+    for k in (settings.ENV_DIR, settings.ENV_HOME):
+        monkeypatch.delenv(k, raising=False)
+
+
+def test_a_dot_folder_in_the_working_folder_holds_the_settings_and_the_window_link(tmp_path, monkeypatch, bare):
+    work = tmp_path / "project"
+    (work / "sub").mkdir(parents=True)
+    monkeypatch.chdir(work / "sub")
+    assert settings.local_home() is None and ".vmd-agent" not in settings.home_dir()
+    folder = settings.make_local(str(work))
+    assert folder == str(work / ".vmd-agent") and (work / ".vmd-agent" / ".gitignore").read_text().strip() == "*"
+    assert settings.local_home() == os.path.realpath(folder)                 # found from a folder below it
+    assert settings.home_dir() == os.path.realpath(folder) and settings.config_dir() == os.path.join(os.path.realpath(folder), "config")
+    settings.save(data_dir=str(work))
+    assert (work / ".vmd-agent" / "config" / "settings.json").is_file()
+    from vmd_agent import ollama_local, vmdlink
+    assert ollama_local.ollama_dir().startswith(os.path.realpath(folder)) and vmdlink._state_file().startswith(os.path.realpath(folder))
+
+
+def test_the_environment_still_wins_over_the_working_folder(tmp_path, monkeypatch, bare):
+    settings.make_local(str(tmp_path))
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv(settings.ENV_HOME, str(tmp_path / "elsewhere"))
+    assert settings.home_dir() == str(tmp_path / "elsewhere")
+
+
+def test_setup_can_keep_its_data_in_this_folder_and_carries_earlier_choices_over(tmp_path, monkeypatch, bare):
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "cfg"))
+    monkeypatch.setattr("platform.system", lambda: "Linux")
+    work = tmp_path / "work"
+    work.mkdir()
+    monkeypatch.chdir(work)
+    settings.save(vmd_path="/some/vmd")
+    io_ = Typed()
+    wizard.setup(io_, assume_yes=True, home="here", data_dir=str(work), model_choice=4)
+    assert (work / ".vmd-agent" / "config" / "settings.json").is_file()
+    s = settings.load()
+    assert s["vmd_path"] == "/some/vmd" and s["data_dir"] == str(work)
+    assert "Git ignores it" in io_.text
+    again = Typed()
+    wizard.step_home(again)
+    assert "belongs to this working folder" in again.text
+
+
+def test_the_tools_may_not_touch_the_data_folder_even_inside_the_files_folder(tmp_path, monkeypatch, bare):
+    from vmd_agent import security
+    settings.make_local(str(tmp_path))
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv(security.ENV_ROOTS, str(tmp_path))
+    security.check_path(str(tmp_path / "1ubq.pdb"))
+    with pytest.raises(security.SecurityError):
+        security.check_path(str(tmp_path / ".vmd-agent" / "config" / "settings.json"))

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.29.0: vmd-agent's own data can live in the working folder
+
+* **`.vmd-agent` in the working folder**: settings, the VMD window link and a private Ollama with its models resolve to a `.vmd-agent` folder in the current folder or any folder above it, before the per-user folder
+  (`VMD_AGENT_HOME` / `VMD_AGENT_CONFIG_DIR` still win). `vmd-agent setup` asks (or `--home here|user`), copies earlier settings, and the folder ignores itself in Git.
+* **The tools cannot touch it**: every path check now refuses vmd-agent's own data folder, also when it is inside the files folder.
+
 ## 0.28.1: the Docker check and the manual follow the unified commands
 
 * **CI**: the Docker smoke test still called the commands removed in 0.23.0 (`probe`, `visualize`); it now runs `tool probe_environment` and `tool visualize_and_interpret`. The same stale `probe` was in the
