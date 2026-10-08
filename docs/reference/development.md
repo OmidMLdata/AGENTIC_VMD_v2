@@ -45,7 +45,7 @@ Every other command is in [Every command](../guide/using.md#ways-to-work). The b
   (`vmd-agent bench models --smoke`: one or two tasks per kind of functionality) through the agent with `VMD_AGENT_LIVE_TOOLS` (default `all`, what the chat uses; `auto` and `core` also work), and fails if the share passed falls below
   `VMD_AGENT_LIVE_MIN_SUCCESS` (default 0.5; set it a little below what your model scores), if the server fails, or if a request that must be declined is answered with an invented result.
   To compare a change, run `bench models --smoke` before and after into the same `--out-dir` and read `summary.md`.
-* **Test every tool:** `vmd-agent bench tools` runs all 53 tools on a generated dataset whose answers are known by construction, with the seconds each took ([the tool test set](../benchmarks/tool-test-set.md)); the same cases run inside `pytest`.
+* **Test every tool:** `vmd-agent bench tools` runs all 44 tools on a generated dataset whose answers are known by construction, with the seconds each took ([the tool test set](../benchmarks/tool-test-set.md)); the same cases run inside `pytest`.
 * **`.gitignore`** keeps out caches and build output, editor files, everything vmd-agent writes while running (`vmd_scripts/`, `vmd_agent_output/`,
   `pdb_cache/`, `/data/`), anything that could hold a key (`.env`, `settings.json`, `/config/`), and VMD itself (`docker/vmd-dist/*`, which UIUC's
   licence forbids committing). A test checks that these stay ignored and that the test data stay tracked.
@@ -65,7 +65,7 @@ pip install -e ".[all]"            # everything above (Python >= 3.10)
 ```
 
 VMD is **optional** and never bundled. For VMD rendering and the plain-VMD benchmark arm, install it yourself from
-UIUC, then `export VMD_BIN=/path/to/vmd` (a launcher or its install directory). `vmd-agent probe` shows what was found.
+UIUC, then `export VMD_BIN=/path/to/vmd` (a launcher or its install directory). `vmd-agent tool probe_environment` shows what was found.
 ffmpeg comes with the install (the `imageio-ffmpeg` package); a system ffmpeg on the PATH is used first when there is one. The bundled
 build has no `ffprobe`, so video metadata and frame counts are then read with `ffmpeg` itself.
 
@@ -85,11 +85,11 @@ real-VMD tests with `pytest -m requires_vmd -rs`. Live model tests spend a few c
 
 ```bash
 vmd-agent chat                                               # talk to it with a local or hosted model
-vmd-agent probe                                              # what this machine can do
-vmd-agent visualize tests/data/1ubq.pdb --renderer matplotlib --views front iso
-vmd-agent claims tests/data/1lyz.pdb "It has 4 disulfide bridges" "It has a membrane"
-vmd-agent analyze system.psf traj.dcd --do rmsd rmsf rgyr contacts convergence --dt-ps 400
-vmd-agent keyframes system.psf traj.dcd -k 9 --render
+vmd-agent tool probe_environment                             # what this machine can do
+vmd-agent tool visualize_and_interpret tests/data/1ubq.pdb --renderer matplotlib --views front iso
+vmd-agent tool verify_claims tests/data/1lyz.pdb "It has 4 disulfide bridges" "It has a membrane"
+vmd-agent tool analyze_trajectory system.psf traj.dcd --analyses rmsd rmsf rgyr contacts convergence --dt-ps 400
+vmd-agent tool select_keyframes system.psf traj.dcd --k 9 --render
 ```
 
 MCP server: see [Use it from an MCP client](../guide/mcp.md#use-it-from-an-mcp-client); `vmd-agent mcp-check` verifies an install.
@@ -100,12 +100,12 @@ Each command computes its numbers locally from your files and prints them. Nothi
 
 ```bash
 # analysis vs independent NumPy, on any topology + trajectory
-vmd-agent validate system.pdb traj.dcd --sel2 "resname LIG" --cutoff 6
+vmd-agent bench validate system.pdb traj.dcd --sel2 "resname LIG" --cutoff 6
 
 # built-in DSSP vs the PDB's own annotations; downloads the entries
-vmd-agent validate-dssp 1CRN 1MBN 2LZM 1UBQ --cache pdb_cache
+vmd-agent bench validate-dssp 1CRN 1MBN 2LZM 1UBQ --cache pdb_cache
 # ... and vs MDTraj's independent DSSP on local files (pip install mdtraj)
-vmd-agent validate-dssp my1.pdb my2.pdb --mdtraj
+vmd-agent bench validate-dssp my1.pdb my2.pdb --mdtraj
 
 # event-aware vs uniform keyframes on YOUR real trajectory, with injected events, plus a no-event control
 vmd-agent bench events top.pdb traj.dcd --trials 100 --frames 300 -k 9 --seed 0

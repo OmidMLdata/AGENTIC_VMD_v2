@@ -132,13 +132,13 @@ async def _check(command: str, args: Sequence[str], env: Dict[str, str],
                         f"relative path resolves "
                         f"{'inside' if ok_rel else 'OUTSIDE'} the first root"))
 
-            tcl = await call("run_vmd_tcl", {"script": "puts check"})
+            tcl = await call("run_tcl", {"script": "puts check"})
             disabled = isinstance(tcl, dict) and "disabled" in str(
                 tcl.get("error", ""))
             out.append(_c("raw_tcl_tool", "ok",
-                          "run_vmd_tcl is disabled (the safe default)"
+                          "run_tcl is disabled (the safe default)"
                           if disabled else
-                          "run_vmd_tcl is ENABLED (VMD_AGENT_ENABLE_TCL=1): the "
+                          "run_tcl is ENABLED (VMD_AGENT_ENABLE_TCL=1): the "
                           "agent can run Tcl; the screen is an accident guard, "
                           "not a security boundary"))
 

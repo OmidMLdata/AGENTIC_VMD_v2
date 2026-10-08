@@ -37,16 +37,20 @@ def test_every_relative_markdown_link_resolves():
 def test_the_tool_counts_in_the_docs_match_the_code():
     from vmd_agent import toolset
     page = open(os.path.join(ROOT, "docs", "guide", "tools.md"), encoding="utf-8").read()
-    missing = [n for n in toolset.TOOLS if f"`{n}`" not in page]
-    assert not missing, f"tools the page does not list: {missing}"
-    total, core = len(toolset.TOOLS), len(toolset.CORE_TOOLS)
-    assert f"# The {total} tools" in page and f"{core} + {total - core - 2} + 2 = {total}" in page
+    readme = open(os.path.join(ROOT, "README.md"), encoding="utf-8").read()
+    names = toolset.library_tools()
+    missing = [n for n in names if f"`{n}`" not in page or f"`{n}`" not in readme]
+    assert not missing, f"tools the page or the README does not list: {missing}"
+    total = len(names)
+    assert f"one list of {total} tools" in page and f"**{total} tools** in ten groups" in readme and len(toolset.LIBRARY) == 10
+    for group, _what, tools in toolset.LIBRARY:
+        assert f"### {group}" in page and f"**{group}** ({len(tools)})" in readme, group
     for f in FILES:
-        if f.endswith("CHANGELOG.md") or f.endswith(os.path.join("guide", "tools.md")):
-            continue                                   # the history, and the page that explains where the old count came from
+        if f.endswith("CHANGELOG.md"):
+            continue                                   # the history keeps the old counts
         text = open(f, encoding="utf-8").read()
-        assert "47 tools" not in text, f"{f} still says 47 tools"
-    assert f"**{total} tools**" in open(os.path.join(ROOT, "README.md"), encoding="utf-8").read()
+        for stale in ("47 tools", "53 tools", "27 original", "CORE_TOOLS", "--tools core", "--tools vmd"):
+            assert stale not in text or f.endswith("RESEARCH.md"), f"{f} still says {stale!r}"
 
 
 def test_every_page_of_the_docs_is_in_the_index():
@@ -70,8 +74,6 @@ def test_the_docs_say_how_much_context_the_tool_descriptions_take():
     from vmd_agent import toolhints
     from vmd_agent.llm_client import to_openai_tools
     page = open(os.path.join(ROOT, "docs", "guide", "tools.md"), encoding="utf-8").read()
-    said = {m.group(1): int(m.group(2).replace(",", "")) for m in re.finditer(r"^\| `(all|core|vmd)`[^|]*\| \d+ \| about ([\d,]+) tokens \|$", page, flags=re.M)}
-    assert set(said) == {"all", "core", "vmd"}
-    for profile, tokens_said in said.items():
-        tokens = len(json.dumps(to_openai_tools(toolhints.enrich(toolset.tool_specs(list(toolset.PROFILES[profile])))))) / 4
-        assert abs(tokens - tokens_said) < 0.12 * tokens_said, f"{profile}: about {tokens:.0f} tokens now, the page says about {tokens_said}: update docs/tools.md"
+    said = int(re.search(r"^\| `all` \(default\) \|[^|]*\| about ([\d,]+) tokens \|$", page, flags=re.M).group(1).replace(",", ""))
+    tokens = len(json.dumps(to_openai_tools(toolhints.enrich(toolset.tool_specs(list(toolset.ALL)))))) / 4
+    assert abs(tokens - said) < 0.12 * said, f"about {tokens:.0f} tokens now, the page says about {said}: update docs/guide/tools.md"

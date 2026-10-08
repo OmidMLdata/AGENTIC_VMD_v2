@@ -125,7 +125,7 @@ def vmd_selected_indices(topology: str, selection: str,
     script = (f"mol new {{{top}}} type pdb waitfor all\n"
               f'set s [atomselect top "{sel}"]\n'
               'puts "VMDIDX=[$s get index]"\n')
-    r = render.run_vmd_tcl(script, vmd_path, timeout=120,
+    r = render.run_tcl(script, vmd_path, timeout=120,
                            allow_unsafe=True, env=sanitized_env())
     if not r.get("ok") and "VMDIDX=" not in (r.get("stdout") or ""):
         raise RuntimeError("VMD failed: " + str(r.get("error") or

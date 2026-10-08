@@ -12,7 +12,30 @@ from __future__ import annotations
 import copy
 from typing import Dict, List
 
-from vmd_agent import vmd_cli
+from vmd_agent.vmdkit import interactions, maps, measure, trajectory, volumetric
+
+#: (tool, parameter) -> the allowed values, for the parameters that take one of a fixed list
+CHOICES: Dict[tuple, tuple] = {
+    ("measure_with_vmd", "kind"): tuple(measure.KINDS),
+    ("find_interactions", "kind"): interactions.KINDS,
+    ("make_map", "kind"): tuple(volumetric.KINDS),
+    ("convert_trajectory", "fmt"): trajectory.TRAJ_WRITERS,
+    ("write_structure", "fmt"): trajectory.STRUCT_WRITERS,
+    ("build_system", "histidine"): ("HSD", "HSE", "HSP"),
+    ("build_membrane", "lipid"): ("POPC", "POPE"),
+    ("build_membrane", "force_field"): ("c27", "c36"),
+    ("build_nanotube", "material"): ("C-C", "B-N"),
+    ("render_movie", "axis"): ("x", "y", "z"),
+    ("combine_maps", "op"): tuple(maps.OPS),
+    ("prepare_namd", "ensemble"): ("npt", "nvt"),
+    ("write_slurm_script", "kind"): ("namd", "vmd", "shell"),
+    ("fetch_structure", "source"): ("auto", "rcsb", "alphafold", "url"),
+    ("fetch_structure", "file_format"): ("auto", "pdb", "cif"),
+    ("visualize_and_interpret", "renderer"): ("auto", "vmd", "matplotlib"),
+    ("select_keyframes", "renderer"): ("auto", "vmd", "matplotlib"),
+    ("visualize_and_interpret", "focus"): ("overview", "fold", "interactions", "surface", "pocket", "performance"),
+    ("annotate_image", "panel_side"): ("right", "left"),
+}
 
 #: parameter name -> what it means, where the name alone does not say
 PARAM_HELP: Dict[str, str] = {
@@ -51,7 +74,7 @@ def enrich(specs: List[dict]) -> List[dict]:
         spec = copy.deepcopy(spec)
         props = spec.get("input_schema", {}).get("properties", {})
         for name, schema in props.items():
-            allowed = vmd_cli.CHOICES.get((spec["name"], name))
+            allowed = CHOICES.get((spec["name"], name))
             if allowed and len(allowed) <= _MAX_ENUM:
                 schema["enum"] = list(allowed)
             help_ = PARAM_HELP.get(name)

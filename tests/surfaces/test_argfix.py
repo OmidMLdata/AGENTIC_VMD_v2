@@ -6,7 +6,7 @@ import shutil
 import pytest
 
 from vmd_agent import agent, argfix, toolset
-from vmd_agent.vmd_cli import CHOICES
+from vmd_agent.toolhints import CHOICES
 
 DATA = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data")
 FILES = ["protein.pdb", "protein.dcd", "runs/other.dcd", "clip.mp4", "figure.png", "notes.txt"]
@@ -38,11 +38,11 @@ def test_a_correct_call_is_left_exactly_as_it_was():
 
 
 def test_choices_are_matched_without_case_or_punctuation():
-    args, notes = fix("vmd_interactions", {"topology": "protein.pdb", "kind": "Salt-Bridges"})
+    args, notes = fix("find_interactions", {"topology": "protein.pdb", "kind": "Salt-Bridges"})
     assert args["kind"] == "salt_bridges" and notes
-    args, _ = fix("vmd_measure", {"topology": "protein.pdb", "kind": "RMSD"})
+    args, _ = fix("measure_with_vmd", {"topology": "protein.pdb", "kind": "RMSD"})
     assert args["kind"] == "rmsd"
-    args, notes = fix("vmd_measure", {"topology": "protein.pdb", "kind": "banana"})
+    args, notes = fix("measure_with_vmd", {"topology": "protein.pdb", "kind": "banana"})
     assert args["kind"] == "banana" and not notes                                          # a wrong value is the tool's to refuse
 
 
@@ -128,7 +128,7 @@ def test_a_file_that_does_not_exist_but_has_a_companion_of_the_same_name_is_read
 
 def test_a_trajectory_named_twice_gets_the_structure_that_goes_with_it():
     files = ["protein.pdb", "protein.dcd", "moved.pdb"]
-    args, notes = fix("vmd_measure", {"topology": "protein.dcd", "trajectory": "protein.dcd", "kind": "rmsd"}, files)
+    args, notes = fix("measure_with_vmd", {"topology": "protein.dcd", "trajectory": "protein.dcd", "kind": "rmsd"}, files)
     assert (args["topology"], args["trajectory"]) == ("protein.pdb", "protein.dcd") and "is a trajectory" in notes[0]
-    args, _ = fix("vmd_measure", {"topology": "protein.dcd", "kind": "rmsd"}, ["a.pdb", "b.pdb", "protein.dcd"])
+    args, _ = fix("measure_with_vmd", {"topology": "protein.dcd", "kind": "rmsd"}, ["a.pdb", "b.pdb", "protein.dcd"])
     assert args["topology"] == "protein.dcd"                                                  # two structures and none of the same name: left for the tool to refuse

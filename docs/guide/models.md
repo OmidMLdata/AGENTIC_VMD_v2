@@ -22,7 +22,7 @@ guide, not a measurement. **Only `granite4.1:8b` and `granite4.1:3b` were run wi
 questions about local files, trajectories and system building; this is not a benchmark). The 8B chose the right tools and reported
 their numbers correctly in the questions tried, though it sometimes fills arguments badly. The 3B chose tools but often misread what
 they returned, which is why the chat flags any number a tool did not return; **start with the 8B or larger**. The others are
-unverified. Any other Ollama model, or any online OpenAI-compatible service, can be used instead. `vmd-agent claims` checks any
+unverified. Any other Ollama model, or any online OpenAI-compatible service, can be used instead. `vmd-agent tool verify_claims` checks any
 statement against the data.
 
 ### How the chat keeps a model honest
@@ -41,7 +41,7 @@ Language models guess; these checks stop a guess from passing as a measurement.
 * **The model reads a sentence, not only fields.** The results that were most often misread (`detect_system`, `structure_stats`) start with a plain `summary` sentence, and parameters whose names do
   not say what they do (`align`, `step`, `solvate`, ...) and choices with fixed values are described to the model.
 * **A list of statements to judge is pointed at `verify_claims`**, and a question that names a whole job (has my run settled, prepare a simulation) at the workflow that does it; the model still makes the call.
-* **Only the tools that fit are offered** with `--tools auto` ([details](tools.md#does-the-model-see-all-53-at-once)); the model can ask for more with `offer_tools`.
+* **Only the tools that fit are offered** with `--tools auto` ([details](tools.md#does-the-model-see-all-of-them-at-once)); the model can ask for more with `offer_tools`.
 * **Inputs are protected.** No tool writes over a file the same call reads, and a trajectory that does not match its topology is an
   error, not an empty result.
 * **Invented settings are ignored.** Models are not shown the `vmd_path` parameter (they invent paths); the toolkit finds VMD itself.

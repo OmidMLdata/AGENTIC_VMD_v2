@@ -1,6 +1,6 @@
 """Which tools to offer a model for a question.
 
-Offering all 53 tools costs about 8,000 tokens of descriptions with every question and gives a small model a long list to choose from.
+Offering every tool costs several thousand tokens of descriptions with every question and gives a small model a long list to choose from.
 Most questions need a handful. This module picks them from the wording of the question and the kinds of files it names; it
 decides nothing else (the model still chooses which of the offered tools to call and with what).
 
@@ -17,37 +17,37 @@ import re
 from typing import Dict, List, Sequence, Tuple
 
 #: always offered: what is this, what is in it, is this true, run a whole job
-BASE: Tuple[str, ...] = ("inspect_files", "detect_system", "structure_stats", "verify_claims", "list_workflows", "run_workflow")
+BASE: Tuple[str, ...] = ("inspect_files", "detect_system", "structure_stats", "verify_claims", "run_workflow")
 
 #: group -> (tools, wording that asks for it); the wording is matched case-insensitively against the question
 GROUPS: Dict[str, Tuple[Tuple[str, ...], str]] = {
-    "environment": (("probe_environment", "vmd_capabilities"),
+    "environment": (("probe_environment",),
                     r"\b(this computer|my computer|installed|available|which version|what can (you|vmd|this)|plugins?|capabilit\w+|can you drive|supported)\b"),
-    "trajectory": (("analyze_trajectory", "select_keyframes", "vmd_measure", "vmd_pbc_info"),
+    "trajectory": (("analyze_trajectory", "select_keyframes", "measure_with_vmd", "periodic_box"),
                    r"\b(rmsd|rmsf|radius of gyration|rgyr|gyration|trajector\w+|simulation|frames?|converge\w*|settled|equilibrat\w*|drift\w*|fluctuat\w+|"
                    r"flexib\w+|periodic|box|sasa|solvent accessible|distance|g\(r\)|cluster\w*|informative|interesting|events?)\b|\.(dcd|xtc|trr|nc)\b"),
-    "interactions": (("vmd_interactions", "vmd_secondary_structure", "analyze_trajectory"),
+    "interactions": (("find_interactions", "secondary_structure", "analyze_trajectory"),
                      r"\b(hydrogen bonds?|h-?bonds?|salt bridges?|contacts?|persist\w*|interact\w*|secondary structure|helix|helices|strand|sheet|stride|dssp)\b"),
-    "checks": (("vmd_backbone_torsions", "vmd_structure_check", "vmd_align_structures"),
+    "checks": (("backbone_torsions", "check_structure", "align_structures"),
                r"\b(torsions?|dihedrals?|ramachandran|phi|psi|outliers?|chirality|cis|trans|peptide bonds?|steric|clash\w*|geometry|sane|sanity|chain gaps?|structure check|superpos\w+|align\w*|overlay\w*|fit .* onto)\b"),
-    "files": (("vmd_convert_trajectory", "vmd_write_structure"),
+    "files": (("convert_trajectory", "write_structure"),
               r"\b(convert\w*|write|save|export|extract|slice|cut( out)?|trim|only the|every (\w+ )?(\d+(st|nd|rd|th)?|tenth|fifth|second|other)|alpha carbons?|backbone atoms?|strip|subset|smaller file|as an? (pdb|dcd|xtc|gro|psf))\b"),
-    "build": (("vmd_build_system", "vmd_mutate_residue", "vmd_merge_structures", "vmd_build_membrane", "vmd_build_nanotube", "vmd_prepare_namd", "vmd_slurm_script"),
+    "build": (("build_system", "mutate_residue", "merge_structures", "build_membrane", "build_nanotube", "prepare_namd", "write_slurm_script"),
               r"\b(build|solvat\w+|water box|neutral\w*|ionize|mutat\w+|swap\w*|replac\w+|substitut\w+|point mutation|merge|combine|join|membrane|bilayer|popc|pope|lipid|nanotube|namd|slurm|sbatch|cluster|"
               r"job script|hpc|psfgen|prepare .* (simulation|namd)|simulation input)\b"),
-    "maps": (("vmd_volmap", "vmd_volume_info", "vmd_map_arithmetic", "vmd_fit_to_map"),
+    "maps": (("make_map", "inspect_map", "combine_maps", "fit_to_map"),
              r"\b(density|map|cryo-?em|isosurface|occupancy|volmap|grid|electrostatic|potential)\b|\.(dx|mrc|ccp4|cube|situs|map)\b"),
-    "render": (("render_image", "render_movie", "vmd_render_scene", "vmd_render_turntable", "export_vmd_session", "visualize_and_interpret",
-                "generate_visualization_recipe", "annotate_image", "view_image", "color_key", "list_representations", "describe_representation"),
+    "render": (("render_image", "render_movie", "export_session", "visualize_and_interpret",
+                "generate_visualization_recipe", "annotate_image", "view_image", "color_key", "list_representations"),
                r"\b(draw|render\w*|picture|image|figure|movie|animat\w+|flip-?book|time-?lapse|turntable|rotat\w+|spin\w*|record\w* .{0,20}video|scene|colou?rs?|cartoon|licorice|surface|quicksurf|represent\w+|"
                r"drawing style|show me|display|visuali[sz]\w+|tachyon|vmd script|tcl|recipe|session|label\w*|key)\b|\.(png|jpg|jpeg|tcl)\b"),
-    "video": (("probe_video", "validate_video", "extract_video_frames", "interpret_video"),
+    "video": (("probe_video", "interpret_video"),
               r"\b(video|clip|mp4|frame rate|fps|resolution|stills?|decode\w*|codec)\b|\.(mp4|mov|webm|gif)\b"),
     "records": (("verify_provenance", "assemble_report", "record_visual_interpretation"),
                 r"\b(provenance|checksums?|hash\w*|sha-?256|re-?check\w*|integrity|unchanged|tamper\w*|report|write up|session folder|recorded)\b"),
-    "network": (("search_pdb", "fetch_structure", "fetch_and_visualize"),
+    "network": (("search_pdb", "fetch_structure"),
                 r"\b(download\w*|fetch\w*|grab\w*|pull\w* .{0,30}from|search the pdb|find (pdb )?entries|pdb entr\w+|from (the )?(pdb|rcsb|protein data bank)|alphafold|uniprot|rcsb)\b|\b[1-9][A-Za-z0-9]{3}\b(?=[ ,.?]|$)"),
-    "tcl": (("run_vmd_tcl",), r"\btcl\b"),
+    "tcl": (("run_tcl",), r"\btcl\b"),
 }
 _COMPILED = {g: re.compile(p, re.I) for g, (_, p) in GROUPS.items()}
 

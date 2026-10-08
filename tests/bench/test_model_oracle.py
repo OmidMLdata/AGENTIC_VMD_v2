@@ -20,7 +20,7 @@ def test_every_task_has_an_oracle_and_nothing_else_does():
         o = model_oracle.ORACLE[t.id]
         assert o.expected.strip() and callable(o.plan) and callable(o.answer)
         if t.decline:
-            assert all(name not in ("vmd_measure",) for name, _ in o.plan({}))        # a refusal is never the plan to run a measurement
+            assert all(name not in ("measure_with_vmd",) for name, _ in o.plan({}))        # a refusal is never the plan to run a measurement
 
 
 def test_a_perfect_agent_passes_every_task_this_computer_can_run(tmp_path):

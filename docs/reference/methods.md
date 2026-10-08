@@ -37,7 +37,7 @@ Kabsch & Sander (1983): amide H placed 1.0 Å from N opposite the preceding C=O;
 `0.084·332·(1/r_ON + 1/r_CH − 1/r_OH − 1/r_CN) < −0.5 kcal/mol` for CA–CA < 9 Å. n-turns (3,4,5) → G/H/I,
 bridges → B/E (ladders of ≥ 2 are E), then T and S (bend > 70°). 3-state: H/G/I → helix, E/B → sheet.
 The tests check it on NeRF-built ideal helix and strand structures. To compare it with PDB annotations and MDTraj on
-structures of your choice, run `vmd-agent validate-dssp <PDB ids> --cache DIR`; compare with `mkdssp` yourself.
+structures of your choice, run `vmd-agent bench validate-dssp <PDB ids> --cache DIR`; compare with `mkdssp` yourself.
 
 ## Time series (`timeseries`)
 * **Statistical inefficiency** `g = 1 + 2 Σ (1 − t/N) C(t)`, truncated at the first non-positive

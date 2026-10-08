@@ -67,9 +67,9 @@ def test_model_written_python_runs_in_the_workspace(built):
 def test_plain_vmd_arm_needs_exec_and_screens_scripts_before_any_launch(built):
     t = _task(built, "rmsd_last")
     off = tools.Environment(t, "vmd_plain")
-    assert "run_vmd_tcl" not in {s["name"] for s in off.tool_specs()}
+    assert "run_tcl" not in {s["name"] for s in off.tool_specs()}
     on = tools.Environment(t, "vmd_plain", allow_exec=True)
-    r = on.call("run_vmd_tcl", {"script": "exec rm -rf /tmp/x\n"})
+    r = on.call("run_tcl", {"script": "exec rm -rf /tmp/x\n"})
     assert r.get("blocked") and "exec" in r["error"]
 
 
@@ -79,7 +79,7 @@ def test_real_vmd_cannot_see_the_api_key_and_runs_in_the_workspace(
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-secret")
     t = _task(built, "rmsd_last")
     env = tools.Environment(t, "vmd_plain", allow_exec=True, vmd_path=real_vmd)
-    r = env.call("run_vmd_tcl", {"script": (
+    r = env.call("run_tcl", {"script": (
         'puts "CWD=[pwd]"\n'
         'puts "KEY=[info exists env(ANTHROPIC_API_KEY)]"\n')})
     assert r["ok"], r

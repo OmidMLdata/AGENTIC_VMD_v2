@@ -8,11 +8,11 @@ The [README](../README.md) is the way in. These pages are the detail, in the ord
 |---|---|
 | [Install and set up](guide/install.md) | the installer, the setup questions, who answers, where everything lives, other ways to install, troubleshooting |
 | [Ways to work](guide/using.md) | the web page, the menu, the chat, the commands; the wall-clock time of every execution |
-| [Command reference](guide/commands.md) | every command and flag, in the order of the pipeline |
+| [The command line](guide/commands.md) | every command, and how a tool becomes a command |
 | [Models](guide/models.md) | the free models, and how the chat keeps one honest |
 | [Whole jobs](guide/workflows.md) | workflows and reports |
-| [VMD](guide/vmd.md) | which VMD versions, and the 24 commands that drive VMD itself |
-| [The 53 tools](guide/tools.md) | what the original 27, the 24 VMD tools and the 2 workflow tools are, and who gets which |
+| [VMD](guide/vmd.md) | which VMD versions, and the tools that drive VMD itself |
+| [The tool library](guide/tools.md) | the 44 tools in ten groups, how a model is offered them, and who gets which |
 
 **Choose a model** (`benchmarks/`), and **reference** (`reference/`)
 

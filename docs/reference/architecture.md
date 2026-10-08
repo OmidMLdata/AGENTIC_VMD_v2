@@ -20,13 +20,13 @@
 
 ```
 src/vmd_agent/
-  cli.py          command-line surface (mirrors the tools)
+  cli.py          command-line surface: setup, chat, the `tool` command (generated from the tools by toolcli.py), workflows, MCP, benchmarks
   settings.py     remembered choices (files folder, VMD, model): per-OS config file, private, never raises
   wizard.py       `vmd-agent setup` and the plain-language menu behind a bare `vmd-agent`
   platform_info.py  OS, CPU, Docker, GPU, Ollama; where VMD and client configs live on each OS
   launcher.py     `vmd-agent start` / `doctor`: picks native or Docker from the facts and runs it
-  toolset.py      the 53 tools as plain functions + JSON schemas (no MCP, no AI client); the 27 original ones are `CORE_TOOLS`
-  vmd_tools.py    the 24 tools that drive VMD itself, built on vmdkit/ (each saves the Tcl it ran)
+  toolset.py      the tool library (44 tools in ten groups: `LIBRARY`) and the `run_workflow` entry, as plain functions + JSON schemas (no MCP, no AI client)
+  vmd_tools.py    the tools that drive VMD itself, built on vmdkit/ (each saves the Tcl it ran)
   workflows.py    named multi-step jobs (structure_overview, equilibration_check, ...): findings, a verdict, a report
   reporting.py    writes report.md / report.html from a workflow: findings, figures, caveats, methods, checksums, the Tcl
   progress.py     what a long job reports as it runs, and who listens (the terminal, the chat)

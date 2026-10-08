@@ -21,14 +21,14 @@ Design contract
 * Inspection, detection, trajectory analysis, claim verification and the
   matplotlib renderer use only open-source Python packages, so they work on
   any machine, VMD present or not. VMD is **not bundled** (UIUC license).
-* VMD rendering and ``run_vmd_tcl`` locate a user-installed VMD and fail
+* VMD rendering and ``run_tcl`` locate a user-installed VMD and fail
   gracefully with actionable messages when it is missing.
 * Every public function returns a JSON-serialisable ``dict`` so calls chain.
 * Results state how they were obtained (bond source, H-bond method, renderer,
   time axis) and what they cannot show.
 """
 
-__version__ = "0.23.0"
+__version__ = "0.24.0"
 
 from vmd_agent.inputs.inspection import inspect_files
 from vmd_agent.structure.detect import detect_system

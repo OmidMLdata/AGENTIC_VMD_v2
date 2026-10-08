@@ -26,7 +26,7 @@ import webbrowser
 from typing import Callable, Optional
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
-from vmd_agent import agent as agent_mod, progress, security, toolset
+from vmd_agent import agent as agent_mod, progress, security, toolset, workflows as workflows_mod
 from vmd_agent.structure import viewer
 
 ASSETS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ui_assets")
@@ -140,8 +140,8 @@ class State:
         return {"version": __version__, "data_dir": self.root, "model": self.model, "server": self.base_url,
                 "model_ready": problem is None, "model_problem": " ".join(problem) if problem else None,
                 "vmd": env.get("vmd_path"), "vmd_version": env.get("vmd_version"), "tachyon": bool(env.get("tachyon_path")),
-                "ffmpeg": bool(env.get("ffmpeg")), "n_tools": len(toolset.TOOLS), "tools_in_chat": len(self.session.names), "profile": self.tools,
-                "profiles": {**{k: len(v) for k, v in toolset.PROFILES.items()}, "auto": 0},
+                "ffmpeg": bool(env.get("ffmpeg")), "n_tools": len(toolset.library_tools()), "tools_in_chat": len(self.session.names), "profile": self.tools,
+                "profiles": {"all": len(toolset.ALL), "auto": 0},
                 "clock": self.session.clock}
 
 
@@ -225,7 +225,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return self._json({"error": "no such folder"}, 404)
             self._json({"root": self.state.root, "dir": sub, **listing, "everything": all_files(self.state.root) if not sub else None})
         elif url.path == "/api/workflows":
-            self._json(toolset.TOOLS["list_workflows"]())
+            self._json(workflows_mod.list_named())
         elif url.path.startswith("/files/"):
             self._serve_file(unquote(url.path[len("/files/"):]))
         else:
@@ -292,8 +292,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return self._look(payload)
             if url.path == "/api/profile":
                 profile = str(payload.get("tools") or "")
-                if profile != "auto" and profile not in toolset.PROFILES:
-                    return self._json({"error": f"tools must be one of {', '.join(list(toolset.PROFILES) + ['auto'])}"}, 400)
+                if profile not in ("all", "auto"):
+                    return self._json({"error": "tools must be one of all, auto"}, 400)
                 if self.state.busy.locked():
                     return self._json({"error": "another job is still running; wait for it to finish"}, 409)
                 self.state.set_tools(profile)

@@ -13,22 +13,22 @@ def _spec(name):
 
 
 def test_ambiguous_parameters_get_a_meaning_and_choice_parameters_their_allowed_values():
-    props = _spec("vmd_measure")
+    props = _spec("measure_with_vmd")
     assert "superpose" in props["align"]["description"] and "false" in props["align"]["description"]
     assert "rmsd" in props["kind"]["enum"] and "rgyr" in props["kind"]["enum"]
-    assert "enum" in _spec("vmd_interactions")["kind"] and "salt_bridges" in _spec("vmd_interactions")["kind"]["enum"]
-    assert "topology" in _spec("vmd_measure") and "description" not in _spec("vmd_measure")["topology"]      # obvious names stay bare
+    assert "enum" in _spec("find_interactions")["kind"] and "salt_bridges" in _spec("find_interactions")["kind"]["enum"]
+    assert "topology" in _spec("measure_with_vmd") and "description" not in _spec("measure_with_vmd")["topology"]      # obvious names stay bare
 
 
 def test_the_original_specs_are_not_changed():
-    before = json.dumps(toolset.tool_specs(["vmd_measure"]))
-    toolhints.enrich(toolset.tool_specs(["vmd_measure"]))
-    assert json.dumps(toolset.tool_specs(["vmd_measure"])) == before and "description" not in json.loads(before)[0]["input_schema"]["properties"]["align"]
+    before = json.dumps(toolset.tool_specs(["measure_with_vmd"]))
+    toolhints.enrich(toolset.tool_specs(["measure_with_vmd"]))
+    assert json.dumps(toolset.tool_specs(["measure_with_vmd"])) == before and "description" not in json.loads(before)[0]["input_schema"]["properties"]["align"]
 
 
 def test_the_agent_sends_the_hints(tmp_path, monkeypatch):
     monkeypatch.setenv("VMD_AGENT_ALLOWED_ROOTS", str(tmp_path))
-    sent = {t["function"]["name"]: t["function"]["parameters"]["properties"] for t in agent.Agent("http://x/v1", "m", tools="core").tools}
+    sent = {t["function"]["name"]: t["function"]["parameters"]["properties"] for t in agent.Agent("http://x/v1", "m", tools="all").tools}
     assert "description" in sent["analyze_trajectory"]["analyses"]
 
 

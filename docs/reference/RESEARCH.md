@@ -144,8 +144,7 @@ split molecule, damaged coordinates) the toolkit says so in the result, not only
 
 #### 3.2 Surfaces
 
-The same functions are exposed three ways: a Python library, a command line (`vmd-agent`, with subcommands from `probe` and
-`detect` to `analyze`, `keyframes`, `claims`, `validate`, `provenance` and `bench`), an MCP server with 53 tools (27 at the time of the original study design, 24 more that drive VMD itself, and 2 that run whole workflows), and a built-in chat front end (`vmd-agent chat`) that gives the same tools to any
+The same functions are exposed three ways: a Python library, a command line (`vmd-agent`, whose `tool` command runs any tool, with `workflow` and `bench` beside it), an MCP server with 44 tools in ten groups (27 at the time of the original study design, others that drive VMD itself, some merged since) and the `run_workflow` call, and a built-in chat front end (`vmd-agent chat`) that gives the same tools to any
 OpenAI-compatible model, local open-source or hosted, so no MCP client is required. The
 original project this work extends exposed 24 tools and 16 command-line subcommands; all were retained (Section 12.1).
 
@@ -182,7 +181,7 @@ has four parts:
   when rendered.
 * **A Tcl deny-list that is an accident guard, not a boundary.** Tested against a real `tclsh`, obfuscated
   forms (names built at run time, `catch $built`, `rename exec`) can create files despite the screen, because filtering
-  cannot make arbitrary Tcl safe. The raw `run_vmd_tcl` tool is therefore **disabled by default**.
+  cannot make arbitrary Tcl safe. The raw `run_tcl` tool is therefore **disabled by default**.
 * **A URL policy** for downloads: http(s) only, no loopback/private/link-local targets (re-checked on every redirect),
   size caps on compressed and decompressed bodies.
 
@@ -327,7 +326,7 @@ produce, and a clean file to produce neither.
 | Arm | Tools beyond `list_files`, `read_text_file`, `submit_answer` | Purpose |
 |---|---|---|
 | `python_mdanalysis` | `run_python` | the strong, realistic baseline: the model writes its own code |
-| `vmd_plain` | `run_vmd_tcl` (real VMD) | plain VMD scripting |
+| `vmd_plain` | `run_tcl` (real VMD) | plain VMD scripting |
 | `vmd_agent` | analysis, keyframe selection, system detection, structure statistics, claim verification, environment probing | the toolkit |
 | `vmd_agent_no_verify` | as above without `verify_claims` | what the verifier adds |
 | `vmd_agent_no_keyframes` | as above without `select_keyframes` | what event-aware selection adds |
@@ -1272,7 +1271,7 @@ Line counts were measured with `diff`/`wc`, not estimated.
 | Module | +/− | What changed |
 |---|---|---|
 | `analysis.py` | +399 / −147 | Rewritten. Honest time axis (`time (ps)` only for readers that record time, else `frame index`); verdicts from `timeseries` instead of fixed thresholds; per-residue RMSF on a **copy** of the universe; angle-based H-bonds (own implementation replaces MDAnalysis `HydrogenBondAnalysis`, which needs charges); contacts report atom and residue-pair counts and fraction of frames in contact; SASA scratch dir cleaned; `convergence` analysis; PBC diagnostics (per-atom half-box jumps) and `unwrap=`; `selection matched 0 atoms` errors; mmCIF-aware loading |
-| `render.py` | +311 / −167 | Scratch dirs removed after every call (`keep_work=` to retain); `render_movie` now **one VMD session, one fixed camera** (was one VMD per frame, camera reset per frame); new `render_frames`; Tachyon runs in parallel; `run_vmd_tcl` screened by `security`; timeouts return structured errors; ffmpeg-missing path keeps frames |
+| `render.py` | +311 / −167 | Scratch dirs removed after every call (`keep_work=` to retain); `render_movie` now **one VMD session, one fixed camera** (was one VMD per frame, camera reset per frame); new `render_frames`; Tachyon runs in parallel; `run_tcl` screened by `security`; timeouts return structured errors; ffmpeg-missing path keeps frames |
 | `stats.py` | +200 / −111 | Partial `CONECT` bonds detected and supplemented by inference; H-bonds angle-based when hydrogens exist (`hbond_method` says which); vectorised ion mask and salt bridges (were per-atom Python loops); His excluded from salt bridges by default; secondary structure from the new DSSP; `count_hydrogen_bonds` exposed for reuse |
 | `server.py` | +182 / −79 | `@tool()` wrapper turns policy violations into structured errors; path sandbox on every tool; `view_image` serves image files only; `renderer` argument; session now stores renderer + provenance; 3 new tools; `analyze_trajectory(unwrap=)` |
 | `cli.py` | +151 / −3 | New subcommands `keyframes`, `claims`, `validate`, `provenance`, `renderers`, `bench {truth,run,sampling,rating-sheet,rating-summary}`; `--renderer` on `show`/`visualize`; `--unwrap` on `analyze`; renderer printed in the brief |
@@ -1318,7 +1317,7 @@ Line counts were measured with `diff`/`wc`, not estimated.
 13. **ffmpeg `eq(n\,k)` / `-vsync`**: fragile across versions; invalid-escape warning.
 14. **`Session` write** could truncate on interruption; **report** crashed on missing numbers.
 15. **Hard-coded paths** (`/home/<user>/...`) in docs and messages.
-16. **`run_vmd_tcl` accepted `exec`** and arbitrary Tcl.
+16. **`run_tcl` accepted `exec`** and arbitrary Tcl.
 17. **`fetch` accepted `file://`, `ftp://` and internal addresses**; no size cap.
 18. **Stale docs**: README said 12 tools, listed 15, code had 24; referenced a `tests/session/` that never existed.
 19. **`pyproject.toml`** would have omitted any new subpackages from an install.
@@ -1371,7 +1370,7 @@ Review these if anything outside this repo uses the old API.
   matplotlib backend** (previously: no images and a note). They also write `provenance.json` into `out_dir`, and the package has new
   `renderer` and `provenance_path` keys.
 * `build_color_keys`: water key only with `show_water=True`.
-* `run_vmd_tcl`: may return `{"ok": False, "blocked": True}`.
+* `run_tcl`: may return `{"ok": False, "blocked": True}`.
 * `fetch_structure(source="url")`: may refuse a URL; `_http_get` gained `max_bytes`.
 * Server: tools return `{"ok": False, "blocked": True, ...}` on policy violations; `view_image` raises for non-image extensions.
 * `Session` data gained `claims`, `provenance`, `renderer`; reports gain sections L and M.

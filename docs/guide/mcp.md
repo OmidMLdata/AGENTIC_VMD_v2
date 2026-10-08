@@ -4,7 +4,7 @@ Setup offers to register vmd-agent with Claude Code for you when the `claude` co
 
 Optional. The chat (`vmd-agent chat`) needs no MCP client; this is for people who already use Claude Code, Claude Desktop or another MCP client.
 
-The same 53 tools are available to any MCP client (Claude Code, Claude Desktop and others) through an MCP server. The server exposes the 53 tools below to an MCP client (Claude Code, Claude Desktop, or any other) over stdio. This
+The same tools are available to any MCP client (Claude Code, Claude Desktop and others) through an MCP server. The server exposes the 44 tools of the [library](tools.md) and the `run_workflow` call (the entry to the [workflows](workflows.md)) to an MCP client over stdio. This
 section is everything needed to run it on a **Linux machine that has VMD installed**.
 
 ## 1. What the Linux machine needs
@@ -27,7 +27,7 @@ No display is needed: VMD is always run headless (`-dispdev text`).
 Run these **as the same user the server will run as**:
 
 ```bash
-~/vmd-agent-venv/bin/vmd-agent probe          # does this machine have VMD, Tachyon, ffmpeg, the libraries?
+~/vmd-agent-venv/bin/vmd-agent tool probe_environment          # does this machine have VMD, Tachyon, ffmpeg, the libraries?
 ~/vmd-agent-venv/bin/vmd-agent mcp-check --roots /srv/md-data --vmd /opt/vmd/bin/vmd --render
 ```
 
@@ -35,7 +35,7 @@ Run these **as the same user the server will run as**:
 gives the server **only** the environment you pass it (MCP clients typically do not forward your shell's exports or
 `PATH`, and the SDK's own client does not), so a variable that works in your terminal but is missing from the client's
 configuration shows up here. It reports:
-`connect` (the server starts and speaks MCP), `tools` (53 registered), `analysis_libraries`, `vmd` and `tachyon` (found?
+`connect` (the server starts and speaks MCP), `tools` (all registered), `analysis_libraries`, `vmd` and `tachyon` (found?
 which version?), `ffmpeg`, the sandbox (a path outside the roots is refused; relative paths resolve inside the first root),
 whether the raw Tcl tool is disabled, and with `--render` a real VMD + Tachyon render of a tiny structure. `FAIL` means a
 client cannot work; `WARN` means reduced capability or a risk (no VMD, no sandbox). Exit code 2 on any `FAIL`.
@@ -102,7 +102,7 @@ Inside the container the data directory is `/data` and the sandbox is already se
   resolve inside one of the roots, with symlinks, `..` and prefix tricks resolved. **A relative path is taken relative
   to the first root**, not to the server's working directory, so a tool's default output directory (`vmd_agent_output`)
   lands inside it. **With it unset the sandbox is off** and the server prints a warning to stderr.
-* **`run_vmd_tcl` is disabled** (it returns a refusal) unless the server environment has `VMD_AGENT_ENABLE_TCL=1`. The
+* **`run_tcl` is disabled** (it returns a refusal) unless the server environment has `VMD_AGENT_ENABLE_TCL=1`. The
   Tcl screen is an accident guard, not a security boundary: enable it only for a client and agent you trust.
 * **Downloads** refuse non-http(s) URLs and loopback/private/link-local hosts (also after redirects). Optional:
   `VMD_AGENT_ALLOW_PRIVATE_URLS=1` for an internal mirror, `VMD_AGENT_MAX_DOWNLOAD_MB` for the size cap.
@@ -118,13 +118,9 @@ Inside the container the data directory is `/data` and the sandbox is already se
 | client says the server exited / will not connect | run the exact command by hand and read stderr; usual causes: Python < 3.10, `mcp` not installed in *that* environment, or a relative or wrong path to `vmd-agent-server`. `mcp-check --command <your command>` tests the same command. |
 | tool results say `vmd_found: false` | `VMD_BIN` is not in the **client's** `env` block. Your shell's `PATH` and exports may not be forwarded. |
 | `path ... is outside the allowed roots` | the path (or an output directory) is not under `VMD_AGENT_ALLOWED_ROOTS`; use a path inside it, or add the directory to the roots. |
-| renders fall back to "matplotlib" though VMD is installed | Tachyon was not found next to VMD, or VMD does not run headless here (missing `tcsh` or libraries). `vmd-agent probe` shows `tachyon_path`; try `vmd -dispdev text -eof` by hand. |
+| renders fall back to "matplotlib" though VMD is installed | Tachyon was not found next to VMD, or VMD does not run headless here (missing `tcsh` or libraries). `vmd-agent tool probe_environment` shows `tachyon_path`; try `vmd -dispdev text -eof` by hand. |
 | `VMD did not produce a Tachyon scene` | VMD started but failed: run `mcp-check --render`, then run VMD by hand with a small script. Use `renderer="matplotlib"` meanwhile. |
 | the connection works over SSH for a while, then breaks | something on the remote side wrote to stdout (login banner, `.bashrc` output). Make the remote shell silent. |
-| movies or video tools fail | `vmd-agent probe` shows whether ffmpeg was found (the bundled copy normally is); check that the server runs in the environment where vmd-agent was installed. |
+| movies or video tools fail | `vmd-agent tool probe_environment` shows whether ffmpeg was found (the bundled copy normally is); check that the server runs in the environment where vmd-agent was installed. |
 
-53 tools. The original 27: `probe_environment` · `inspect_files` · `detect_system` · `generate_visualization_recipe` · `structure_stats` ·
-`color_key` · `annotate_image` · `list_representations` · `describe_representation` · `render_image` · `render_movie` ·
-`run_vmd_tcl` · `search_pdb` · `fetch_structure` · `fetch_and_visualize` · `visualize_and_interpret` ·
-`analyze_trajectory` · `select_keyframes` · `verify_claims` · `verify_provenance` · `extract_video_frames` ·
-`probe_video` · `validate_video` · `interpret_video` · `view_image` · `record_visual_interpretation` · `assemble_report`. The 24 that drive VMD itself ([Driving VMD itself](vmd.md#6-drive-vmd-itself)): `vmd_capabilities` · `vmd_measure` · `vmd_interactions` · `vmd_secondary_structure` · `vmd_backbone_torsions` · `vmd_structure_check` · `vmd_align_structures` · `vmd_pbc_info` · `vmd_convert_trajectory` · `vmd_write_structure` · `vmd_volmap` · `vmd_volume_info` · `vmd_build_system` · `vmd_mutate_residue` · `vmd_merge_structures` · `vmd_render_scene` · `vmd_render_turntable` · `vmd_build_membrane` · `vmd_build_nanotube` · `export_vmd_session` · `vmd_fit_to_map` · `vmd_map_arithmetic` · `vmd_prepare_namd` · `vmd_slurm_script`. And the two that run whole jobs ([Whole jobs](workflows.md)): `list_workflows` · `run_workflow`.
+44 tools, in ten groups ([the library](tools.md)): `probe_environment` · `inspect_files` · `detect_system` · `structure_stats` · `search_pdb` · `fetch_structure` · `visualize_and_interpret` · `render_image` · `render_movie` · `annotate_image` · `view_image` · `generate_visualization_recipe` · `list_representations` · `color_key` · `export_session` · `run_tcl` · `analyze_trajectory` · `measure_with_vmd` · `select_keyframes` · `periodic_box` · `find_interactions` · `secondary_structure` · `backbone_torsions` · `check_structure` · `align_structures` · `convert_trajectory` · `write_structure` · `make_map` · `inspect_map` · `combine_maps` · `fit_to_map` · `build_system` · `mutate_residue` · `merge_structures` · `build_membrane` · `build_nanotube` · `prepare_namd` · `write_slurm_script` · `probe_video` · `interpret_video` · `verify_claims` · `record_visual_interpretation` · `assemble_report` · `verify_provenance`. Plus `run_workflow` (with no name it lists the workflows).

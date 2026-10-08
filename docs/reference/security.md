@@ -10,14 +10,14 @@ or write. Paths are resolved through symlinks, so `..`, symlink escapes and pref
 Docker image sets it to `/data`. The CLI is operator-run and is not sandboxed.
 `view_image` only serves image files.
 
-## `run_vmd_tcl` is off by default
+## `run_tcl` is off by default
 Tcl can run any program, and **no filter can stop it**: command names can be built at run time
 (`set c ex; append c ec; $c cmd`, `catch $built_script`, `\x65xec`, `rename exec e`). A second audit confirmed this
 with a real `tclsh`: scripts that passed the deny-list below created files. The first audit "closed" five specific bypasses,
 which was true only for those strings. So the MCP tool is **disabled unless the server is started with
 `VMD_AGENT_ENABLE_TCL=1`**, and enabling it means trusting the caller with code execution on that machine.
 
-When enabled (or when calling `vmd_agent.visual.render.run_vmd_tcl` from your own code), a deny-list still rejects the obvious
+When enabled (or when calling `vmd_agent.visual.render.run_tcl` from your own code), a deny-list still rejects the obvious
 dangerous commands, in command position (start of a line, or after `;` `[` `{` `"`): `exec`, `open`, `source`, `play`,
 `socket`, destructive `file` operations, `cd`, `system`, `eval`, `uplevel`, `interp`, `subst`, `load`, `unix`,
 `mol urlload`, `render <method> <file> <command>`, and `package require` outside a short allow-list. That catches accidents

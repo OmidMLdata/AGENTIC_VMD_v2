@@ -8,7 +8,7 @@ Tcl on your machine. Two controls limit the blast radius:
   path the server touches must then resolve, after symlinks, inside one of
   them. Unset means unrestricted, which is the right default for a local
   single-user install.
-* **Tcl screening.** ``run_vmd_tcl`` rejects scripts that can spawn processes,
+* **Tcl screening.** ``run_tcl`` rejects scripts that can spawn processes,
   open sockets, delete files or evaluate dynamically built code.
 
 Neither is a complete sandbox: Tcl screening is a deny-list and can be

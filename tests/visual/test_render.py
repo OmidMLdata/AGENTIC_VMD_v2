@@ -123,7 +123,7 @@ def test_hostile_recipe_path_never_reaches_the_script(ubq, tmp_path):
 
 
 def test_run_vmd_tcl_blocks_dangerous_script():
-    r = render.run_vmd_tcl("exec rm -rf /")
+    r = render.run_tcl("exec rm -rf /")
     assert r["blocked"] and not r["ok"]
 
 
@@ -165,13 +165,13 @@ def test_no_vmd_gives_actionable_error(tmp_path, ubq):
 # ============================================================ real VMD required
 @pytest.mark.requires_vmd
 def test_run_vmd_tcl_runs_a_safe_script_in_real_vmd(real_vmd):
-    r = render.run_vmd_tcl("puts hello_from_vmd", real_vmd)
+    r = render.run_tcl("puts hello_from_vmd", real_vmd)
     assert r["ok"] and "hello_from_vmd" in r["stdout"]
 
 
 @pytest.mark.requires_vmd
 def test_real_vmd_loads_the_structure_it_is_given(real_vmd, ubq):
-    r = render.run_vmd_tcl(
+    r = render.run_tcl(
         f"mol new {{{ubq}}} type pdb waitfor all\n"
         'puts "ATOMS=[[atomselect top all] num]"', real_vmd)
     n = [l for l in r["stdout"].splitlines() if l.startswith("ATOMS=")]

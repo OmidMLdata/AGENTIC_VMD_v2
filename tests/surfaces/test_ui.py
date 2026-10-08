@@ -74,7 +74,7 @@ def test_the_page_needs_the_key_and_the_right_host(page):
 
 def test_status_files_and_workflows(page):
     status = json.loads(page.req("GET", "/api/status")[1])
-    assert status["model"] == "m" and status["n_tools"] == 53 and status["data_dir"] == os.path.realpath(page.root)
+    assert status["model"] == "m" and status["n_tools"] == 44 and status["data_dir"] == os.path.realpath(page.root)
     assert status["model_ready"] in (True, False) and "ffmpeg" in status
     files = json.loads(page.req("GET", "/api/files")[1])["files"]
     assert [f["path"] for f in files] == ["1ubq.pdb"] and files[0]["kind"] == "structure"
@@ -112,7 +112,7 @@ def test_a_file_can_be_looked_at_with_a_few_read_only_tools(page):
     s, body, _ = page.post("/api/look", {"tool": "detect_system", "path": "1ubq.pdb"})
     r = json.loads(body)
     assert s == 200 and r["result"]["components"]["protein"]["n_residues"] == 76 and r["seconds"] >= 0
-    assert page.post("/api/look", {"tool": "run_vmd_tcl", "path": "x"})[0] == 400          # only the listed looks
+    assert page.post("/api/look", {"tool": "run_tcl", "path": "x"})[0] == 400          # only the listed looks
     s, body, _ = page.post("/api/look", {"tool": "inspect_files", "path": "../../etc/hosts"})
     assert "error" in json.dumps(json.loads(body)["result"]).lower()                       # the sandbox applies
 
@@ -205,8 +205,8 @@ def test_the_viewer_gets_atoms_bonds_and_other_frames(page):
 
 
 def test_the_tools_the_chat_offers_can_be_changed_from_the_page(page):
-    s, body, _ = page.post("/api/profile", {"tools": "core"})
+    s, body, _ = page.post("/api/profile", {"tools": "auto"})
     status = json.loads(body)
-    assert s == 200 and status["profile"] == "core" and status["tools_in_chat"] == 27 and status["profiles"]["all"] == 53
+    assert s == 200 and status["profile"] == "auto" and status["profiles"]["all"] == 45
     assert page.post("/api/profile", {"tools": "nonsense"})[0] == 400
-    assert json.loads(page.post("/api/profile", {"tools": "all"})[1])["tools_in_chat"] == 53
+    assert json.loads(page.post("/api/profile", {"tools": "all"})[1])["tools_in_chat"] == 45

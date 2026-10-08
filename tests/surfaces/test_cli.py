@@ -11,36 +11,33 @@ def run_cli(argv, capsys):
     return capsys.readouterr().out
 
 
-def test_cli_probe_and_renderers(capsys):
-    assert "matplotlib" in run_cli(["renderers"], capsys)
-    assert "recommended_renderer" in run_cli(["probe"], capsys)
+def test_cli_tool_probe_environment(capsys):
+    assert "recommended_renderer" in run_cli(["tool", "probe_environment"], capsys)
 
 
-def test_cli_show_style_visualize(ubq, tmp_path, capsys):
-    out = run_cli(["visualize", ubq, "--out-dir", str(tmp_path), "--views",
-                   "front", "--renderer", "matplotlib"], capsys)
+def test_cli_tool_visualize_reads_like_a_report(ubq, tmp_path, capsys):
+    out = run_cli(["tool", "visualize_and_interpret", ubq, "--out", str(tmp_path), "--views", "front", "--renderer", "matplotlib"], capsys)
     assert "RENDERER: matplotlib" in out and "caveat:" in out
     assert "SAVED IMAGES" in out and "ANNOTATED IMAGES" in out
 
 
-def test_cli_claims(lyz, capsys):
-    out = run_cli(["claims", lyz, "It has one chain", "It has a membrane"], capsys)
-    assert "SUPPORTED" in out and "CONTRADICTED" in out
+def test_cli_tool_verify_claims(lyz, capsys):
+    out = json.loads(run_cli(["tool", "verify_claims", lyz, "It has one chain", "It has a membrane"], capsys))
+    assert sorted(c["verdict"] for c in out["results"]) == ["contradicted", "supported"]
 
 
-def test_cli_analyze_with_convergence(sample, tmp_path, capsys):
+def test_cli_tool_analyze_with_convergence(sample, tmp_path, capsys):
     pdb, dcd = sample
-    out = run_cli(["analyze", pdb, dcd, "--do", "rmsd", "convergence",
-                   "--out-dir", str(tmp_path)], capsys)
+    out = run_cli(["tool", "analyze_trajectory", pdb, dcd, "--analyses", "rmsd", "convergence", "--out", str(tmp_path)], capsys)
     assert '"convergence"' in out and "time (ps)" in out
 
 
-def test_cli_keyframes_and_provenance(sample, ubq, tmp_path, capsys):
+def test_cli_tool_keyframes_and_provenance(sample, ubq, tmp_path, capsys):
     pdb, dcd = sample
-    out = run_cli(["keyframes", pdb, dcd, "-k", "4"], capsys)
+    out = run_cli(["tool", "select_keyframes", pdb, dcd, "--k", "4"], capsys)
     assert '"frames"' in out
-    run_cli(["visualize", ubq, "--out-dir", str(tmp_path), "--no-render"], capsys)
-    assert '"ok": true' in run_cli(["provenance", str(tmp_path)], capsys)
+    run_cli(["tool", "visualize_and_interpret", ubq, "--out", str(tmp_path), "--renderer", "matplotlib", "--views", "front"], capsys)
+    assert '"ok": true' in run_cli(["tool", "verify_provenance", str(tmp_path)], capsys)
 
 
 def test_cli_bench_commands(ubq, lyz, tmp_path, capsys):
@@ -55,10 +52,10 @@ def test_cli_bench_commands(ubq, lyz, tmp_path, capsys):
     assert "| legend_stats |" in out
 
 
-def test_cli_reps_and_recipe(ubq, tmp_path, capsys):
-    assert "NEWCARTOON" not in run_cli(["reps", "--name", "Licorice"], capsys)
-    out = run_cli(["recipe", ubq, "-o", str(tmp_path / "r.tcl")], capsys)
-    assert "recipe written" in out and (tmp_path / "r.tcl").exists()
+def test_cli_tool_representations_and_recipe(ubq, tmp_path, capsys):
+    assert "Licorice" in run_cli(["tool", "list_representations", "--name", "Licorice"], capsys)
+    run_cli(["tool", "generate_visualization_recipe", ubq, "--out", str(tmp_path / "r.tcl")], capsys)
+    assert (tmp_path / "r.tcl").exists()
 
 
 def test_cli_bench_synth_and_dry_run(ubq, tmp_path, capsys):
@@ -72,25 +69,24 @@ def test_cli_bench_synth_and_dry_run(ubq, tmp_path, capsys):
 
 
 def test_cli_validate_dssp_on_files(ubq, lyz, capsys):
-    out = run_cli(["validate-dssp", ubq, lyz], capsys)
+    out = run_cli(["bench", "validate-dssp", ubq, lyz], capsys)
     assert '"q3"' in out
 
 
 def test_cli_analyze_dt_ps(tmp_path, capsys):
     import os
     d = UBQ_MD_DIR
-    out = run_cli(["analyze", os.path.join(d, "protein.pdb"),
-                   os.path.join(d, "protein.dcd"), "--do", "rgyr", "--dt-ps",
-                   "400", "--out-dir", str(tmp_path)], capsys)
+    out = run_cli(["tool", "analyze_trajectory", os.path.join(d, "protein.pdb"), os.path.join(d, "protein.dcd"),
+                   "--analyses", "rgyr", "--dt-ps", "400", "--out", str(tmp_path)], capsys)
     assert "user-supplied dt_ps" in out
 
 
 @pytest.mark.parametrize("argv", [
-    ["analyze", "/nope.pdb", "/nope.dcd"],
-    ["validate", "/nope", "/nope"],
-    ["validate-dssp", "/nope.pdb"],
+    ["tool", "analyze_trajectory", "/nope.pdb", "/nope.dcd", "--analyses", "rmsd"],
+    ["bench", "validate", "/nope", "/nope"],
+    ["bench", "validate-dssp", "/nope.pdb"],
     ["bench", "events", "/nope", "/nope"],
-    ["report", "/proc/definitely/not/writable"],
+    ["tool", "assemble_report", "/proc/definitely/not/writable"],
 ])
 def test_bad_paths_give_a_clean_error_not_a_traceback(argv, capsys):
     """Six invocations used to die with a raw Python traceback."""
@@ -105,7 +101,7 @@ def test_debug_switch_restores_the_traceback(monkeypatch):
     from vmd_agent import cli
     monkeypatch.setenv("VMD_AGENT_DEBUG", "1")
     with pytest.raises(Exception):
-        cli.main(["validate-dssp", "/nope.pdb"])
+        cli.main(["bench", "validate-dssp", "/nope.pdb"])
 
 
 def test_unknown_benchmark_condition_is_rejected_at_parse_time():
@@ -155,69 +151,62 @@ def test_the_top_level_help_is_the_grouped_overview(capsys):
     with pytest.raises(SystemExit):
         cli.main(["--help"])
     out = capsys.readouterr().out
-    assert "1. Set up" in out and "Drive VMD itself" in out and "vmd-agent vmd" in out
+    assert "1. Set up" in out and "The tool library" in out and "vmd-agent tool" in out
     assert out.count("\n") < 80                                  # one screen or two, not a wall of flags
 
 
-def test_every_vmd_tool_is_a_vmd_command_with_a_valid_example():
+def test_every_tool_is_a_command_with_a_summary_and_a_valid_example():
     import shlex
-    from vmd_agent import cli, vmd_cli
+    from vmd_agent import cli, toolcli, toolset
     p, _, _ = _all_commands()
-    names = vmd_cli.VMD_TOOLS
-    assert len(names) == 24
+    names = toolset.library_tools()
+    assert len(names) == 44 and set(toolcli.SUMMARY) == set(names) == set(toolcli.EXAMPLES)
     for n in names:
-        example = vmd_cli.EXAMPLES[n]
-        assert example.startswith("vmd-agent vmd " + vmd_cli.command_name(n)), n
-        assert vmd_cli.SUMMARY[n]
-        argv = shlex.split(example)[1:]
-        argv = [a if a != "scene.json" else '{"reps": [{}]}' for a in argv]          # a file name stands for JSON here
-        args = p.parse_args(argv)                                                      # the documented example parses
+        example = toolcli.EXAMPLES[n]
+        words = shlex.split(example)
+        assert words[words.index("vmd-agent") + 1:][:2] == ["tool", n], n
+        argv = [a if a != "scene.json" else '{"reps": [{}]}' for a in words[words.index("vmd-agent") + 1:]]    # a file name stands for JSON here
+        args = p.parse_args(argv)                                                                                 # the documented example parses
         assert args._tool == n
-    assert cli.main(["vmd"]) == 0
+    assert cli.main(["tool"]) == 0
 
 
-def test_vmd_command_flags_come_from_the_tool_signatures():
+def test_tool_flags_come_from_the_tool_signatures():
     p, _, _ = _all_commands()
-    a = p.parse_args(["vmd", "measure", "a.pdb", "a.dcd", "--kind", "rmsd", "--selection", "name CA", "--no-align",
-                      "--step", "5"])
+    a = p.parse_args(["tool", "measure_with_vmd", "a.pdb", "a.dcd", "--kind", "rmsd", "--selection", "name CA", "--no-align", "--step", "5"])
     assert (a.topology, a.trajectory, a.kind, a.selection, a.align, a.step) == ("a.pdb", "a.dcd", "rmsd", "name CA", False, 5)
-    b = p.parse_args(["vmd", "convert-trajectory", "a.pdb", "--out", "x.dcd", "--wrap"])
+    b = p.parse_args(["tool", "convert_trajectory", "a.pdb", "--out", "x.dcd", "--wrap"])
     assert b.trajectory is None and b.out_path == "x.dcd" and b.wrap is True
-    c = p.parse_args(["vmd", "mutate-residue", "a.psf", "a.pdb", "P0", "6", "ALA", "--out", "m"])
+    c = p.parse_args(["tool", "mutate_residue", "a.psf", "a.pdb", "P0", "6", "ALA", "--out", "m"])
     assert (c.segid, c.resid, c.new_resname, c.out_prefix) == ("P0", 6, "ALA", "m")
+    d = p.parse_args(["tool", "analyze_trajectory", "a.pdb", "a.dcd", "--analyses", "rmsd", "rgyr", "--dt-ps", "400"])
+    assert d.analyses == ["rmsd", "rgyr"] and d.dt_ps == 400
+    e = p.parse_args(["tool", "inspect_files", "a.psf", "a.dcd"])
+    assert e.paths == ["a.psf", "a.dcd"]
     with pytest.raises(SystemExit):
-        p.parse_args(["vmd", "measure", "a.pdb", "--kind", "bogus"])           # choices are enforced
+        p.parse_args(["tool", "measure_with_vmd", "a.pdb", "--kind", "bogus"])           # choices are enforced
     with pytest.raises(SystemExit):
-        p.parse_args(["vmd", "convert-trajectory", "a.pdb"])                   # --out is required
+        p.parse_args(["tool", "convert_trajectory", "a.pdb"])                            # --out is required
 
 
-def test_a_vmd_command_gives_the_same_answer_as_the_tool(tmp_path, capsys, monkeypatch):
+def test_a_tool_command_gives_the_same_answer_as_the_tool(tmp_path, capsys, monkeypatch):
     from vmd_agent import cli
     monkeypatch.setenv("VMD_AGENT_ALLOWED_ROOTS", str(tmp_path))
     dx = tmp_path / "m.dx"
     dx.write_text("object 1 class gridpositions counts 2 2 2\norigin 0 0 0\ndelta 1 0 0\ndelta 0 1 0\ndelta 0 0 1\n"
                   "object 2 class gridconnections counts 2 2 2\nobject 3 class array type double rank 0 items 8 data follows\n"
                   "1 2 3\n4 5 6\n7 8\n")
-    assert cli.main(["vmd", "volume-info", str(dx)]) == 0
+    assert cli.main(["tool", "inspect_map", str(dx)]) == 0
     out = json.loads(capsys.readouterr().out)
     assert out["shape"] == [2, 2, 2] and out["integral"] == 36
-    assert cli.main(["vmd", "volume-info", str(tmp_path / "missing.mrc")]) == 1
-
-
-def test_old_flag_spellings_still_work_and_new_aliases_exist():
-    from vmd_agent import cli
-    p, _, _ = _all_commands()
-    assert p.parse_args(["detect", "a.pdb", "--traj", "a.dcd"]).traj == "a.dcd"
-    assert p.parse_args(["detect", "a.pdb", "--trajectory", "a.dcd"]).traj == "a.dcd"
-    assert p.parse_args(["analyze", "a.pdb", "a.dcd", "--selection", "name CA", "--selection2", "resname LIG"]).sel2 == "resname LIG"
-    assert cli is not None
+    assert cli.main(["tool", "inspect_map", str(tmp_path / "missing.mrc")]) == 1
 
 
 def _flags_of(sub, command):
     parser = sub.choices[command]
     flags = {o for a in parser._actions for o in a.option_strings}
     nested = getattr(parser, "_subparsers", None)
-    if nested is not None:                                # `vmd` has its own sub-commands
+    if nested is not None:                                # `tool` and `bench` have their own sub-commands
         for sp in nested._group_actions[0].choices.values():
             flags |= {o for a in sp._actions for o in a.option_strings}
     return flags
@@ -253,12 +242,14 @@ def test_every_command_and_every_flag_the_manual_names_exists():
             have |= _flags_of(sub, w)
         for flag in re.findall(r"(?<![\w-])(--[a-z0-9][a-z0-9-]*|-[a-z](?=[ `,)·]))", " ".join(cells[2:])):
             assert flag in have, f"README says `{words[0]}` has {flag}, which it does not"
-    missing = cmds - seen - {"vmd", "menu", "bench"}
+    missing = cmds - seen - {"menu", "bench", "tool"}
     assert not missing, f"commands the README's tables do not describe: {sorted(missing)}"
 
 
-def test_every_vmd_command_is_described_in_the_manual():
-    from vmd_agent import vmd_cli
+def test_every_tool_is_in_the_manual_with_its_group():
+    from vmd_agent import toolset
     readme = _docs_text()
-    for n in vmd_cli.VMD_TOOLS:
-        assert f"vmd-agent vmd {vmd_cli.command_name(n)}" in readme, n
+    for n in toolset.library_tools():
+        assert f"`{n}`" in readme, n
+    for group, _d, _t in toolset.LIBRARY:
+        assert group in readme, group

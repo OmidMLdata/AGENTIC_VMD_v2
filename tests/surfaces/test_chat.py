@@ -143,7 +143,7 @@ def test_a_real_model_cannot_answer_a_data_question_without_a_tool(tmp_path, mon
 
 def test_models_are_not_shown_the_parameters_they_only_make_up():
     from vmd_agent import toolset
-    props = toolset.tool_schema(toolset.TOOLS["vmd_measure"])["input_schema"]["properties"]
+    props = toolset.tool_schema(toolset.TOOLS["measure_with_vmd"])["input_schema"]["properties"]
     assert "vmd_path" not in props and "topology" in props
     s = _session()
     out = json.loads(s.run_tool({"id": "1", "name": "probe_environment", "arguments": {"vmd_path": "/usr/local/vmd"}}))
@@ -212,11 +212,13 @@ def test_the_hint_is_added_to_the_question_only_when_the_tool_is_offered():
     srv, url, requests = _server([{"content": "ok"}])
     try:
         agent.Agent(url, "m", guard=False).ask("Which of these are true: (1) a ligand")
-        agent.Agent(url, "m", guard=False, tools="vmd").ask("Which of these are true: (1) a ligand")
+        without = agent.Agent(url, "m", guard=False)
+        without.names = [n for n in without.names if n != "verify_claims"]
+        without.ask("Which of these are true: (1) a ligand")
     finally:
         srv.shutdown()
     assert "verify_claims" in requests[0]["messages"][-1]["content"] and "hint from the toolkit" in requests[0]["messages"][-1]["content"]
-    assert "hint from the toolkit" not in requests[1]["messages"][-1]["content"]                       # the vmd tool set has no verify_claims
+    assert "hint from the toolkit" not in requests[1]["messages"][-1]["content"]                       # a tool set without verify_claims
 
 
 def _tool_then(*replies):

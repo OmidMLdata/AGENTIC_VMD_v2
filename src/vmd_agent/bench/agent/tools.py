@@ -8,7 +8,7 @@ experiment: what does the toolkit add over a model that writes its own code?
 ``vmd_agent_no_verify``   same, without ``verify_claims`` (ablation)
 ``vmd_agent_no_keyframes``  same, without ``select_keyframes`` (ablation)
 ``python_mdanalysis``  ``run_python``: the model writes MDAnalysis/NumPy itself
-``vmd_plain``          ``run_vmd_tcl``: the model writes Tcl for a real VMD
+``vmd_plain``          ``run_tcl``: the model writes Tcl for a real VMD
 ====================  =========================================================
 
 Every arm also gets ``list_files``, ``read_text_file`` and ``submit_answer``.
@@ -16,7 +16,7 @@ Every arm also gets ``list_files``, ``read_text_file`` and ``submit_answer``.
 Safety. File arguments are confined to the task's workspace. ``run_python``
 runs model-written code in a subprocess with a timeout; that is **not a
 sandbox**. Enable it (``allow_exec=True``) only inside a container or VM.
-``run_vmd_tcl`` goes through the toolkit's Tcl screen, which is an accident
+``run_tcl`` goes through the toolkit's Tcl screen, which is an accident
 guard, not a boundary (see ``README.md#security``), and needs a real VMD.
 """
 from __future__ import annotations
@@ -46,9 +46,9 @@ ARMS: Dict[str, tuple] = {
         "probe_environment", "inspect_files", "detect_system",
         "structure_stats", "analyze_trajectory", "verify_claims"),
     "python_mdanalysis": COMMON + ("run_python",),
-    "vmd_plain": COMMON + ("run_vmd_tcl",),
+    "vmd_plain": COMMON + ("run_tcl",),
 }
-NEEDS_EXEC = {"run_python", "run_vmd_tcl"}
+NEEDS_EXEC = {"run_python", "run_tcl"}
 PYTHON_TIMEOUT_S = 120
 VMD_TIMEOUT_S = 300
 
@@ -280,7 +280,7 @@ def _run_vmd_tcl(env, script: str) -> dict:
     if not env.allow_exec:
         raise PermissionError("code execution is disabled (allow_exec=False)")
     from vmd_agent.visual import render
-    r = render.run_vmd_tcl(script, env.vmd_path, timeout=VMD_TIMEOUT_S,
+    r = render.run_tcl(script, env.vmd_path, timeout=VMD_TIMEOUT_S,
                            cwd=env.workdir, env=sanitized_env())
     return {k: r.get(k) for k in ("ok", "error", "blocked", "returncode",
                                   "stdout", "stderr") if k in r}
@@ -293,7 +293,7 @@ _IMPL: Dict[str, Callable] = {
     "structure_stats": _structure_stats,
     "analyze_trajectory": _analyze_trajectory,
     "select_keyframes": _select_keyframes, "verify_claims": _verify_claims,
-    "run_python": _run_python, "run_vmd_tcl": _run_vmd_tcl,
+    "run_python": _run_python, "run_tcl": _run_vmd_tcl,
 }
 
 _STR = {"type": "string"}
@@ -351,7 +351,7 @@ _SPECS: Dict[str, tuple] = {
     "run_python": ("Run a Python 3 script (NumPy, SciPy, MDAnalysis, "
                    "matplotlib are installed) in the workspace; returns "
                    "stdout and stderr.", _obj({"code": _STR}, ["code"])),
-    "run_vmd_tcl": (
+    "run_tcl": (
         "Run a Tcl script in headless VMD (text mode, no display) and return "
         "its stdout/stderr. Only what you `puts` is returned. Relative paths "
         "resolve in the workspace. Load with `mol new FILE type pdb waitfor "

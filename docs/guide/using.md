@@ -7,7 +7,7 @@ Four ways in. They all call the same [tools](tools.md), so a number does not dep
 | **The web page** | you want everything in one window: files, chat, whole jobs, pictures | `vmd-agent ui` |
 | **The menu** | you would rather not learn commands | type `vmd-agent`, pick a number |
 | **Chat** | you want to ask in plain words, in the terminal | `vmd-agent chat` (or `vmd-agent chat "your question"` for a single answer) |
-| **Commands** | scripts, batches, no AI | `vmd-agent <command> ...`, listed in the [command reference](commands.md) |
+| **The command line** | scripts, batches, no AI | `vmd-agent tool NAME ...` for one tool, `vmd-agent workflow ...` for a whole job: [the command line](commands.md) |
 
 ## The web page (`vmd-agent ui`)
 
@@ -38,13 +38,13 @@ remembered; double-click one to restore it), and the light/dark/automatic theme 
   chat ([How the chat keeps a model honest](models.md#how-the-chat-keeps-a-model-honest)).
 * **Assistant, Whole jobs.** Pick a [workflow](workflows.md), pick the files, run it, and read the verdict, the graded findings, the step table with seconds and the figures, with a link to the
   report. No model is needed for this tab.
-* **Status bar.** Whether the model answers, VMD's version, ffmpeg, the mouse mode, and a **chat tools** menu: `all`, `core` or `vmd` (see [Does the model see all 53 at once?](tools.md#does-the-model-see-all-53-at-once)).
+* **Status bar.** Whether the model answers, VMD's version, ffmpeg, the mouse mode, and a **chat tools** menu: `all` or `auto` (see [Does the model see all of them at once?](tools.md#does-the-model-see-all-of-them-at-once)).
   On a narrow window the columns stack.
 
 It runs **only on this computer**: it listens on 127.0.0.1, answers only requests addressed to it by that name, and wants the one-time key that is part of the address it prints (kept in a
 cookie), so no other web page you have open can use it. It can read and write only inside your files folder, never overwrites an uploaded file, and runs one job at a time. It needs nothing
 beyond what vmd-agent already installs. The drawing is vmd-agent's own and is a convenient look at a structure, not a replacement for VMD's: no surfaces, no secondary-structure
-cartoons; for those, [drive VMD itself](vmd.md#6-drive-vmd-itself).
+cartoons; for those, [drive VMD itself](vmd.md#driving-vmd-itself).
 
 ## Wall-clock time of every execution
 
@@ -64,7 +64,7 @@ nothing in the repository records any.
 ## Chat commands
 
 Inside `vmd-agent chat`: `/tools` lists the tools, `/time` says where the time went, `/reset` starts over, `/help` shows this, `/quit` leaves.
-Options: `--model NAME`, `--base-url ADDRESS`, `--api-key KEY`, `--roots FOLDER ...`, `--tools all|core|vmd|auto`, `--max-turns N`, `--temperature T`,
+Options: `--model NAME`, `--base-url ADDRESS`, `--api-key KEY`, `--roots FOLDER ...`, `--tools all|auto`, `--max-turns N`, `--temperature T`,
 `--no-stream`, `--no-check`.
 
 Things to ask (examples of what to type, not results): *"What is in 1ubq.pdb?"*, *"Draw it from the front and the side and tell me what each colour means."*,
@@ -72,5 +72,5 @@ Things to ask (examples of what to type, not results): *"What is in 1ubq.pdb?"*,
 really have a ligand and a disulfide bond?"*
 
 The answer appears as the model writes it (`--no-stream` to wait for the whole thing); each tool call is shown with its progress ("frame 20 of 50",
-"adding a water box", "ray tracing 72 frames"). The `vmd` and `workflow` commands print the same progress on the error stream (`--quiet` hides it), so the
+"adding a water box", "ray tracing 72 frames"). The `tool` and `workflow` commands print the same progress on the error stream (`--quiet` hides it), so the
 result on standard output stays clean to pipe.

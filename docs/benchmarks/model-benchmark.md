@@ -10,7 +10,6 @@ vmd-agent bench models --list --reference                       # every prompt, 
 vmd-agent bench models --catalogue --pull                       # every suggested model (`vmd-agent models`), downloading the missing ones, each unloaded when done
 vmd-agent bench models --model granite4.1:8b                    # one model on Ollama or any OpenAI-compatible server
 vmd-agent bench models --model granite4.1:3b granite4.1:8b gemma4:e4b --repeats 3       # several, one after the other
-vmd-agent bench models --model granite4.1:8b --tools core       # offer 27 tools instead of 53 (see "Does the model see all 53 at once?")
 vmd-agent bench models --model granite4.1:8b --tools auto       # only the tools that fit each question; run it into the same --out-dir to see both side by side
 vmd-agent bench models --model granite4.1:8b --smoke            # the small set (one or two tasks per category): the quick check after changing something
 vmd-agent bench models --model m --categories trajectory decline --skip network         # a part of it
@@ -40,7 +39,7 @@ the records. Nothing is stored in the repository: you run it on your models and 
 | `inspect` | what are these files, what is in the system, what can this computer do, what do the colours mean | 6 |
 | `claims` | which of these statements are true (some are false) | 2 |
 | `trajectory` | radius of gyration, RMSD and convergence, informative frames, drift, fluctuation | 5 |
-| `vmd_measure` | VMD's own measurements: contacts, secondary structure, box, torsions, structure checks, superposition, capabilities | 7 |
+| `measure_with_vmd` | VMD's own measurements: contacts, secondary structure, box, torsions, structure checks, superposition, capabilities | 7 |
 | `files` | write some atoms and frames to a new trajectory, save one frame | 2 |
 | `build` | solvated system, mutation, merge, membrane, nanotube, a NAMD input | 6 |
 | `maps` | read a density map, scale it, fit a model into it, make a density | 4 |

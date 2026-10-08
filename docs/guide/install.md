@@ -92,5 +92,5 @@ volume.)
 | "VMD was found but did not run" | the message names the likely cause (for example Linux needs `tcsh`: `sudo apt install tcsh`). `vmd-agent doctor` repeats it. |
 | It cannot find VMD | `vmd-agent setup --vmd "<VMD's folder>"`. VMD is optional: without it, pictures use the built-in drawing. |
 | "outside the allowed roots" | the AI can only use your files folder; put the file there, or choose another with `vmd-agent setup --data-dir` |
-| the model's answers are poor or wrong | a small model may be the cause: try a larger one (`vmd-agent setup`, option 1) or an online model. `vmd-agent claims` checks any statement against the data. |
+| the model's answers are poor or wrong | a small model may be the cause: try a larger one (`vmd-agent setup`, option 1) or an online model. `vmd-agent tool verify_claims` checks any statement against the data. |
 | anything else | run `vmd-agent doctor` and read its notes |

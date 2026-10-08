@@ -453,24 +453,27 @@ def menu(io: Optional[IO] = None, run_cli: Optional[Callable[[List[str]], int]] 
                     continue
                 if os.path.exists(_in_data(what)) or "." in what:
                     traj = io.ask("A trajectory file to go with it (Enter for none)", "")
-                    args = ["visualize", _in_data(what), "--out-dir", out_dir]
-                    if traj:
-                        args += ["--traj", _in_data(traj)]
+                    args = ["tool", "visualize_and_interpret", _in_data(what)] + ([_in_data(traj)] if traj else []) + ["--out", out_dir]
                     run_cli(args)
                 else:
-                    run_cli(["show", what.upper(), "--out-dir", out_dir])
+                    from vmd_agent import toolset
+                    got = toolset.TOOLS["fetch_structure"](what.upper(), out_dir=out_dir)
+                    if not got.get("ok"):
+                        io.say(f"Could not fetch {what.upper()}: {got.get('error')}")
+                        continue
+                    run_cli(["tool", "visualize_and_interpret", got["path"], "--out", out_dir])
             elif pick == 4:
                 top = io.ask("Structure file (PDB, PSF ...)")
                 trj = io.ask("Trajectory file (DCD, XTC ...)")
                 if not top or not trj:
                     continue
                 what = io.ask("What to measure (rmsd rmsf rgyr contacts hbonds sasa convergence)", "rmsd rgyr")
-                run_cli(["analyze", _in_data(top), _in_data(trj), "--do"] + what.split())
+                run_cli(["tool", "analyze_trajectory", _in_data(top), _in_data(trj), "--analyses"] + what.split())
             elif pick == 5:
                 top = io.ask("Structure file")
                 claim = io.ask("A statement to check (e.g. It has 4 disulfide bridges)")
                 if top and claim:
-                    run_cli(["claims", _in_data(top), claim])
+                    run_cli(["tool", "verify_claims", _in_data(top), claim])
             elif pick == 6:
                 setup_ai_app(io, settings.get("data_dir") or os.getcwd())
             elif pick == 7:

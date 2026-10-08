@@ -70,7 +70,7 @@ def test_the_cases_that_need_vmd_pass_with_a_real_vmd(tmp_path):
     records = tool_cases.run(str(tmp_path / "run"), skip=["network"])
     assert not [r for r in records if r.status == "FAIL"]
     assert all("network" in r.reason for r in records if r.status == "skip")        # only the network was left out
-    assert {r.tool for r in records if r.status == "pass"} >= set(toolset.TOOLS) - {"search_pdb", "fetch_structure", "fetch_and_visualize"}
+    assert {r.tool for r in records if r.status == "pass"} >= set(toolset.TOOLS) - {"search_pdb", "fetch_structure"}
 
 
 def test_a_wrong_expectation_is_reported_not_hidden(tmp_path):
@@ -85,8 +85,8 @@ def test_a_wrong_expectation_is_reported_not_hidden(tmp_path):
 
 
 def test_only_selects_cases_and_what_they_come_after():
-    ids = [c.id for c in tool_cases.select(["vmd_mutate_residue"])]
-    assert ids == ["vmd_build_system_dry", "vmd_build_system_solvated", "vmd_mutate_residue", "vmd_mutate_residue_solvated"]
+    ids = [c.id for c in tool_cases.select(["mutate_residue"])]
+    assert ids == ["build_system_dry", "build_system_solvated", "mutate_residue", "mutate_residue_solvated"]
     assert [c.id for c in tool_cases.select(["color_key"])] == ["color_key"]
     with pytest.raises(ValueError, match="no such case"):
         tool_cases.select(["no_such_tool"])
@@ -95,7 +95,7 @@ def test_only_selects_cases_and_what_they_come_after():
 def test_the_command_runs_a_case_and_lists_them(tmp_path, capsys):
     from vmd_agent import cli
     assert cli.main(["bench", "tools", "--list"]) == 0
-    assert "describe_representation" in capsys.readouterr().out
+    assert "list_representations_one" in capsys.readouterr().out
     assert cli.main(["bench", "tools", "--data-dir", str(tmp_path / "d"), "--only", "color_key", "inspect_files"]) == 0
     out = capsys.readouterr().out
     assert "pass  color_key" in out and "2 passed, 0 failed" in out

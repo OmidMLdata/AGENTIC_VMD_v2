@@ -30,7 +30,7 @@ jobs:
       - name: Lint, dead-code check and the whole test suite
         run: pip install ruff vulture && ruff check src tests && vulture && pytest -q -rs
       - name: Cross-validation against independent NumPy
-        run: vmd-agent validate tests/data/sample/sample.pdb tests/data/sample/sample.dcd --sel2 "resname LIG" --cutoff 6
+        run: vmd-agent bench validate tests/data/sample/sample.pdb tests/data/sample/sample.dcd --sel2 "resname LIG" --cutoff 6
 
   mcp1:
     # The server supports both MCP SDK generations; test the older one for real.

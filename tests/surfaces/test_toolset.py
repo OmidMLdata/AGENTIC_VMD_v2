@@ -11,44 +11,35 @@ import pytest
 from vmd_agent import toolset
 
 DATA = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data")
-EXPECTED = {
-    "probe_environment", "inspect_files", "detect_system",
-    "generate_visualization_recipe", "structure_stats", "color_key",
-    "annotate_image", "list_representations", "describe_representation",
-    "search_pdb", "fetch_structure", "fetch_and_visualize",
-    "visualize_and_interpret", "render_image", "render_movie", "run_vmd_tcl",
-    "analyze_trajectory", "select_keyframes", "verify_claims",
-    "extract_video_frames", "probe_video", "validate_video", "interpret_video",
-    "view_image", "record_visual_interpretation", "assemble_report",
-    "verify_provenance",
+LIBRARY = {
+    "probe_environment", "inspect_files", "detect_system", "structure_stats", "search_pdb", "fetch_structure",
+    "visualize_and_interpret", "render_image", "render_movie", "annotate_image", "view_image", "generate_visualization_recipe",
+    "list_representations", "color_key", "export_session", "run_tcl",
+    "analyze_trajectory", "measure_with_vmd", "select_keyframes", "periodic_box",
+    "find_interactions", "secondary_structure", "backbone_torsions", "check_structure", "align_structures",
+    "convert_trajectory", "write_structure", "make_map", "inspect_map", "combine_maps", "fit_to_map",
+    "build_system", "mutate_residue", "merge_structures", "build_membrane", "build_nanotube", "prepare_namd", "write_slurm_script",
+    "probe_video", "interpret_video", "verify_claims", "record_visual_interpretation", "assemble_report", "verify_provenance",
 }
-
-VMD_EXPECTED = {
-    "vmd_capabilities", "vmd_measure", "vmd_interactions", "vmd_secondary_structure", "vmd_backbone_torsions",
-    "vmd_structure_check", "vmd_align_structures", "vmd_pbc_info", "vmd_convert_trajectory", "vmd_write_structure",
-    "vmd_volmap", "vmd_volume_info", "vmd_build_system", "vmd_mutate_residue", "vmd_merge_structures",
-    "vmd_render_scene", "export_vmd_session", "vmd_build_membrane", "vmd_build_nanotube", "vmd_render_turntable",
-    "vmd_fit_to_map", "vmd_map_arithmetic", "vmd_prepare_namd", "vmd_slurm_script",
-}
-WORKFLOW_EXPECTED = {"list_workflows", "run_workflow"}
 
 
 def test_the_registry_holds_every_tool():
-    assert set(toolset.TOOLS) == EXPECTED | VMD_EXPECTED | WORKFLOW_EXPECTED and len(toolset.TOOLS) == 53
-    assert set(toolset.CORE_TOOLS) == EXPECTED and len(toolset.CORE_TOOLS) == 27      # none of the original tools was lost
+    assert set(toolset.library_tools()) == LIBRARY and len(toolset.library_tools()) == 44
+    assert set(toolset.TOOLS) == LIBRARY | {"run_workflow"}                  # the workflows are reached through one call, not 6 tools
 
 
-def test_the_tool_profiles_are_consistent():
-    assert set(toolset.PROFILES["all"]) == set(toolset.TOOLS)
-    assert set(toolset.PROFILES["core"]) == EXPECTED
-    assert VMD_EXPECTED <= set(toolset.PROFILES["vmd"])
-    assert all(n in toolset.TOOLS for p in toolset.PROFILES.values() for n in p)
+def test_the_library_is_one_grouped_list():
+    names = toolset.library_tools()
+    assert len(names) == len(set(names))                                    # a tool is in exactly one group
+    assert all(toolset.group_of(n) for n in names) and toolset.group_of("run_workflow") == ""
+    assert {toolset.needs_vmd(n) for n in names} == {"yes", "no", "optional"}
+    assert set(toolset.ALL) == set(toolset.TOOLS)
 
 
 def test_importing_the_tools_does_not_need_the_mcp_sdk():
     code = ("import sys\n"
             "from vmd_agent import toolset\n"
-            "assert len(toolset.TOOLS) == 53\n"
+            "assert len(toolset.TOOLS) == 45\n"
             "assert 'mcp' not in sys.modules, 'toolset imported the MCP SDK'\n")
     r = subprocess.run([sys.executable, "-c", code], capture_output=True,
                        text=True, env={**os.environ, "PYTHONWARNINGS": "ignore"})
@@ -90,7 +81,7 @@ def test_tools_run_for_real_and_policy_errors_are_results_not_exceptions(
 
 
 def test_run_vmd_tcl_is_disabled_by_default():
-    r = toolset.TOOLS["run_vmd_tcl"]("puts hi")
+    r = toolset.TOOLS["run_tcl"]("puts hi")
     assert r["blocked"] and "disabled" in r["error"]
 
 

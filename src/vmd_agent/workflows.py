@@ -95,8 +95,8 @@ def structure_overview(structure: str, out_dir: str, options: dict) -> dict:
     run.step("inspect_files", "classify the file", paths=[structure])
     det = run.step("detect_system", "find what is in it", topology=structure)
     stats = run.step("structure_stats", "count bonds, disulfides, H-bonds, secondary structure", topology=structure)
-    tors = run.step("vmd_backbone_torsions", "check the backbone torsions", topology=structure)
-    chk = run.step("vmd_structure_check", "check chirality, cis peptides, chain gaps", topology=structure)
+    tors = run.step("backbone_torsions", "check the backbone torsions", topology=structure)
+    chk = run.step("check_structure", "check chirality, cis peptides, chain gaps", topology=structure)
     vis = run.step("visualize_and_interpret", "draw it", topology=structure, out_dir=os.path.join(out_dir, "views"),
                    views=["front", "side"], renderer=options.get("renderer", "auto"))
     for p in (vis.get("images") or {}).values():
@@ -134,8 +134,8 @@ def equilibration_check(topology: str, trajectory: str, out_dir: str, options: d
     run.step("inspect_files", "classify the files", paths=[topology, trajectory])
     an = run.step("analyze_trajectory", "RMSD, radius of gyration, convergence tests", topology=topology, trajectory=trajectory,
                   analyses=["rmsd", "rgyr", "convergence"], selection=sel, out_dir=os.path.join(out_dir, "analysis"))
-    box = run.step("vmd_pbc_info", "periodic box over time", topology=topology, trajectory=trajectory, step=max(1, int(options.get("step", 1))))
-    vrms = run.step("vmd_measure", "RMSD again, with VMD (cross-check)", topology=topology, trajectory=trajectory, kind="rmsd",
+    box = run.step("periodic_box", "periodic box over time", topology=topology, trajectory=trajectory, step=max(1, int(options.get("step", 1))))
+    vrms = run.step("measure_with_vmd", "RMSD again, with VMD (cross-check)", topology=topology, trajectory=trajectory, kind="rmsd",
                     selection=sel, mass_weighted=False)
     res = an.get("results", {}) if an.get("ok", True) is not False else {}
     for key, name in (("rmsd", "RMSD"), ("rgyr", "Radius of gyration")):
@@ -181,13 +181,13 @@ def interaction_report(topology: str, trajectory: str, out_dir: str, options: di
                {"topology": os.path.basename(topology), "trajectory": os.path.basename(trajectory), "selection": sel,
                 "partner": partner or "-"}, [topology, trajectory], 4 if partner else 2)
     step = max(1, int(options.get("step", 1)))
-    hb = run.step("vmd_interactions", "hydrogen bonds", topology=topology, trajectory=trajectory, kind="hbonds", selection=sel, step=step)
-    sb = run.step("vmd_interactions", "salt bridges", topology=topology, trajectory=trajectory, kind="salt_bridges", selection=sel, step=step)
+    hb = run.step("find_interactions", "hydrogen bonds", topology=topology, trajectory=trajectory, kind="hbonds", selection=sel, step=step)
+    sb = run.step("find_interactions", "salt bridges", topology=topology, trajectory=trajectory, kind="salt_bridges", selection=sel, step=step)
     rows: Dict[str, dict] = {"hydrogen bonds": hb, "salt bridges": sb}
     if partner:
-        rows["contacts with " + partner] = run.step("vmd_interactions", f"contacts between '{sel}' and '{partner}'", topology=topology,
+        rows["contacts with " + partner] = run.step("find_interactions", f"contacts between '{sel}' and '{partner}'", topology=topology,
                                                     trajectory=trajectory, kind="contacts", selection=sel, selection2=partner, step=step)
-        run.step("vmd_measure", f"surface area of '{partner}' over time", topology=topology, trajectory=trajectory, kind="sasa",
+        run.step("measure_with_vmd", f"surface area of '{partner}' over time", topology=topology, trajectory=trajectory, kind="sasa",
                  selection=partner, step=step)
     for name, r in rows.items():
         if not r.get("ok"):
@@ -213,7 +213,7 @@ def compare_runs(topology: str, trajectory_a: str, trajectory_b: str, out_dir: s
     got: Dict[str, Dict[str, dict]] = {"A": {}, "B": {}}
     for tag, traj in (("A", trajectory_a), ("B", trajectory_b)):
         for kind, what in (("rmsd", "RMSD"), ("rgyr", "radius of gyration"), ("rmsf", "per-atom fluctuation")):
-            got[tag][kind] = run.step("vmd_measure", f"{what}, run {tag}", topology=topology, trajectory=traj, kind=kind, selection=sel,
+            got[tag][kind] = run.step("measure_with_vmd", f"{what}, run {tag}", topology=topology, trajectory=traj, kind=kind, selection=sel,
                                       mass_weighted=False)
     for kind, name, unit in (("rmsd", "RMSD", "A"), ("rgyr", "Radius of gyration", "A"), ("rmsf", "RMSF", "A")):
         a, b = got["A"][kind].get("summary"), got["B"][kind].get("summary")
@@ -240,16 +240,16 @@ def prepare_simulation(structure: str, out_dir: str, options: dict) -> dict:
     run = _Run("prepare_simulation", "Prepare a simulation", "Is this structure ready to simulate, and can it be built into a CHARMM36 system?",
                {"structure": os.path.basename(structure), "padding (A)": options.get("padding", 10.0), "salt (M)": options.get("salt", 0.15),
                 "temperature (K)": options.get("temperature", 310.0)}, [structure], 5)
-    chk = run.step("vmd_structure_check", "check the input structure", topology=structure)
-    tors = run.step("vmd_backbone_torsions", "check the backbone torsions", topology=structure)
+    chk = run.step("check_structure", "check the input structure", topology=structure)
+    tors = run.step("backbone_torsions", "check the backbone torsions", topology=structure)
     pre = os.path.join(out_dir, "system", "system")
-    built = run.step("vmd_build_system", "build, solvate and neutralise (psfgen, solvate, autoionize)", input_pdb=structure, out_prefix=pre,
+    built = run.step("build_system", "build, solvate and neutralise (psfgen, solvate, autoionize)", input_pdb=structure, out_prefix=pre,
                      padding=float(options.get("padding", 10.0)), salt_concentration=float(options.get("salt", 0.15)))
     namd = {}
     if built.get("ok"):
-        namd = run.step("vmd_prepare_namd", "write the NAMD input", psf=built["final_psf"], pdb=built["final_pdb"],
+        namd = run.step("prepare_namd", "write the NAMD input", psf=built["final_psf"], pdb=built["final_pdb"],
                         out_prefix=os.path.join(out_dir, "system", "equilibrate"), temperature=float(options.get("temperature", 310.0)))
-        run.step("vmd_slurm_script", "write a SLURM job script", command="equilibrate.namd", kind="namd",
+        run.step("write_slurm_script", "write a SLURM job script", command="equilibrate.namd", kind="namd",
                  out_path=os.path.join(out_dir, "system", "run.sbatch"))
     if chk.get("ok"):
         bad = [f"{chk[k]} {w}" for k, w in (("chirality_errors", "chirality error(s)"), ("cis_peptides", "cis peptide(s)"), ("chain_gaps", "chain gap(s)")) if chk.get(k)]
@@ -271,16 +271,16 @@ def cryoem_fit(model: str, map_file: str, out_dir: str, options: dict) -> dict:
     res = float(options.get("resolution", 8.0))
     run = _Run("cryoem_fit", "Fit a model into a density map", "Where does this model fit this map best, and how well?",
                {"model": os.path.basename(model), "map": os.path.basename(map_file), "resolution (A)": res}, [model, map_file], 4)
-    info = run.step("vmd_volume_info", "read the map", path=map_file)
-    fit = run.step("vmd_fit_to_map", "rigid-body fit", model=model, map_file=map_file, resolution=res, out_pdb=os.path.join(out_dir, "fitted.pdb"))
+    info = run.step("inspect_map", "read the map", path=map_file)
+    fit = run.step("fit_to_map", "rigid-body fit", model=model, map_file=map_file, resolution=res, out_pdb=os.path.join(out_dir, "fitted.pdb"))
     if fit.get("ok"):
         scene = {"reps": [{"selection": "protein", "style": "NewCartoon", "color": "Structure"}],
                  "isosurfaces": [{"file": map_file, "isovalue": float((info.get("suggested_isovalues") or {}).get("mean+3sd", 0.1)),
                                   "style": "wireframe", "color": "ColorID 1"}], "background": "white"}
-        img = run.step("vmd_render_scene", "draw the fitted model inside the map", scene_spec=scene, topology=fit["fitted_pdb"], trajectory=None,
+        img = run.step("render_image", "draw the fitted model inside the map", scene_spec=scene, topology=fit["fitted_pdb"], trajectory=None,
                        out_png=os.path.join(out_dir, "fit.png"), width=1000, height=800)
         run.figure(img.get("image"))
-        run.step("export_vmd_session", "export a session you can open in VMD", scene_spec=scene, topology=fit["fitted_pdb"], trajectory=None,
+        run.step("export_session", "export a session you can open in VMD", scene_spec=scene, topology=fit["fitted_pdb"], trajectory=None,
                  out_dir=os.path.join(out_dir, "session"))
         gain = fit["correlation_after"] - fit["correlation_before"]
         run.finding("ok" if fit["correlation_after"] >= 0.7 else "warning",
@@ -324,22 +324,22 @@ def run_named(name: str, files: List[str], out_dir: str, options: Optional[dict]
     return wf.fn(*files, out_dir, dict(options or {}))
 
 
-# ---------------------------------------------------------------- tools
-@tool()
-def list_workflows() -> dict:
-    """The named multi-step workflows (each runs several tools in a fixed order, reports findings and writes a report):
-    what each does, which files it needs, and whether it needs VMD."""
+def list_named() -> dict:
+    """The named workflows: what each does, which files it needs (in order), whether it needs VMD, and an example."""
     return {"ok": True, "workflows": {n: {"files": w.roles, "does": w.summary, "needs_vmd": w.needs_vmd, "example": w.example}
                                       for n, w in WORKFLOWS.items()}}
 
 
+# ---------------------------------------------------------------- the workflow entry point (not a tool: a layer above them)
 @tool()
-def run_workflow(name: str, files: List[str], out_dir: str = "workflow_report", options: Optional[dict] = None) -> dict:
-    """Run a whole job on the user's files, in one call. USE THIS (not a single measurement) when asked whether a run has settled
+def run_workflow(name: Optional[str] = None, files: Optional[List[str]] = None, out_dir: str = "workflow_report", options: Optional[dict] = None) -> dict:
+    """With no name: list the named workflows, what each does, which files it needs and whether it needs VMD. With a name: run a whole job on the user's files, in one call. USE THIS (not a single measurement) when asked whether a run has settled
     or equilibrated, to compare two runs, to prepare a simulation, to fit a model into a cryo-EM map, or for an overview of a structure.
     name and the files it needs, in order: equilibration_check [topology, trajectory]; structure_overview [structure];
     interaction_report [topology, trajectory]; compare_runs [topology, trajectory_a, trajectory_b]; prepare_simulation
     [structure]; cryoem_fit [model, map]. It runs the checks, grades the findings (ok / note / warning / problem), gives a verdict
     and writes report.md and report.html into out_dir. options: {"selection": "protein"}, {"partner": "resname LIG"}, {"padding": 10},
     {"resolution": 6}."""
-    return run_named(name, [_p(f) for f in files], _p(out_dir) or out_dir, options)
+    if not name:
+        return list_named()
+    return run_named(name, [_p(f) for f in files or []], _p(out_dir) or out_dir, options)

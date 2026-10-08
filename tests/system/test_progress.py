@@ -54,5 +54,5 @@ def test_the_chat_shows_a_tools_progress_under_the_call(tmp_path, monkeypatch):
         shutil.copy(f, tmp_path)
     lines = []
     s = agent.Agent("http://127.0.0.1:1/v1", "m", echo=lines.append)
-    s.run_tool({"id": "1", "name": "vmd_measure", "arguments": {"topology": "protein.pdb", "trajectory": "protein.dcd", "kind": "rgyr"}})
+    s.run_tool({"id": "1", "name": "measure_with_vmd", "arguments": {"topology": "protein.pdb", "trajectory": "protein.dcd", "kind": "rgyr"}})
     assert any("frame 25 of 50" in m for m in lines) and lines[0].lstrip().startswith("->")

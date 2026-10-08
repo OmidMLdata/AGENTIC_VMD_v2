@@ -19,7 +19,7 @@ _PAR = "[file join $::env(VMDDIR) plugins noarch tcl readcharmmpar1.5]"
 def prepare_namd(psf: str, pdb: str, out_prefix: str, temperature: float = 310.0, minimize_steps: int = 1000,
                  equilibrate_ps: float = 100.0, timestep_fs: float = 2.0, ensemble: str = "npt",
                  vmd_path: Optional[str] = None) -> dict:
-    """Write a NAMD configuration (`<out_prefix>.namd`) for a PSF/PDB built with CHARMM36 (see `vmd_build_system`):
+    """Write a NAMD configuration (`<out_prefix>.namd`) for a PSF/PDB built with CHARMM36 (see `build_system`):
     minimisation, then equilibration at `temperature` K in the NPT or NVT ensemble, with PME, rigid bonds and a
     2 fs step. The periodic box is taken from the coordinates, and the CHARMM36 parameter files are copied beside the
     file so the folder can be moved. Not run in NAMD: review it first."""
@@ -47,7 +47,7 @@ def prepare_namd(psf: str, pdb: str, out_prefix: str, temperature: float = 310.0
     centre = [(h + l) / 2 for l, h in zip(lo, hi)]
     if int(res["rows"]["BOX"][0][8]) == 0 or min(size) < 20:
         return {"ok": False, "error": "this system has no water (or is tiny): it is not a solvated periodic system, so there is no "
-                                       "box to simulate in. Build one with vmd_build_system first."}
+                                       "box to simulate in. Build one with build_system first."}
     files = ["par_all36_prot.prm", "toppar_water_ions_namd.str"]
     local = pre + "_toppar"
     os.makedirs(local, exist_ok=True)

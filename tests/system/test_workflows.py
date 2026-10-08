@@ -32,7 +32,7 @@ def _texts(r, level=None):
 
 
 def test_the_workflows_are_listed_with_their_files_and_an_example():
-    r = toolset.TOOLS["list_workflows"]()
+    r = toolset.TOOLS["run_workflow"]()
     assert set(r["workflows"]) == {"structure_overview", "equilibration_check", "interaction_report", "compare_runs",
                                    "prepare_simulation", "cryoem_fit"}
     for name, w in r["workflows"].items():
@@ -51,7 +51,7 @@ def test_a_workflow_checks_how_many_files_it_gets_and_knows_its_name(work):
 @vmd
 def test_equilibration_check_compares_two_engines_and_writes_a_report(work):
     r = workflows.run_named("equilibration_check", ["protein.pdb", "protein.dcd"], "eq", {})
-    assert r["ok"] and [s["tool"] for s in r["steps"]] == ["inspect_files", "analyze_trajectory", "vmd_pbc_info", "vmd_measure"]
+    assert r["ok"] and [s["tool"] for s in r["steps"]] == ["inspect_files", "analyze_trajectory", "periodic_box", "measure_with_vmd"]
     both = [t for t in _texts(r) if "independent engines" in t][0]
     assert "they agree" in both                                       # the toolkit's and VMD's RMSD match to 2 %
     nums = [float(x) for x in __import__("re").findall(r"(\d+\.\d{3}) A", both)]
@@ -87,8 +87,8 @@ def test_interaction_report_finds_the_known_salt_bridge(work):
 
 @vmd
 def test_compare_runs_says_what_each_number_is_relative_to(work):
-    toolset.TOOLS["vmd_convert_trajectory"]("protein.pdb", "protein.dcd", "a.dcd", first=0, last=24)
-    toolset.TOOLS["vmd_convert_trajectory"]("protein.pdb", "protein.dcd", "b.dcd", first=25, last=49)
+    toolset.TOOLS["convert_trajectory"]("protein.pdb", "protein.dcd", "a.dcd", first=0, last=24)
+    toolset.TOOLS["convert_trajectory"]("protein.pdb", "protein.dcd", "b.dcd", first=25, last=49)
     r = workflows.run_named("compare_runs", ["protein.pdb", "a.dcd", "b.dcd"], "cmp", {})
     assert r["ok"] and len(r["steps"]) == 6
     assert any("own first frame" in t for t in _texts(r))               # RMSDs are relative to different frames: said plainly
@@ -116,7 +116,7 @@ def test_without_vmd_the_vmd_steps_are_skipped_and_said_so(work, monkeypatch):
 @vmd
 def test_prepare_simulation_builds_checks_and_warns_about_what_it_left_out(work):
     r = workflows.run_named("prepare_simulation", ["1ubq.pdb"], "prep", {"padding": 6})
-    assert r["ok"] and [s["tool"] for s in r["steps"]][-3:] == ["vmd_build_system", "vmd_prepare_namd", "vmd_slurm_script"]
+    assert r["ok"] and [s["tool"] for s in r["steps"]][-3:] == ["build_system", "prepare_namd", "write_slurm_script"]
     assert any("net charge +0.000" in t for t in _texts(r, "ok"))
     assert any("HOH" in t and "left out" in t for t in _texts(r, "warning"))        # crystal water was not parameterised
     assert any("not been run in NAMD" in t for t in _texts(r, "warning"))

@@ -14,7 +14,7 @@ around the model is deliberate and each part can be switched off to measure the 
 * **the guard**: a data question answered without a tool is sent back once; numbers no tool returned are flagged;
 * **compact results**: what goes back to the model is shortened and stripped of housekeeping.
 
-Safety defaults: if ``VMD_AGENT_ALLOWED_ROOTS`` is unset the agent is confined to the current directory; ``run_vmd_tcl`` stays disabled unless
+Safety defaults: if ``VMD_AGENT_ALLOWED_ROOTS`` is unset the agent is confined to the current directory; ``run_tcl`` stays disabled unless
 ``VMD_AGENT_ENABLE_TCL=1``.
 """
 from __future__ import annotations
@@ -54,13 +54,13 @@ header) say so and do not report the affected number as if it were fine.
 facts with verify_claims and drop or correct anything it contradicts.
 6. You cannot see images. Describe results from the measurements, not from pictures.
 7. Be concise: the answer first, then how you got it.
-8. Tools whose names start with vmd_ run VMD itself. They save the exact Tcl they ran \
+8. Tools that run VMD itself save the exact Tcl they ran \
 (`reproduce_script` in the result): mention it when the user may want to repeat the \
-analysis in their own VMD, and offer export_vmd_session to hand over a scene as a \
+analysis in their own VMD, and offer export_session to hand over a scene as a \
 folder they can open. Never write or paraphrase Tcl yourself: give only the path from \
-`reproduce_script`. When the user asks what VMD can do, call vmd_capabilities.
+`reproduce_script`. When the user asks what VMD can do, call probe_environment with plugins=true.
 9. For a whole job (has a run settled, what interacts, compare two runs, prepare a simulation, fit a model into a map) call \
-list_workflows, then run_workflow: it runs the steps, grades the findings and writes a report. Quote its verdict and findings and \
+run_workflow (with no name it lists the workflows): it runs the steps, grades the findings and writes a report. Quote its verdict and findings and \
 give the report path."""
 
 
@@ -196,9 +196,9 @@ def digest(result):
 
 
 def _choices():
-    """The allowed values of the tools' choice parameters (the same table the VMD commands use)."""
-    from vmd_agent import vmd_cli
-    return vmd_cli.CHOICES
+    """The allowed values of the tools' choice parameters (the same table the command line uses)."""
+    from vmd_agent import toolhints
+    return toolhints.CHOICES
 
 
 @dataclass
@@ -231,10 +231,10 @@ class Agent:
         self.guard = guard
         self.max_tokens = max_tokens          # a model that rambles or repeats itself is cut off, not waited for
         self.echo = echo or (lambda m: None)
-        if tools != "auto" and tools not in toolset.PROFILES:
-            raise ValueError(f"tools must be one of {', '.join(list(toolset.PROFILES) + ['auto'])}")
+        if tools not in ("all", "auto"):
+            raise ValueError("tools must be 'all' or 'auto'")
         self.profile = tools
-        self.names = list(toolset.PROFILES["all" if tools == "auto" else tools])     # what is offered now; "auto" narrows it per question
+        self.names = list(toolset.ALL)     # what is offered now; "auto" narrows it per question
         self.repair = repair                   # put unambiguous argument mistakes right (and say so); off to measure the model alone
         self.widened: List[str] = []           # tools added after the router's choice, because the model asked for them
         self.usage = {"input_tokens": 0, "output_tokens": 0}
@@ -360,9 +360,9 @@ class Agent:
 
     def _ask(self, text: str, on_token: Optional[Callable[[str], None]]) -> str:
         if self.profile == "auto":
-            self.names = routing.select(text, list(toolset.PROFILES["all"]))
+            self.names = routing.select(text, list(toolset.ALL))
             self.widened = []
-            self.echo(f"  (offering {len(self.names)} of {len(toolset.PROFILES['all'])} tools for this question)")
+            self.echo(f"  (offering {len(self.names)} of {len(toolset.ALL)} tools for this question)")
         hint = route(text) if "run_workflow" in self.names else None
         note = ""
         if hint:

@@ -15,7 +15,7 @@ tools with any OpenAI-compatible model (see :mod:`vmd_agent.chat`).
 Security
 --------
 Set ``VMD_AGENT_ALLOWED_ROOTS`` to confine every path the tools read or write
-(the Docker image sets it to ``/data``). ``run_vmd_tcl`` is disabled unless
+(the Docker image sets it to ``/data``). ``run_tcl`` is disabled unless
 ``VMD_AGENT_ENABLE_TCL=1``. See :mod:`vmd_agent.security`.
 """
 from __future__ import annotations

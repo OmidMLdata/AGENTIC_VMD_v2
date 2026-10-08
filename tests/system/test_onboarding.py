@@ -248,8 +248,7 @@ def test_every_command_has_a_plain_language_description():
                        capture_output=True, text=True,
                        env={**os.environ, "PYTHONWARNINGS": "ignore"})
     out = r.stdout
-    for cmd in ("setup", "chat", "doctor", "probe", "inspect", "analyze", "visualize",
-                "claims", "show", "mcp-config"):
+    for cmd in ("setup", "chat", "doctor", "tools", "tool", "workflow", "mcp-config"):
         assert f"  {cmd} " in out or f"    {cmd} " in out, cmd
     assert "Just type  vmd-agent" in out and "First time?" in out
 

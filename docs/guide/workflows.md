@@ -1,6 +1,8 @@
 # Whole jobs: workflows and reports
 
-A workflow is a named job that runs several tools in a fixed order, the way a person would, and ends with a **verdict**, a list of
+Tools and workflows are different layers. A [tool](tools.md) does one thing; a workflow is a job above the tools. There are six, and the agent reaches them through one call, `run_workflow` (with no name it lists them), so they are not among the tools of the library.
+
+A workflow is a named job that runs several [tools](tools.md) in a fixed order, the way a person would, and ends with a **verdict**, a list of
 **findings** and a **report**. Nothing in it is decided by a language model: the findings come from the tools' own numbers and wording, and each is
 graded **ok**, **note**, **warning** or **problem**. A step that needs VMD is skipped, and reported as skipped, when there is no VMD.
 

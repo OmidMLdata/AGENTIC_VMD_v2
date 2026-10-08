@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.24.0: one tool library, workflows above it, and no second set of commands
+
+* **One list of 44 tools, in ten groups** (`toolset.LIBRARY`). The old division into "the original 27" and "the 24 that drive VMD" is gone, and so are the `core` and `vmd` chat profiles (`--tools` is now
+  `all` or `auto`). The README and `docs/guide/tools.md` list the groups, and a test keeps them equal to the code.
+* **Merged tools**, so one function does one job: `vmd_capabilities` into `probe_environment(plugins=true)`; `describe_representation` into `list_representations(name=...)`; `vmd_render_scene` into
+  `render_image(scene_spec=...)`; `vmd_render_turntable` into `render_movie(spin=true)`; `validate_video` into `probe_video(expect_*)`; `extract_video_frames` into `interpret_video`; `fetch_and_visualize`
+  removed (`fetch_structure` then `visualize_and_interpret`); `list_workflows` into `run_workflow` (no name lists them).
+* **Renamed** without the `vmd_` prefix, by what they do: `measure_with_vmd`, `find_interactions`, `secondary_structure`, `backbone_torsions`, `check_structure`, `align_structures`, `periodic_box`,
+  `convert_trajectory`, `write_structure`, `make_map`, `inspect_map`, `combine_maps`, `fit_to_map`, `build_system`, `mutate_residue`, `merge_structures`, `build_membrane`, `build_nanotube`, `prepare_namd`,
+  `write_slurm_script`, `export_session`, `run_tcl`.
+* **Workflows are a layer above the tools**, not tools: six jobs reached through one call, `run_workflow`.
+* **One way to run a tool from a terminal**: `vmd-agent tool NAME ...`, with flags generated from the tool's own parameters (`toolcli.py`). The hand-written duplicates (`probe`, `inspect`, `detect`,
+  `stats`, `render`, `recipe`, `reps`, `annotate`, `fetch`, `search`, `show`, `visualize`, `analyze`, `keyframes`, `claims`, `report`, `probe-video`, `interpret-video`, `provenance`, `renderers`, and the whole
+  `vmd` group) are removed. `validate` and `validate-dssp` moved under `bench`.
+
 ## 0.23.0: the web page follows VMD's interface
 
 * **Menus, command palette and shortcuts**: File, Molecule, Graphics, Display, Mouse, Animation, Extensions and Help menus; Ctrl/⌘ K searches every action; a shortcuts sheet (`?`); keyboard-operable menus,

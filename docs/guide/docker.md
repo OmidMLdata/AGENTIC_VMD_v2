@@ -48,7 +48,7 @@ docker build -f docker/Dockerfile --target with-vmd -t vmd-agent:vmd-local .   #
 #### Open-source image
 
 ```bash
-docker run --rm -v "$PWD/data:/data" vmd-agent probe
+docker run --rm -v "$PWD/data:/data" vmd-agent tool probe_environment
 docker run --rm -v "$PWD/data:/data" vmd-agent \
     visualize /data/protein.pdb --out-dir /data/out --renderer matplotlib
 docker run -i --rm -v "$PWD/data:/data" vmd-agent            # MCP server on stdio
@@ -115,7 +115,7 @@ with `--live-api`. The run's `manifest.json` records versions, the VMD path and 
 a container and a hash of the suite, never a secret.
 
 **What protects the key.** The benchmark process holds `ANTHROPIC_API_KEY`. Code the model writes (`run_python`,
-`run_vmd_tcl`) runs with a **whitelisted environment** (search paths, locale, `VMD*`), so it cannot read the key. This is
+`run_tcl`) runs with a **whitelisted environment** (search paths, locale, `VMD*`), so it cannot read the key. This is
 not a sandbox: that code can still use the network from inside the container, so use a dedicated, spend-capped key and
 a throwaway data directory. The container is also limited (`pids_limit`, `mem_limit`, read-only root, no
 capabilities, no new privileges).

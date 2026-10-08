@@ -453,7 +453,7 @@ def test_an_exported_session_opens_in_vmd_from_anywhere(tmp_path):
 def test_the_saved_script_reproduces_the_tool_result_in_plain_vmd(tmp_path, monkeypatch, real_vmd):
     monkeypatch.setenv(security.ENV_ROOTS, str(tmp_path))
     topo, traj = shutil.copy(PDB, tmp_path), shutil.copy(DCD, tmp_path)
-    r = toolset.TOOLS["vmd_measure"](topology=topo, trajectory=traj, kind="rgyr", selection="protein", step=10)
+    r = toolset.TOOLS["measure_with_vmd"](topology=topo, trajectory=traj, kind="rgyr", selection="protein", step=10)
     assert r["ok"], r
     sc = r["reproduce_script"]
     assert os.path.isfile(sc) and os.path.dirname(sc) == str(tmp_path / "vmd_scripts")
@@ -466,9 +466,9 @@ def test_the_saved_script_reproduces_the_tool_result_in_plain_vmd(tmp_path, monk
 
 def test_tools_stay_inside_the_sandbox(tmp_path, monkeypatch):
     monkeypatch.setenv(security.ENV_ROOTS, str(tmp_path))
-    out = toolset.TOOLS["vmd_measure"](topology=PDB, trajectory=DCD, kind="rgyr")
+    out = toolset.TOOLS["measure_with_vmd"](topology=PDB, trajectory=DCD, kind="rgyr")
     assert out["ok"] is False and out["blocked"] is True
-    out = toolset.TOOLS["vmd_convert_trajectory"](topology=str(tmp_path / "a.pdb"), trajectory=None, out_path="/etc/x.dcd")
+    out = toolset.TOOLS["convert_trajectory"](topology=str(tmp_path / "a.pdb"), trajectory=None, out_path="/etc/x.dcd")
     assert out["ok"] is False and out["blocked"] is True
 
 
@@ -485,8 +485,8 @@ def test_every_wrapped_plugin_names_a_tool_that_exists():
     import re
     for name, (status, detail) in capabilities.COVERAGE.items():
         if status == capabilities.W:
-            tools = re.findall(r"(vmd_[a-z_]+|render_movie|export_vmd_session)", detail)
-            assert tools and all(t in toolset.TOOLS for t in tools), (name, detail)
+            tools = [t for t in toolset.TOOLS if re.search(rf"\b{t}\b", detail)]
+            assert tools, (name, detail)                                       # the detail names a tool of the library
 
 
 @vmd
@@ -562,29 +562,31 @@ def test_water_oxygen_rdf_has_the_known_first_peak(tmp_path):
 
 
 # ------------------------------------------------------------------ the command line
-def test_tools_command_lists_the_vmd_tools(capsys):
-    from vmd_agent import cli
-    assert cli.main(["tools", "--group", "vmd"]) == 0
+def test_tools_command_lists_every_tool_in_groups(capsys):
+    from vmd_agent import cli, toolset
+    assert cli.main(["tools"]) == 0
     out = capsys.readouterr().out
-    assert "vmd_measure" in out and "export_vmd_session" in out and "analyze_trajectory" not in out
-    assert cli.main(["tools", "--group", "core"]) == 0
-    assert len(capsys.readouterr().out.strip().splitlines()) == 27
+    assert all(n in out for n in toolset.library_tools()) and "Whole jobs" in out
+    assert all(g in out for g, _d, _t in toolset.LIBRARY)
 
 
-def test_tool_command_runs_a_tool_from_json_and_reports_bad_input(tmp_path, capsys, monkeypatch):
+def test_tool_command_runs_a_tool_with_flags_and_reports_bad_input(tmp_path, capsys, monkeypatch):
     from vmd_agent import cli
     monkeypatch.setenv(security.ENV_ROOTS, str(tmp_path))
     dx = tmp_path / "m.dx"
     dx.write_text("object 1 class gridpositions counts 2 2 2\norigin 0 0 0\ndelta 1 0 0\ndelta 0 1 0\ndelta 0 0 1\n"
                   "object 2 class gridconnections counts 2 2 2\nobject 3 class array type double rank 0 items 8 data follows\n"
                   "1 2 3\n4 5 6\n7 8\n")
-    assert cli.main(["tool", "vmd_volume_info", json.dumps({"path": str(dx)})]) == 0
+    assert cli.main(["tool", "inspect_map", str(dx)]) == 0
     out = json.loads(capsys.readouterr().out)
     assert out["ok"] and out["shape"] == [2, 2, 2] and out["max"] == 8 and out["integral"] == 36
-    assert cli.main(["tool", "no_such_tool"]) == 2
-    assert cli.main(["tool", "vmd_volume_info", "[1]"]) == 2                      # arguments must be an object
-    assert cli.main(["tool", "vmd_volume_info", json.dumps({"bogus": 1})]) == 2           # wrong argument names
-    assert cli.main(["tool", "vmd_volume_info", json.dumps({"path": str(tmp_path / "x.mrc")})]) == 1     # ok: false -> exit 1
+    with pytest.raises(SystemExit) as e:
+        cli.main(["tool", "no_such_tool"])
+    assert e.value.code == 2
+    with pytest.raises(SystemExit) as e:
+        cli.main(["tool", "inspect_map", str(dx), "--bogus", "1"])                        # wrong flag names
+    assert e.value.code == 2
+    assert cli.main(["tool", "inspect_map", str(tmp_path / "x.mrc")]) == 1                # ok: false -> exit 1
 
 
 # ------------------------------------------------------------------ a model mixing up inputs and outputs

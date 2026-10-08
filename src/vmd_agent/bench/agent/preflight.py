@@ -69,7 +69,7 @@ def _vmd_checks(vmd_path: Optional[str], tmp: str) -> List[dict]:
     with open(pdb, "w") as fh:
         fh.write(_PDB)
     from vmd_agent.visual import render
-    smoke = render.run_vmd_tcl(
+    smoke = render.run_tcl(
         f'mol new {{{pdb}}} type pdb waitfor all\n'
         'puts "PFATOMS=[[atomselect top all] num]"\n', vmd, timeout=120,
         env=sanitized_env())
@@ -96,7 +96,7 @@ def _vmd_checks(vmd_path: Optional[str], tmp: str) -> List[dict]:
         out.append(_c("vmd_selection", "fail",
                       f"{type(e).__name__}: {e}"[:200], ["vmd_plain"]))
     tga = os.path.join(tmp, "pf.tga")
-    r = render.run_vmd_tcl(
+    r = render.run_tcl(
         f'mol new {{{pdb}}} type pdb waitfor all\n'
         'display resize 64 64\n'
         f'render TachyonInternal {{{tga}}}\n', vmd, timeout=120,

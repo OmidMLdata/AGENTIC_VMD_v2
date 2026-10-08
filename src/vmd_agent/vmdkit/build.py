@@ -103,7 +103,7 @@ def mutate_residue(psf: str, pdb: str, out_prefix: str, segid: str, resid: int, 
             "emit M [[atomselect top all] num] [$r get resname]"]
     res = S.run(body, vmd_path, timeout=900)
     if not res["ok"]:
-        hint = (" Mutate the dry system (vmd_build_system with solvate=false), then solvate: the mutator plugin failed on a solvated one."
+        hint = (" Mutate the dry system (build_system with solvate=false), then solvate: the mutator plugin failed on a solvated one."
                 if "topology file" in str(res.get("error")) else "")
         return {"ok": False, "error": str(res.get("error")) + hint, "log": res.get("log", "")[-400:]}
     n, rn = res["rows"]["M"][0]

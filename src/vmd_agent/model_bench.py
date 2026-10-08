@@ -44,14 +44,14 @@ def prepare(folder: str, log: Callable[[str], None] = lambda m: None) -> dict:
         toolset.TOOLS["detect_system"](topology=top, session_dir=os.path.join(folder, "sess"))
         extras += ["prov", "sess"]
         if available("vmd") is None:
-            dry = toolset.TOOLS["vmd_build_system"](input_pdb=top, out_prefix=os.path.join(folder, "dry"), solvate=False)
+            dry = toolset.TOOLS["build_system"](input_pdb=top, out_prefix=os.path.join(folder, "dry"), solvate=False)
             if dry.get("ok"):                                          # the build writes dry.psf / dry.pdb as <prefix>_ion? keep plain names
                 for ext in ("psf", "pdb"):
                     src = dry.get(f"final_{ext}")
                     if src and os.path.abspath(src) != os.path.join(folder, f"dry.{ext}"):
                         shutil.copy(src, os.path.join(folder, f"dry.{ext}"))
                 extras.append("dry")
-            wet = toolset.TOOLS["vmd_build_system"](input_pdb=top, out_prefix=os.path.join(folder, "build", "sys"), padding=8.0)
+            wet = toolset.TOOLS["build_system"](input_pdb=top, out_prefix=os.path.join(folder, "build", "sys"), padding=8.0)
             if wet.get("ok"):
                 extras.append("build")
             else:
@@ -297,7 +297,7 @@ def _rate(rows: Sequence[dict], key: str) -> Optional[float]:
 
 
 def label(r: dict) -> str:
-    """What a row of the summary is: the model and how it was run, so the same model with 53 tools and with routed tools sit side by side."""
+    """What a row of the summary is: the model and how it was run, so the same model with every tool and with routed tools sit side by side."""
     return f"{r['model']} ({r.get('tools_profile', 'all')}{'' if r.get('guard', True) else ', no guard'})"
 
 

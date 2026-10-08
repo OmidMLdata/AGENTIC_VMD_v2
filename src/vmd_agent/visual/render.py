@@ -14,7 +14,7 @@ Changes from the first version
   trajectory each time, and reset the camera per frame so the movie jittered.
 * ``render_frames`` renders an arbitrary list of frames the same way and backs
   the event-aware keyframe feature.
-* ``run_vmd_tcl`` screens scripts through :mod:`vmd_agent.security`.
+* ``run_tcl`` screens scripts through :mod:`vmd_agent.security`.
 """
 from __future__ import annotations
 
@@ -293,7 +293,7 @@ def count_frames(topology: str, trajectory: Optional[str]) -> int:
 
 
 # ------------------------------------------------------------------ raw Tcl
-def run_vmd_tcl(script: str, vmd_path: Optional[str] = None,
+def run_tcl(script: str, vmd_path: Optional[str] = None,
                 timeout: int = 900, allow_unsafe: Optional[bool] = None,
                 cwd: Optional[str] = None, env: Optional[dict] = None) -> dict:
     """Execute a Tcl script in headless VMD and capture output.

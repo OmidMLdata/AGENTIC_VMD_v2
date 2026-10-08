@@ -14,7 +14,7 @@ no client.
 Security
 --------
 Set ``VMD_AGENT_ALLOWED_ROOTS`` to confine every path the tools read or write
-(the Docker image sets it to ``/data``). ``run_vmd_tcl`` is disabled unless
+(the Docker image sets it to ``/data``). ``run_tcl`` is disabled unless
 ``VMD_AGENT_ENABLE_TCL=1``. See :mod:`vmd_agent.security`.
 """
 from __future__ import annotations
@@ -76,11 +76,17 @@ def _store(session_dir: Optional[str], key: str, value):
 
 # ---- environment / inspection --------------------------------------------
 @tool()
-def probe_environment(vmd_path: Optional[str] = None) -> dict:
-    """Report what this machine can do: VMD/Tachyon/ffmpeg, analysis libraries
-    and which renderers (vmd, matplotlib) are available. Call this first
-    to choose a renderer; the matplotlib backend works without VMD."""
-    return auto_mod.probe_environment(_p(vmd_path))
+def probe_environment(vmd_path: Optional[str] = None, plugins: bool = False, verbose: bool = False) -> dict:
+    """Report what this machine can do: VMD/Tachyon/ffmpeg, analysis libraries and which renderers (vmd, matplotlib) are
+    available. Call this first to choose a renderer; the matplotlib backend works without VMD. plugins=true also lists the
+    plugins of the installed VMD by status: wrapped by this toolkit (with the tool that does it), library, window-only,
+    needing another program (NAMD, APBS, ...), or not wrapped yet (use it when asked what VMD can do); verbose=true adds
+    every plugin's version and the file formats."""
+    r = auto_mod.probe_environment(_p(vmd_path))
+    if plugins:
+        from vmd_agent.vmdkit import capabilities
+        r["vmd_plugins"] = capabilities.vmd_capabilities(_p(vmd_path), verbose=verbose)
+    return r
 
 
 @tool()
@@ -196,22 +202,14 @@ def annotate_image(image_path: str, topology: Optional[str] = None,
 
 
 @tool()
-def list_representations(category: Optional[str] = None) -> dict:
-    """Catalogue of VMD graphical representations, colour methods and materials.
-
-    Consult this to choose or explain a drawing style. Categories: 'backbone'
-    (NewCartoon, Tube, Ribbons), 'atomic' (CPK, Licorice, Lines, VDW),
-    'surface' (QuickSurf, Surf, MSMS), 'special' (DynamicBonds, HBonds)."""
+def list_representations(category: Optional[str] = None, name: Optional[str] = None) -> dict:
+    """Catalogue of VMD graphical representations, colour methods and materials. Consult this to choose or explain a
+    drawing style. Categories: 'backbone' (NewCartoon, Tube, Ribbons), 'atomic' (CPK, Licorice, Lines, VDW),
+    'surface' (QuickSurf, Surf, MSMS), 'special' (DynamicBonds, HBonds). Give name (for example 'QuickSurf') instead
+    for the full detail on one representation: what it draws, what it is best for, its VMD command with default
+    parameters, and its limitations."""
     from vmd_agent.visual import representations as reps_mod
-    return reps_mod.list_representations(category)
-
-
-@tool()
-def describe_representation(name: str) -> dict:
-    """Full detail on one representation: what it draws, what it is best for,
-    its VMD command with default parameters, and its limitations."""
-    from vmd_agent.visual import representations as reps_mod
-    return reps_mod.describe_representation(name)
+    return reps_mod.describe_representation(name) if name else reps_mod.list_representations(category)
 
 
 @tool()
@@ -226,7 +224,7 @@ def search_pdb(query: str, limit: int = 10) -> dict:
 def fetch_structure(identifier: str, out_dir: str = "structures",
                     source: str = "auto", file_format: str = "auto") -> dict:
     """Download a structure from the web to a local file. Use ONLY when the entry is not already in the data folder;
-    for a file that is already there use inspect_files, detect_system or structure_stats.
+    for a file that is already there use inspect_files, detect_system or structure_stats. To see it afterwards, call visualize_and_interpret on the saved file.
 
     identifier: PDB ID (e.g. '1UBQ'), UniProt accession for an AlphaFold model
     (e.g. 'P69905'), or a direct URL. Falls back to mmCIF when the legacy PDB
@@ -234,47 +232,6 @@ def fetch_structure(identifier: str, out_dir: str = "structures",
     from vmd_agent.inputs import fetch as fetch_mod
     return fetch_mod.fetch_structure(identifier, out_dir=_p(out_dir),
                                      source=source, file_format=file_format)
-
-
-@tool()
-def fetch_and_visualize(identifier: str,
-                        out_dir: str = "vmd_agent_output",
-                        source: str = "auto",
-                        views: Optional[List[str]] = None,
-                        style: str = "publication",
-                        background: str = "white",
-                        show_water: bool = False,
-                        focus: str = "overview",
-                        representation: Optional[str] = None,
-                        annotate: bool = True,
-                        session_dir: Optional[str] = None,
-                        vmd_path: Optional[str] = None,
-                        renderer: str = "auto") -> dict:
-    """ONE CALL: download a protein from the PDB (or AlphaFold/URL), pick the
-    best representation automatically, render it from several viewpoints, and
-    return a grounded interpretation package with the saved image paths.
-
-    renderer: 'auto' (VMD if installed, else the open-source matplotlib
-    backend), 'vmd' or 'matplotlib'. The package says which one drew
-    the images and lists its visual caveats.
-
-    Use this whenever the user names a protein or PDB ID and wants to see it.
-    Afterwards call view_image on each saved image and write the interpretation."""
-    pkg = auto_mod.fetch_and_visualize(
-        identifier, out_dir=_p(out_dir), source=source,
-        views=tuple(views) if views else ("front", "side", "top", "iso"),
-        style=style, background=background, show_water=show_water,
-        focus=focus, representation=representation, annotate=annotate,
-        vmd_path=_p(vmd_path), renderer=renderer)
-    if session_dir and pkg.get("ok"):
-        _store(session_dir, "inspection", pkg.get("inspection"))
-        _store(session_dir, "detection", pkg.get("detection"))
-        _store(session_dir, "renderer", pkg.get("renderer"))
-        _store(session_dir, "provenance", pkg.get("provenance_path"))
-        for v, p in (pkg.get("images") or {}).items():
-            report_mod.Session(_p(session_dir)).add_figure(
-                p, caption=f"{identifier} — {v} view")
-    return pkg
 
 
 @tool()
@@ -316,14 +273,26 @@ def visualize_and_interpret(topology: str, trajectory: Optional[str] = None,
 
 
 @tool()
-def render_image(topology: str, trajectory: Optional[str] = None,
+def render_image(topology: Optional[str] = None, trajectory: Optional[str] = None,
                  frame: int = -1, out_png: str = "vmd_render.png",
                  width: int = 1600, height: int = 1200,
                  background: str = "white",
                  recipe_path: Optional[str] = None,
+                 scene_spec: Optional[dict] = None,
                  vmd_path: Optional[str] = None) -> dict:
-    """Render one publication image via headless VMD+Tachyon. Requires VMD
-    (use visualize_and_interpret with renderer='matplotlib' without it)."""
+    """Render one publication image via headless VMD+Tachyon. Requires VMD (use visualize_and_interpret with
+    renderer='matplotlib' without it). With only topology (and trajectory) it draws the system the way detect_system
+    suggests. To draw a scene you describe, pass scene_spec: {reps: [{selection, style, color, material, params}],
+    isosurfaces: [{file, isovalue, color, style: solid|wireframe|points}], background, frame, rotate: [[axis, degrees]],
+    zoom, projection, axes, depthcue, shadows, ambient_occlusion}. Styles: Lines, Licorice, VDW, CPK, NewCartoon, QuickSurf,
+    Surf, MSMS, ...; colors: Name, Element, ResName, Chain, Structure, Beta, ColorID n, ... (topology may then be left out
+    for a map-only scene). Use export_session to hand the same scene to a VMD user."""
+    if scene_spec is not None:
+        from vmd_agent.vmdkit import scene
+        return scene.render_scene(scene_spec, _p(topology), _p(trajectory), _p(out_png), width=width, height=height,
+                                  vmd_path=_p(vmd_path))
+    if not topology:
+        raise security.InvalidInput("give a topology, or a scene_spec that describes what to draw")
     det = None
     if not recipe_path:
         det = detect_mod.detect_system(_p(topology), _p(trajectory))
@@ -334,12 +303,21 @@ def render_image(topology: str, trajectory: Optional[str] = None,
 
 
 @tool()
-def render_movie(topology: str, trajectory: str,
+def render_movie(topology: str, trajectory: Optional[str] = None,
                  out_mp4: str = "vmd_movie.mp4", stride: int = 1,
                  fps: int = 24, width: int = 1280, height: int = 720,
+                 spin: bool = False, scene_spec: Optional[dict] = None,
+                 frames: int = 72, degrees: float = 360.0, axis: str = "y",
                  vmd_path: Optional[str] = None) -> dict:
-    """Render a trajectory to an MP4 via VMD+Tachyon+ffmpeg in ONE VMD session
-    with a fixed camera. Requires VMD."""
+    """Render a movie via VMD+Tachyon+ffmpeg. Requires VMD. By default it plays a trajectory (give trajectory) in ONE VMD
+    session with a fixed camera. With spin=true it is a rotating-view movie instead (a turntable) of the scene in
+    scene_spec (same form as in render_image): the camera turns `degrees` about `axis` over `frames` frames."""
+    if spin:
+        from vmd_agent.vmdkit import scene
+        return scene.render_turntable(scene_spec or {}, _p(topology), _p(trajectory), _p(out_mp4), frames=frames,
+                                      degrees=degrees, axis=axis, fps=fps, width=width, height=height, vmd_path=_p(vmd_path))
+    if not trajectory:
+        raise security.InvalidInput("a movie of a trajectory needs a trajectory (or use spin=true for a rotating view of one structure)")
     topology, trajectory = _p(topology), _p(trajectory)
     det = detect_mod.detect_system(topology, trajectory)
     r = render_mod.render_movie(
@@ -365,7 +343,7 @@ ENV_ENABLE_TCL = "VMD_AGENT_ENABLE_TCL"
 
 
 @tool()
-def run_vmd_tcl(script: str, vmd_path: Optional[str] = None) -> dict:
+def run_tcl(script: str, vmd_path: Optional[str] = None) -> dict:
     """Run Tcl in headless VMD (escape hatch for VMD-only analyses).
 
     DISABLED unless the server is started with VMD_AGENT_ENABLE_TCL=1: Tcl can
@@ -375,11 +353,11 @@ def run_vmd_tcl(script: str, vmd_path: Optional[str] = None) -> dict:
     the obvious dangerous commands as an accident guard, not a boundary."""
     if os.environ.get(ENV_ENABLE_TCL) != "1":
         return {"ok": False, "blocked": True,
-                "error": "run_vmd_tcl is disabled. Tcl can run arbitrary "
+                "error": "run_tcl is disabled. Tcl can run arbitrary "
                          "programs and cannot be made safe by filtering; set "
                          f"{ENV_ENABLE_TCL}=1 on the server only if you fully "
                          "trust the caller."}
-    return render_mod.run_vmd_tcl(script, vmd_path=_p(vmd_path))
+    return render_mod.run_tcl(script, vmd_path=_p(vmd_path))
 
 
 # ---- analysis -------------------------------------------------------------
@@ -446,43 +424,31 @@ def verify_claims(topology: str, claims: List[str],
 
 # ---- media / interpretation ----------------------------------------------
 @tool()
-def extract_video_frames(video: str, n: int = 9,
-                         out_dir: Optional[str] = None) -> dict:
-    """Extract evenly-spaced stills from a VMD movie/GIF for interpretation."""
-    return media.extract_frames(_p(video), n=n, out_dir=_p(out_dir))
-
-
-@tool()
-def probe_video(video: str, count_frames: bool = False) -> dict:
+def probe_video(video: str, count_frames: bool = False,
+                expect_width: Optional[int] = None,
+                expect_height: Optional[int] = None,
+                expect_fps: Optional[float] = None,
+                expect_n_frames: Optional[int] = None,
+                expect_min_duration_s: Optional[float] = None) -> dict:
     """Read a video's real codec/geometry/timing metadata and prove it decodes.
 
     Use on any encoded movie -- including one the user supplies. Encoded video
     is rendered visual evidence, NOT a molecular trajectory: VMD cannot load an
     MP4 as coordinates, so route such input here, never to detect_system.
+    To check that it matches what was asked for (size, frame rate, frame count,
+    length), give the expect_* values: the answer then has a `validation` with
+    one line per check, and an expectation left unset is reported as "not checked"
+    rather than passing, so a thin check never reads as a thorough one.
     """
     r = media.probe_video(_p(video), count_frames=count_frames)
     if r.get("ok") and r.get("width"):
         r["summary"] = (f"{r.get('width')} x {r.get('height')} pixels (width x height), {r.get('fps')} frames per second, {r.get('n_frames')} frames, "
                         f"{r.get('duration_s')} s long, {r.get('codec')}, file size {r.get('size_bytes')} bytes (not the picture size).")
+    if any(v is not None for v in (expect_width, expect_height, expect_fps, expect_n_frames, expect_min_duration_s)):
+        r["validation"] = media.validate_video(
+            _p(video), expect_width=expect_width, expect_height=expect_height, expect_fps=expect_fps,
+            expect_n_frames=expect_n_frames, expect_min_duration_s=expect_min_duration_s)
     return r
-
-
-@tool()
-def validate_video(video: str,
-                   expect_width: Optional[int] = None,
-                   expect_height: Optional[int] = None,
-                   expect_fps: Optional[float] = None,
-                   expect_n_frames: Optional[int] = None,
-                   expect_min_duration_s: Optional[float] = None) -> dict:
-    """Verify an encoded video decodes and matches the requested settings.
-
-    Expectations left unset are reported as "not checked" rather than passing,
-    so a thin check never reads as a thorough one.
-    """
-    return media.validate_video(
-        _p(video), expect_width=expect_width, expect_height=expect_height,
-        expect_fps=expect_fps, expect_n_frames=expect_n_frames,
-        expect_min_duration_s=expect_min_duration_s)
 
 
 @tool()
@@ -496,7 +462,8 @@ def interpret_video(video: str, n_frames: int = 9,
                     source_trajectory: Optional[str] = None,
                     count_frames: bool = False,
                     session_dir: Optional[str] = None) -> dict:
-    """ONE CALL: verify a video and return inspectable stills for interpretation.
+    """ONE CALL: verify a video and return inspectable stills for interpretation (n_frames evenly spaced ones, or
+    stills at the given timestamps).
 
     Probes the file, proves it decodes, extracts stills at known timestamps
     FROM THE ENCODED OUTPUT, runs quality control (blank/frozen frames), maps
@@ -614,12 +581,54 @@ def tool_specs(names: Optional[List[str]] = None) -> List[dict]:
             if names is None or n in names]
 
 
-#: the tools every front end had before VMD itself was wrapped (a smaller menu for small models)
-CORE_TOOLS = tuple(TOOLS)
-
-# The tools that drive VMD itself, and the named workflows, register themselves into TOOLS on import.
+# The tools that drive VMD itself, and the workflow entry point, register themselves into TOOLS on import.
 from vmd_agent import vmd_tools, workflows  # noqa: F401
 
-#: tool-set choices for the chat: all of them, only the original ones, or only those that drive VMD
-PROFILES = {"all": tuple(TOOLS), "core": CORE_TOOLS,
-            "vmd": tuple(n for n in TOOLS if n not in CORE_TOOLS) + ("inspect_files", "probe_environment")}
+#: the one call that reaches the workflows (a layer above the tools: it runs several of them in a fixed order)
+WORKFLOW_ENTRY = "run_workflow"
+
+#: the tool library, as the README and ``vmd-agent tools`` show it: (group, what the group is for, [(tool, needs VMD)]).
+#: ``needs`` is "yes", "no", or "optional" (a built-in drawing is used when VMD is missing).
+LIBRARY: List[tuple] = [
+    ("Look at this computer and your files", "what is here, and what is in it", [
+        ("probe_environment", "no"), ("inspect_files", "no"), ("detect_system", "no"), ("structure_stats", "no")]),
+    ("Get a structure", "from the PDB, AlphaFold or a web address", [
+        ("search_pdb", "no"), ("fetch_structure", "no")]),
+    ("Draw", "pictures, movies and scenes", [
+        ("visualize_and_interpret", "optional"), ("render_image", "yes"), ("render_movie", "yes"), ("annotate_image", "no"), ("view_image", "no"),
+        ("generate_visualization_recipe", "no"), ("list_representations", "no"), ("color_key", "no"), ("export_session", "yes"), ("run_tcl", "yes")]),
+    ("Measure a simulation", "size, shape, flexibility, convergence, box", [
+        ("analyze_trajectory", "no"), ("measure_with_vmd", "yes"), ("select_keyframes", "no"), ("periodic_box", "yes")]),
+    ("Interactions and structure quality", "who touches whom, secondary structure, geometry", [
+        ("find_interactions", "yes"), ("secondary_structure", "yes"), ("backbone_torsions", "yes"), ("check_structure", "yes"), ("align_structures", "yes")]),
+    ("Convert and write files", "other formats, fewer atoms or frames", [
+        ("convert_trajectory", "yes"), ("write_structure", "yes")]),
+    ("Density maps (cryo-EM and more)", "make, read, combine and fit maps", [
+        ("make_map", "yes"), ("inspect_map", "no"), ("combine_maps", "no"), ("fit_to_map", "no")]),
+    ("Build and prepare a simulation", "systems, mutations, membranes, nanotubes, input files", [
+        ("build_system", "yes"), ("mutate_residue", "yes"), ("merge_structures", "yes"), ("build_membrane", "yes"), ("build_nanotube", "yes"),
+        ("prepare_namd", "no"), ("write_slurm_script", "no")]),
+    ("Video", "check and sample an encoded movie", [
+        ("probe_video", "no"), ("interpret_video", "no")]),
+    ("Evidence and records", "check claims, keep provenance, write the report", [
+        ("verify_claims", "no"), ("record_visual_interpretation", "no"), ("assemble_report", "no"), ("verify_provenance", "no")]),
+]
+
+
+def library_tools() -> List[str]:
+    """Every tool of the library, in the order of :data:`LIBRARY` (the workflow entry point is not one of them)."""
+    return [n for _g, _d, ts in LIBRARY for n, _v in ts]
+
+
+def group_of(name: str) -> str:
+    """The library group a tool belongs to ('' for the workflow entry point)."""
+    return next((g for g, _d, ts in LIBRARY for n, _v in ts if n == name), "")
+
+
+def needs_vmd(name: str) -> str:
+    """'yes', 'no' or 'optional': whether the tool needs VMD installed."""
+    return next((v for _g, _d, ts in LIBRARY for n, v in ts if n == name), "no")
+
+
+#: what the chat is offered: every tool and the workflow entry point (the chat can instead narrow them per question, see routing)
+ALL = tuple(library_tools()) + (WORKFLOW_ENTRY,)

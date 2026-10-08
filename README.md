@@ -9,12 +9,12 @@ is installed, the same tools are offered to it as well, like any other MCP serve
 
 ## Highlights
 
-* **An agent for VMD.** Describe what you want; the agent picks from **53 tools**, runs them, and answers from their numbers. It says how each number was obtained.
+* **An agent for VMD.** Describe what you want; the agent picks from **44 tools** in ten groups, runs them, and answers from their numbers. It says how each number was obtained.
 * **Open-source first.** Free models run locally through a private copy of Ollama, chosen to fit your memory. Nothing leaves your computer unless you choose an online model.
-* **A complete wrapper around VMD.** 24 commands drive VMD itself: measurements, interactions, trajectory conversion, density maps, system building, scenes, movies and hand-offs to NAMD and
-  a cluster. Each one saves the exact Tcl it ran, so you can repeat it in your own VMD.
-* **Whole jobs, not only single commands.** Six workflows run several tools in a fixed order, grade what they find and write a report with the checksums of your inputs and the Tcl of every step.
-* **Four ways to work, one set of tools.** A web page with a molecule viewer, a numbered menu, a terminal chat, and plain commands.
+* **A complete wrapper around VMD.** The library covers VMD itself: measurements, interactions, trajectory conversion, density maps, system building, scenes, movies and hand-offs to NAMD and
+  a cluster. Each tool that runs VMD saves the exact Tcl it ran, so you can repeat it in your own VMD.
+* **Whole jobs, not only single tools.** Six workflows sit above the tools: each runs several of them in a fixed order, grades what it finds and writes a report with the checksums of your inputs and the Tcl of every step.
+* **Four ways to work, one library.** A web page that looks like VMD, with a molecule viewer and console, a numbered menu, a terminal chat, and one command, `vmd-agent tool`, that runs any tool.
 * **Honest answers.** Every number must come from a tool; a model that answers from memory is sent back to use one, a number no tool returned is sent back or flagged, and a request that cannot be answered
   is declined rather than guessed.
 * **Everything is timed.** You see how long each model call and each tool call took.
@@ -48,7 +48,7 @@ choose who answers: a free model on your computer (recommended), an online servi
 |---|---|
 | the **operating system and CPU** (macOS, Linux, Windows, WSL, a container; Apple Silicon or not) | finds VMD where that system keeps it, uses the right launcher, paths and settings folder, and tells you what cannot work here (for example, a Mac's VMD cannot run inside Docker) |
 | the **memory and graphics card** | suggests the model that fits: the 8B default from 16 GB (or with an NVIDIA card), the 3B from 8 GB, and says plainly when there is too little for a model that can use tools |
-| **VMD**: whether it is there, starts, and its version | uses it for pictures and the 24 VMD tools; without it every other tool still works, with built-in pictures |
+| **VMD**: whether it is there, starts, and its version | uses it for pictures and the tools that run VMD; without it every other tool still works, with built-in pictures |
 | **Ollama** | runs the open-source model through a private copy kept inside the vmd-agent folder (or yours, if you have one), downloading a model only after asking |
 | **Claude Code** | if the `claude` command is installed, offers to register vmd-agent as an MCP server so Claude Code can use VMD through it |
 
@@ -58,17 +58,18 @@ choose who answers: a free model on your computer (recommended), an online servi
 
 | Way | What it is | Start it |
 |---|---|---|
-| **The web page** | A workbench in your browser: your files, a **molecule viewer** (backbone, bonds, spheres, points; coloured by element, chain, residue type, residue number or index; trajectory playback, saved pictures), the chat with every tool call shown with its progress and seconds, and a tab that runs whole jobs | `vmd-agent ui` |
+| **The web page** | A workbench laid out like VMD in your browser: menus and a command palette, a molecule list, a display with **representations** (VMD's selection language, drawing and colouring methods, several molecules), animation, a console that takes VMD's commands, the chat with every tool call shown with its progress and seconds, and a tab that runs whole jobs | `vmd-agent ui` |
 | **The menu** | Numbered choices in plain words: look at a structure, analyse a simulation, check a statement, connect an AI app | `vmd-agent` |
 | **The chat** | Ask in plain language in the terminal; answers stream as they are written, with the time each step took | `vmd-agent chat` |
-| **Commands** | Scripts and batches without any model: every capability is a command with flags | `vmd-agent <command>` |
+| **The command line** | Scripts and batches without any model: any tool of the library, with flags made from its parameters | `vmd-agent tool NAME ...` |
 
 ```bash
-vmd-agent show 1UBQ                                         # fetch, draw and describe a structure
-vmd-agent analyze run.psf run.dcd --do rmsd rmsf rgyr       # measure a simulation
-vmd-agent claims my.pdb "It has 4 disulfide bridges"        # check a statement against the data
-vmd-agent workflow equilibration_check run.psf run.dcd      # a whole job, with a report
-vmd-agent vmd measure run.pdb run.dcd --kind rgyr           # one of VMD's own measurements
+vmd-agent tools                                                          # the library, in groups
+vmd-agent tool fetch_structure 1UBQ --out pdbs                           # download a structure
+vmd-agent tool analyze_trajectory run.psf run.dcd --analyses rmsd rgyr   # measure a simulation
+vmd-agent tool verify_claims my.pdb "It has 4 disulfide bridges"         # check a statement against the data
+vmd-agent tool measure_with_vmd run.pdb run.dcd --kind rgyr              # one of VMD's own measurements
+vmd-agent workflow equilibration_check run.psf run.dcd                   # a whole job, with a report
 ```
 
 Put your structure and trajectory files in your files folder and ask for them by name: *"What is in protein.pdb?"*, *"Has my run settled? Use run.psf and run.dcd."*, *"Which salt bridges persist?"*,
@@ -76,46 +77,52 @@ Put your structure and trajectory files in your files folder and ask for them by
 
 ## What it can do
 
-The pipeline of a project, with the commands for each stage. `vmd-agent --help` lists every command in this order.
+### The tool library: 44 tools in ten groups
 
-| Stage | You want to | Main commands | Detail |
-|---|---|---|---|
-| 1. Set up | install, find VMD, choose who answers | `vmd-agent setup`, `doctor`, `models` | [Install](docs/guide/install.md), [Models](docs/guide/models.md) |
-| 2. Get a structure | have a file to work with | `vmd-agent fetch`, `search` | [Commands](docs/guide/commands.md#2-get-a-structure) |
-| 3. Look at it | see and describe what is in it | `vmd-agent show`, `visualize`, `inspect`, `detect`, `stats` | [Commands](docs/guide/commands.md#3-look-at-it) |
-| 4. Measure a simulation | numbers, events, true-or-false checks | `vmd-agent analyze`, `keyframes`, `claims` | [Commands](docs/guide/commands.md#4-measure-a-simulation) |
-| 5. Run a whole job | several steps, a verdict, a report | `vmd-agent workflow` | [Workflows](docs/guide/workflows.md) |
-| 6. Drive VMD itself | build systems, maps, scenes, hand-offs | `vmd-agent vmd ...` | [VMD](docs/guide/vmd.md) |
-| 7. Check and keep records | re-check hashes, videos, validation | `vmd-agent provenance`, `report`, `validate` | [Commands](docs/guide/commands.md#7-check-and-keep-records) |
+A tool does one thing. Every tool is available to the chat, to an MCP client and to `vmd-agent tool NAME`; there is no second list. [Every tool, with what it does and whether it needs VMD](docs/guide/tools.md).
 
-### Understand a structure
-Detects what a system contains (protein chains, ligands, water, ions, lipids, nucleic acids, materials), counts bonds, disulfides, hydrogen bonds and salt bridges, assigns secondary structure, checks
-chirality, cis peptides and chain gaps, and draws it from several angles with a legend that ties every colour to what it shows. Structures come from your files, the PDB, AlphaFold or a URL.
+| Group | Tools |
+|---|---|
+| **Look at this computer and your files** (4) | `probe_environment` · `inspect_files` · `detect_system` · `structure_stats` |
+| **Get a structure** (2) | `search_pdb` · `fetch_structure` |
+| **Draw** (10) | `visualize_and_interpret` · `render_image` · `render_movie` · `annotate_image` · `view_image` · `generate_visualization_recipe` · `list_representations` · `color_key` · `export_session` · `run_tcl` |
+| **Measure a simulation** (4) | `analyze_trajectory` · `measure_with_vmd` · `select_keyframes` · `periodic_box` |
+| **Interactions and structure quality** (5) | `find_interactions` · `secondary_structure` · `backbone_torsions` · `check_structure` · `align_structures` |
+| **Convert and write files** (2) | `convert_trajectory` · `write_structure` |
+| **Density maps (cryo-EM and more)** (4) | `make_map` · `inspect_map` · `combine_maps` · `fit_to_map` |
+| **Build and prepare a simulation** (7) | `build_system` · `mutate_residue` · `merge_structures` · `build_membrane` · `build_nanotube` · `prepare_namd` · `write_slurm_script` |
+| **Video** (2) | `probe_video` · `interpret_video` |
+| **Evidence and records** (4) | `verify_claims` · `record_visual_interpretation` · `assemble_report` · `verify_provenance` |
 
-### Measure a simulation
-RMSD, RMSF, radius of gyration, contacts, hydrogen bonds, distances, solvent-accessible area and density, with convergence tests that say whether a run has settled; event-aware keyframes that pick the frames
-where something actually happens; and **claim checking**: a statement about the system comes back supported, contradicted or "cannot tell", with the evidence.
+* **Understand a structure.** Detects what a system contains (protein chains, ligands, water, ions, lipids, nucleic acids, materials), counts bonds, disulfides, hydrogen bonds and salt bridges, assigns secondary
+  structure, checks chirality, cis peptides and chain gaps, and draws it from several angles with a legend that ties every colour to what it shows. Structures come from your files, the PDB, AlphaFold or a URL.
+* **Measure a simulation.** RMSD, RMSF, radius of gyration, contacts, hydrogen bonds, distances, solvent-accessible area and density, with convergence tests that say whether a run has settled; event-aware
+  keyframes that pick the frames where something actually happens; and **claim checking**: a statement about the system comes back supported, contradicted or "cannot tell", with the evidence.
+* **Drive VMD itself.** VMD's own `measure` commands, interactions as how often each pair is present, secondary structure per frame, Ramachandran regions, trajectory conversion, density maps, solvated
+  CHARMM36 systems, mutations, membranes and nanotubes, scenes rendered to images and rotating movies or exported as a folder you can open in your own VMD, cryo-EM map fitting, NAMD inputs and SLURM scripts.
+  `probe_environment` with `plugins` classifies every plugin of *your* VMD as driven, GUI-only, needing another program, or not yet wrapped. [VMD](docs/guide/vmd.md).
+* **Videos and records.** Read a video's real metadata, prove it decodes and pull stills you can map back to simulation frames; re-check the hashes recorded for an earlier run; assemble a written report from a session.
 
-### Drive VMD itself (24 commands)
-Measure commands (radius of gyration, RMSD, RMSF, g(r), SASA, clusters and more), hydrogen bonds, salt bridges and contacts as how often each pair is present, secondary structure per frame, Ramachandran
-regions, structure checks, superposition, periodic box analysis; trajectory conversion and structure writing; density, occupancy and potential maps; building solvated and neutral CHARMM36 systems, mutations,
-merges, membranes and nanotubes; scenes rendered to images and rotating movies, or exported as a folder you can open in your own VMD; cryo-EM map fitting and map arithmetic; NAMD inputs and SLURM scripts.
-The list: [VMD](docs/guide/vmd.md). `vmd_capabilities` classifies every plugin of *your* VMD as driven, GUI-only, needing another program, or not yet wrapped.
+### Workflows: whole jobs above the tools
 
-### Whole jobs and reports
-`structure_overview`, `equilibration_check`, `interaction_report`, `compare_runs`, `prepare_simulation` and `cryoem_fit` run several tools in order, grade the findings (ok, note, warning, problem), give a verdict
-and write `report.md` and `report.html` with the figures, every caveat the tools raised, the methods, the SHA-256 of every input and the Tcl of every VMD step. [Workflows](docs/guide/workflows.md).
+A workflow is not a tool: it runs several tools in a fixed order, grades the findings (ok, note, warning, problem), gives a verdict and writes `report.md` and `report.html` with the figures, every caveat the
+tools raised, the methods, the SHA-256 of every input and the Tcl of every VMD step. The agent reaches all six through one call, `run_workflow`; from a terminal it is `vmd-agent workflow NAME FILE ...`. [Workflows](docs/guide/workflows.md).
 
-### Videos, records and hand-offs
-Read a video's real metadata and prove it decodes, pull stills you can map back to simulation frames; re-check the hashes recorded for an earlier run; assemble a written report from a session; write NAMD
-inputs and cluster job scripts.
+| Workflow | Files | What it does |
+|---|---|---|
+| `structure_overview` | structure | what is in it, and is it in good shape: composition, torsions, chirality, gaps, pictures |
+| `equilibration_check` | topology, trajectory | has the run settled: RMSD and size convergence, periodic box, two engines compared |
+| `interaction_report` | topology, trajectory | hydrogen bonds and salt bridges (and contacts with a partner group), as how often each is present |
+| `compare_runs` | topology, two trajectories | RMSD, size and fluctuation of two runs side by side |
+| `prepare_simulation` | structure | check the input, build a solvated neutral CHARMM36 system, write NAMD and SLURM files |
+| `cryoem_fit` | model, map | fit a model into a cryo-EM map, with a picture and a session for VMD |
 
 ## The agent
 
 One module runs the model, the tools and the checks, and every screen is a thin front end on it, so the chat, the web page and the benchmark behave the same.
 
-* **Routing.** `--tools auto` offers the model only the tools that fit the question, plus a way to ask for more; `--tools all` (the default), `core` and `vmd` give it a fixed set.
-  [Which tools a model sees](docs/guide/tools.md#does-the-model-see-all-53-at-once).
+* **Routing.** `--tools auto` offers the model only the tools that fit the question, plus a way to ask for more; `--tools all` (the default) gives it the whole library.
+  [Which tools a model sees](docs/guide/tools.md#does-the-model-see-all-of-them-at-once).
 * **Argument repair.** A number written as text, `RMSD` for `rmsd`, a missing folder in a file name, a trajectory given as the topology: put right when there is only one way to read it, and the result says so.
 * **Plain results.** The results models misread most start with a one-sentence summary, and parameters whose names do not say what they do are described to the model.
 * **The guard.** A data question answered without a tool is sent back once; an answer with a number no tool returned is sent back once, then flagged.
@@ -148,7 +155,7 @@ The free-form Tcl tool is off unless you switch it on. Downloads are limited to 
 ## Repository layout
 
 ```
-src/vmd_agent/     the package: the agent, the 53 tools, VMD wrappers (vmdkit/), analysis, drawing, the web page, the benchmarks
+src/vmd_agent/     the package: the agent, the tool library, VMD wrappers (vmdkit/), analysis, drawing, the web page, the benchmarks
 install/           the one-line installers (install.sh for Mac and Linux, install.ps1 for Windows)
 docker/            Dockerfile, compose files and helpers for the container routes
 docs/              the manual: guide/ (using it), benchmarks/ (choosing a model), reference/ (architecture, methods, security, research), CHANGELOG and NOTICE
@@ -158,8 +165,8 @@ tests/             the test suite, mirrored on the package
 
 ## Documentation
 
-[**All the pages**](docs/index.md): [Install and set up](docs/guide/install.md) · [Ways to work](docs/guide/using.md) · [Command reference](docs/guide/commands.md) · [Models](docs/guide/models.md) ·
-[Whole jobs](docs/guide/workflows.md) · [VMD](docs/guide/vmd.md) · [The 53 tools](docs/guide/tools.md) · [MCP clients](docs/guide/mcp.md) · [Docker](docs/guide/docker.md) ·
+[**All the pages**](docs/index.md): [Install and set up](docs/guide/install.md) · [Ways to work](docs/guide/using.md) · [The command line](docs/guide/commands.md) · [Models](docs/guide/models.md) ·
+[Whole jobs](docs/guide/workflows.md) · [VMD](docs/guide/vmd.md) · [The tool library](docs/guide/tools.md) · [MCP clients](docs/guide/mcp.md) · [Docker](docs/guide/docker.md) ·
 [The model benchmark](docs/benchmarks/model-benchmark.md) · [Development](docs/reference/development.md) · [Architecture](docs/reference/architecture.md) · [Methods](docs/reference/methods.md) ·
 [Security](docs/reference/security.md) · [Research paper](docs/reference/RESEARCH.md) · [Changelog](docs/CHANGELOG.md)
 
