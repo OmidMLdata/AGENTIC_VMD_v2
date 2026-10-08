@@ -77,3 +77,25 @@ def test_the_docs_say_how_much_context_the_tool_descriptions_take():
     said = int(re.search(r"^\| `all` \|[^|]*\| about ([\d,]+) tokens \|$", page, flags=re.M).group(1).replace(",", ""))
     tokens = len(json.dumps(to_openai_tools(toolhints.enrich(toolset.tool_specs(list(toolset.ALL)))))) / 4
     assert abs(tokens - said) < 0.12 * said, f"about {tokens:.0f} tokens now, the page says about {said}: update docs/guide/tools.md"
+
+
+def test_every_command_the_docs_and_ci_run_exists():
+    """`vmd-agent NAME` in the manual, the CI workflow and the Docker files names a command (and `tool NAME` a tool) that exists."""
+    import argparse
+    from vmd_agent import cli, toolset
+    sub = next(a for a in cli.build_parser()[0]._actions if isinstance(a, argparse._SubParsersAction))
+    commands, tools = set(sub.choices), set(toolset.TOOLS) | {toolset.WORKFLOW_ENTRY}
+    others = [os.path.join(ROOT, p) for p in (".github/workflows/ci.yml", "docker/docker-compose.yml", "docker/Dockerfile", "docs/guide/docker.md")]
+    bad = []
+    for f in [f for f in FILES if not f.endswith("CHANGELOG.md")] + others:
+        text = open(f, encoding="utf-8").read()
+        for m in re.finditer(r"`vmd-agent (?:--?[\w-]+ )*([a-z][a-z-]+)(?: ([a-z_]+))?|vmd-agent:\w+ (?:tool )?([a-z][a-z_-]+)|hostvmd (?:tool )?([a-z][a-z_-]+)", text):
+            cmd, arg = m.group(1), m.group(2)
+            if cmd and cmd not in commands and cmd not in ("is", "and", "to", "does", "the", "then"):
+                bad.append((os.path.basename(f), cmd))
+            elif cmd == "tool" and arg and arg not in tools:
+                bad.append((os.path.basename(f), "tool " + arg))
+            for g in (m.group(3), m.group(4)):
+                if g and g not in commands | tools | {"tool"} and not g.startswith(("run", "tool")):
+                    bad.append((os.path.basename(f), g))
+    assert bad == []

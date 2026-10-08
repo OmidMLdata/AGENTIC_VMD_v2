@@ -511,25 +511,6 @@ def sample_frames(video: str, n: int = 9, out_dir: Optional[str] = None,
             "out_dir": out_dir, "probe": info}
 
 
-def extract_frames(video: str, n: int = 9,
-                   out_dir: Optional[str] = None) -> dict:
-    """Extract ``n`` evenly-spaced frames from a video/GIF.
-
-    Kept for the original ``extract_video_frames`` contract: returns plain PNG
-    paths. :func:`interpret_video` is the richer entry point.
-    """
-    r = sample_frames(video, n=n, out_dir=out_dir)
-    if not r.get("ok"):
-        return {"ok": False, "error": r.get("error"), "n_frames": 0,
-                "frames": [], "out_dir": r.get("out_dir")}
-    return {"ok": True, "n_frames": r["n_frames"],
-            "frames": [f["path"] for f in r["frames"]],
-            "timestamps_s": [f["video_time_s"] for f in r["frames"]],
-            "out_dir": r["out_dir"], "video_info": r["probe"],
-            "note": "Hand these stills to the agent for visual interpretation; "
-                    "do not over-claim dynamics from single frames."}
-
-
 # ---------------------------------------------------------------- mapping
 def map_to_source(frames: Sequence[dict], fps: Optional[float],
                   stride: int = 1, first_frame: int = 0,

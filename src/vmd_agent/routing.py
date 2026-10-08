@@ -80,7 +80,7 @@ def group_of(tool: str) -> str:
     return next((g for g, (tools, _) in GROUPS.items() if tool in tools), "")
 
 
-#: the agent-internal tool a model uses to ask for more tools when the routed set lacks one (it is not one of the 53 and exists only in "auto")
+#: the agent-internal tool a model uses to ask for more tools when the routed set lacks one (it is not one of the 57 library tools and exists only in "auto")
 OFFER = "offer_tools"
 
 

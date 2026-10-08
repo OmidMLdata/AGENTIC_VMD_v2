@@ -54,8 +54,8 @@ running; the window then sits on your screen, and you can use VMD's own mouse an
 
 It runs **only on this computer**: it listens on 127.0.0.1, answers only requests addressed to it by that name, and wants the one-time key that is part of the address it prints (kept in a
 cookie), so no other web page you have open can use it. It can read and write only inside your files folder, never overwrites an uploaded file, and runs one job at a time. It needs nothing
-beyond what vmd-agent already installs. The drawing is vmd-agent's own and is a convenient look at a structure, not a replacement for VMD's: no surfaces, no secondary-structure
-cartoons; for those, [drive VMD itself](vmd.md#driving-vmd-itself).
+beyond what vmd-agent already installs. The picture in the middle is always VMD's own: the page is a remote for a real VMD window ([the window](window.md)), so surfaces, cartoons and every
+other style VMD has are available.
 
 ## Wall-clock time of every execution
 

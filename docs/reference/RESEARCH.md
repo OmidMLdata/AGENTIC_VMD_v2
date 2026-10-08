@@ -27,7 +27,7 @@ figure, write up what was seen. In that setting the dangerous failure is not the
 agent that is wrong and says nothing. Accuracy alone cannot tell the two apart. We present **vmd-agent**, a toolkit and a
 benchmark built around that distinction.
 
-The **toolkit** (Python library, command line, a built-in chat front end for local or hosted models, and a Model Context Protocol server, all over the same 27 tools) prepares evidence and
+The **toolkit** (Python library, command line, a built-in chat front end for local or hosted models, and a Model Context Protocol server, all over the same set of tools, 57 in the current library) prepares evidence and
 states how it was obtained: a native mmCIF reader, a NumPy implementation of the Kabsch–Sander secondary-structure
 assignment, autocorrelation-aware trajectory statistics with an explicit "insufficient data" verdict, per-atom
 periodic-boundary diagnostics, event-aware keyframe selection, a four-valued claim verifier (supported, contradicted,
@@ -415,10 +415,10 @@ count as a failure of the instrument. Outputs are produced locally and are not s
 
 #### 8.1 Toolkit measurements against independent code
 
-* **Analysis numbers.** `vmd-agent validate system.pdb traj.dcd --sel2 "resname LIG" --cutoff 6` recomputes RMSD (SVD
+* **Analysis numbers.** `vmd-agent bench validate system.pdb traj.dcd --sel2 "resname LIG" --cutoff 6` recomputes RMSD (SVD
   Kabsch), mass-weighted Rg, contacts and centre-of-mass distances with separate NumPy code and prints both. Disagreement
   beyond numerical precision is a defect.
-* **Secondary structure.** `vmd-agent validate-dssp <PDB ids> --cache DIR` compares the built-in assignment, per residue,
+* **Secondary structure.** `vmd-agent bench validate-dssp <PDB ids> --cache DIR` compares the built-in assignment, per residue,
   with the HELIX/SHEET records in each file (the PDB annotation pipeline, not `mkdssp`) and, if MDTraj is installed, with
   MDTraj. Report Q3 against the records for both implementations (the established implementation is the ceiling for
   agreement with the records) and the toolkit-versus-MDTraj agreement. Choose structures that cover what you care about;
@@ -690,10 +690,10 @@ benchmarks, which is a conflict of interest the design tries to contain (see the
 |---|---|---|---|
 | Q1 | Can an LLM agent automate VMD-style analysis and visualization workflows correctly, and does it fail loudly or silently? | **Primary** | run the automation benchmark with a model (README, section 5) |
 | Q2 | Which tooling makes the difference: plain Python, plain VMD, this toolkit, or its parts? | Primary (arms of Q1) | the same run across arms |
-| Q3 | Are the toolkit's own measurements correct? | Supporting | `vmd-agent validate`, `validate-dssp` (section 8.1) |
+| Q3 | Are the toolkit's own measurements correct? | Supporting | `vmd-agent bench validate`, `bench validate-dssp` (section 8.1) |
 | Q4 | Does event-aware frame selection find short structural events that uniform sampling misses, and when does it stop helping? | Supporting | `vmd-agent bench events` (section 8.2) |
 | Q5 | Do autocorrelation-aware statistics change the conclusions drawn from a trajectory? | Supporting | not built: would be an arm of the benchmark (drifting versus stationary trajectories) |
-| Q6 | Can an agent's written claims be checked against the data, and how much of what it says can be checked? | Supporting | the `report` task family and `vmd-agent claims`; coverage on real write-ups is for you to measure |
+| Q6 | Can an agent's written claims be checked against the data, and how much of what it says can be checked? | Supporting | the `report` task family and `vmd-agent tool verify_claims`; coverage on real write-ups is for you to measure |
 | Q7 | Does structured grounding (legend, colour key, measured statistics) help a model read a rendered image? | Secondary | `vmd-agent bench run` (Appendix E) |
 | Q8 | How much of a model's performance on molecular images is memorisation of famous structures? | Secondary | the same run with `--synthetic-dir` |
 
@@ -739,7 +739,7 @@ reported and left unfixed during a confirmatory study so the toolkit is not tune
 independent NumPy; the built-in DSSP against the PDB's own annotations and against MDTraj; the novel-structure
 generator against its own design intent.
 
-*Evidence.* None is included; produce it with `vmd-agent validate`, `validate-dssp` and `bench synth` (section 8). The
+*Evidence.* None is included; produce it with `vmd-agent bench validate`, `bench validate-dssp` and `bench synth` (section 8). The
 defects that validation work has found in the toolkit are recorded in the CHANGELOG.
 
 *Open.* DSSP against `mkdssp` itself; larger and more varied structure sets (the 50 are mostly small soluble
@@ -766,7 +766,7 @@ is designed for abrupt events; the benchmark's slow-ramp event tasks probe that 
 "stable" verdicts are easy to reach. The toolkit reports statistical inefficiency, effective sample size, a trend test
 (Mann-Kendall with Theil-Sen) and an explicit "insufficient data" verdict.
 
-*Evidence.* None is included. The methods are implemented and property-tested; run `vmd-agent analyze ... --do rmsd
+*Evidence.* None is included. The methods are implemented and property-tested; run `vmd-agent tool analyze_trajectory ... --analyses rmsd
 convergence` on your trajectory to see the effective sample size and the verdict it gives.
 
 *Open.* **No study measures whether this changes what an agent concludes.** That would be a natural arm of the
@@ -780,7 +780,7 @@ automation benchmark (drifting versus stationary trajectories). It is not built.
 burial, secondary-structure content, disulfides, RMSD stability, contact persistence) and returns supported,
 contradicted, unverifiable or unparsed, failing closed.
 
-*Evidence.* None is included. The verifier is unit, property and mutation tested; `vmd-agent claims` and the `report` task
+*Evidence.* None is included. The verifier is unit, property and mutation tested; `vmd-agent tool verify_claims` and the `report` task
 family exercise it.
 
 *Open.* **Coverage.** The parser is template-based, so many natural sentences come back unparsed. How much of a real
@@ -963,7 +963,7 @@ passing run covers, and what has never been verified. Run `pytest -rs` to see wh
 
 | Property | How |
 |---|---|
-| RMSD, Rg, contacts, COM distance agree with independent NumPy | SVD-Kabsch RMSD, mass-weighted Rg, brute-force contacts; `vmd-agent validate` repeats it on your data |
+| RMSD, Rg, contacts, COM distance agree with independent NumPy | SVD-Kabsch RMSD, mass-weighted Rg, brute-force contacts; `vmd-agent bench validate` repeats it on your data |
 | DSSP reproduces known structure | NeRF-built ideal α-helix and strand, and PDB annotations (`validate-dssp` on your structures) |
 | Statistical inefficiency is right | white noise, and AR(1) against `(1 + φ) / (1 − φ)` |
 | Error bars are honest | autocorrelated series give wider intervals than naive ones |

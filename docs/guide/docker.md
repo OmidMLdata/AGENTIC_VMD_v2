@@ -65,7 +65,7 @@ docker run -i --rm \
   vmd-agent:hostvmd
 ```
 
-(or `VMD_HOME=/opt/vmd-1.9.4 docker compose -f docker/docker-compose.yml --profile hostvmd run --rm hostvmd probe`).
+(or `VMD_HOME=/opt/vmd-1.9.4 docker compose -f docker/docker-compose.yml --profile hostvmd run --rm hostvmd tool probe_environment`).
 
 #### With VMD baked in (local use)
 

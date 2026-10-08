@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.28.1: the Docker check and the manual follow the unified commands
+
+* **CI**: the Docker smoke test still called the commands removed in 0.23.0 (`probe`, `visualize`); it now runs `tool probe_environment` and `tool visualize_and_interpret`. The same stale `probe` was in the
+  compose file and the Docker guide.
+* **Manual**: `vmd-agent validate`, `validate-dssp`, `analyze` and `claims` in the research paper are now `bench validate`, `bench validate-dssp`, `tool analyze_trajectory` and `tool verify_claims`; the page guide no
+  longer says the picture is vmd-agent's own drawing; the paper counts 57 tools.
+* **A test keeps it so**: every `vmd-agent NAME` (and `tool NAME`) in the manual, the CI workflow and the Docker files must be a command or tool that exists.
+* Removed `extract_frames` (no caller since the video tools were merged) and a stale tool count in a comment.
+
 ## 0.28.0: what the tools find can be shown in your VMD window
 
 * **`show_in_window`** on the tools that find something to look at (`find_interactions`, `backbone_torsions`, `check_structure`, `secondary_structure`, `select_keyframes`, `align_structures`, `fit_to_map`, `make_map`,

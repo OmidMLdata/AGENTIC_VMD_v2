@@ -55,9 +55,9 @@ jobs:
           mkdir -p data && cp tests/data/1ubq.pdb data/
           # the image runs as an unprivileged user; run as the owner of the mounted folder so it can write there
           U="--user $(id -u):$(id -g) -e HOME=/tmp"
-          docker run --rm $U -v "$PWD/data:/data" vmd-agent:ci probe | grep -q matplotlib
+          docker run --rm $U -v "$PWD/data:/data" vmd-agent:ci tool probe_environment | grep -q matplotlib
           docker run --rm $U -v "$PWD/data:/data" vmd-agent:ci \
-            visualize /data/1ubq.pdb --out-dir /data/out --views front --renderer matplotlib
+            tool visualize_and_interpret /data/1ubq.pdb --out /data/out --views front --renderer matplotlib
           test -s data/out/views/front.png
       - name: Server path sandbox is active in the image
         run: |
