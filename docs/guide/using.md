@@ -16,24 +16,27 @@ vmd-agent ui                    # opens your browser; Ctrl+C in the terminal sto
 vmd-agent ui --data-dir ~/my-project --port 8765 --no-browser
 ```
 
-A workbench laid out like VMD's own windows: a **Molecules** list (VMD's Main window) and your files on the left, the **Display** in the middle (its Graphics window), the assistant on the right,
-and a **console** along the bottom (its Tk console), with a menu bar on top (File, Molecule, Graphics, Display, Mouse, Animation, Extensions, Help) and a status bar under it. Every action is in
-the menus, in the command palette (**Ctrl/⌘ K** searches all of them), on a keyboard shortcut (press **?**), or in the console. The three splitters resize the columns and the console (they are
-remembered; double-click one to restore it), and the light/dark/automatic theme button is in the menu bar.
+A workbench laid out like VMD's own windows, **in front of a real VMD**: a **Molecules** list and your files on the left, the **Display** in the middle, the assistant on the right, and a **console** along the bottom,
+with a menu bar on top (File, Molecule, Graphics, Display, Mouse, Animation, Extensions, Help) and a status bar under it. Every action is in the menus, in the command palette (**Ctrl/⌘ K** searches all of them), on a
+keyboard shortcut (press **?**), or in the console. The three splitters resize the columns and the console (they are remembered; double-click one to restore it), and the light/dark/automatic theme button is in the status bar.
 
-* **Molecules.** A table as in VMD: ID, **T** (top molecule), **D** (drawn), name, atoms, frames. Load several and show or hide each. Below it, everything in your files folder, with a drop zone and
-  folders that open. Click a file for its details and read-only looks (`inspect files`, `detect system`, `structure stats`, `probe video`, each with its seconds); double-click a structure to draw it
-  as a new molecule, or a trajectory to load it into the top molecule.
-* **Representations** (Graphics menu, **Ctrl/⌘ R**). Each molecule has any number of representations, each with a selection, a drawing method (`Lines`, `Licorice`, `CPK`, `VDW`, `Points`, `Trace`,
-  `Tube`) and a colouring method (`Name`, `Chain`, `ResType`, `Resid`, `Index`, `Mono`, `ColorID`). Selections use VMD's own language: `protein`, `water`, `backbone`, `sidechain`, `name CA`,
-  `resname ALA GLY`, `chain A`, `resid 10 to 40`, `within 5 of resname LIG`, `same residue as ...`, combined with `and`, `or`, `not` and parentheses; a mistake is explained under the box.
-* **Display.** Rotate, Move, Zoom and **Query** (click an atom to see what it is) mouse modes as in VMD's Mouse menu, perspective or orthographic projection, depth cueing, axes and background
-  colour, and the animation bar (first, previous, play, next, last, reverse, a frame box, speed, and the loop, once and rock styles). **Save picture** keeps the view as a PNG. Images and videos that
-  tools make open in the same place, and every figure is kept in a strip under the display. A system of more than 40,000 atoms opens as its backbone and non-solvent atoms only, and the caption says so.
-* **Console.** VMD's commands for what the page shows: `mol new`, `mol addfile`, `mol addrep`, `mol modselect`, `mol modstyle`, `mol modcolor`, `mol delrep`, `mol top`, `mol delete`, `animate goto`, `animate forward`,
-  `display projection`, `display depthcue`, `axes location`, `color Display Background`, `rotate`, `scale`, plus `ask ...` (send a question to the assistant), `look TOOL FILE`, `workflow NAME FILES` and `help`.
+**Nothing on the page is drawn by the page.** The display shows snapshots of a real VMD window, and every button sends a command to that VMD ([Your VMD window](window.md)). Opening a structure starts VMD for you if it is not
+running; the window then sits on your screen, and you can use VMD's own mouse and menus in it as well: the page notices within a few seconds.
+
+* **Molecules.** VMD's own list: ID, **T** (top molecule), **D** (drawn), name, atoms, frames, read from VMD. Load several and show or hide each. Below it, everything in your files folder, with a drop zone and
+  folders that open. Click a file for its details and read-only looks (`inspect files`, `detect system`, `structure stats`, `probe video`, each with its seconds); double-click a structure to load it into VMD,
+  or a trajectory to add its frames to the top molecule.
+* **Representations** (Graphics menu, **Ctrl/⌘ R**). VMD's Graphical Representations: each molecule has any number of representations, each with a selection (VMD's own language, which VMD parses: an invalid one is
+  reported under the box), any of VMD's drawing methods (`NewCartoon`, `QuickSurf`, `Licorice`, `CPK`, `VDW`, `Tube`, `Surf`, `MSMS`, ...), any colouring method (`Name`, `ResType`, `Structure`, `Chain`, `Beta`,
+  `ColorID`, ...) and a material.
+* **Display.** Rotate, Move and Zoom mouse modes act on VMD's view (drag the picture; Shift-drag moves in any mode; the wheel zooms; a double click resets). Perspective or orthographic projection, depth cueing, axes,
+  shadows and background colour are VMD's settings. The animation bar steps and plays the frames **inside VMD** (first, previous, play, next, last, reverse, a frame box, speed, and the loop, once and rock styles).
+  **Refresh** takes a new snapshot; **live** keeps taking them. **Save picture** has VMD's ray tracer draw the window as a PNG. Images and videos that tools make open in the same place, and every figure is kept in a
+  strip under the display.
+* **Console.** VMD's commands, sent to VMD: `mol new`, `mol addfile`, `mol addrep`, `mol modselect`, `mol modstyle`, `mol modcolor`, `mol delrep`, `mol top`, `mol delete`, `animate goto`, `animate forward`,
+  `display projection`, `display depthcue`, `axes location`, `color Display Background`, `rotate`, `scale by`, plus `ask ...` (send a question to the assistant), `look TOOL FILE`, `workflow NAME FILES` and `help`.
   Arrow keys recall earlier commands. It also logs every tool and model call with its seconds and progress, and the totals of the session.
-* **Assistant, Chat.** The model's answer is written as Markdown (headings, lists, tables, code; never raw HTML), every tool call is a collapsible card with its arguments, result, a progress bar and
+* **Assistant, Chat.** The model can drive the VMD window too (*"show the ligand as licorice"*, *"go to frame 20"*); the page updates when it does. The model's answer is written as Markdown (headings, lists, tables, code; never raw HTML), every tool call is a collapsible card with its arguments, result, a progress bar and
   **the seconds it took**, each model call is timed, and a line under every answer says where the time went. The numbers in an answer are checked against the tools' results exactly as in the terminal
   chat ([How the chat keeps a model honest](models.md#how-the-chat-keeps-a-model-honest)).
 * **Assistant, Tools.** Every tool of the [library](tools.md) as a form, for people who prefer to click: pick a group and a tool, then fill in drop-downs (your files, filtered by kind: structures, trajectories, maps, videos, images;
@@ -45,7 +48,7 @@ remembered; double-click one to restore it), and the light/dark/automatic theme 
   report. No model is needed for this tab.
 * **Model.** The page is connected to the model that setup chose. If none answers (the server is not running, or it lacks the model), a note says which of the two it is, with buttons to start the local
   model server, to choose another model (**Extensions, Model…**: the free local one, or any server with the common chat interface such as an online service, Ollama, LM Studio or vLLM) and to check again; a question
-  asked meanwhile gets a plain explanation instead of an error, and the viewer, the files, the look buttons and the whole jobs keep working. The page checks again every 15 seconds.
+  asked meanwhile gets a plain explanation instead of an error, and the files, the look buttons, the whole jobs and the VMD window itself keep working. The page checks again every 15 seconds.
 * **Status bar.** Whether the model answers, VMD's version, ffmpeg, the mouse mode, and a **chat tools** menu: `all` or `auto` (see [Does the model see all of them at once?](tools.md#does-the-model-see-all-of-them-at-once)).
   On a narrow window the columns stack.
 

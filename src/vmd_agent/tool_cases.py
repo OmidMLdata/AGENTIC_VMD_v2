@@ -152,6 +152,14 @@ def _independent_rg(c: Context) -> float:
     return float(c.universe(c.p("protein.pdb")).select_atoms("protein").radius_of_gyration())
 
 
+def _bond_at_frame(c: Context, i: int, j: int, frame: int) -> float:
+    import MDAnalysis as mda
+    import numpy as np
+    u = mda.Universe(c.p("protein.pdb"), c.p("protein.dcd"))
+    u.trajectory[frame]
+    return float(np.linalg.norm(u.atoms[i].position - u.atoms[j].position))
+
+
 def _protein_mass(c: Context) -> float:
     return float(c.universe(c.p("protein.pdb")).select_atoms("protein").masses.sum())
 
@@ -397,6 +405,43 @@ def _cases() -> List[Case]:
                  all(t in open(k.get("script")).read() for t in ("--gres=gpu:1", "--time=02:00:00", "equilibrate.namd")),
                  "the requested resources are not in the script"),
              note="the script is checked for what was asked, never run on a cluster"),
+        # ---- the VMD window (run here with VMD's own commands and no window, so no window appears; the same verbs drive a real one)
+        Case("window_open", "window_open", lambda c: {"headless": True},
+             lambda k, c: k.ok().eq("headless", True).has("vmd_version"), needs=("vmd",), note="a private VMD with no window, started in this run's own folder"),
+        Case("window_load", "window_load", lambda c: {"topology": _top(c), "trajectory": _trj(c)}, after=("window_open",),
+             check=lambda k, c: k.ok().eq("loaded.natoms", c.info["n_atoms"]).eq("loaded.nframes", D.N_FRAMES), needs=("vmd",),
+             note="the structure's own frame is dropped, so VMD frame N is trajectory frame N"),
+        Case("window_molecules", "window_molecules", lambda c: {"action": "list"}, after=("window_load",),
+             check=lambda k, c: k.ok().eq("molecules.0.top", True).eq("molecules.0.frames", D.N_FRAMES), needs=("vmd",)),
+        Case("window_representation_only", "window_representation",
+             lambda c: {"action": "only", "selection": "protein", "style": "NewCartoon", "color": "Structure"}, after=("window_load",),
+             check=lambda k, c: k.ok().eq("representations.0.style", "NewCartoon").eq("representations.0.color", "Structure")
+             .when(len(k.get("representations") or []) == 1, "only one representation should be left"), needs=("vmd",)),
+        Case("window_representation_modify", "window_representation", lambda c: {"action": "modify", "rep": 0, "color": "Chain", "selection": "name CA"},
+             after=("window_representation_only",),
+             check=lambda k, c: k.ok().eq("representations.0.color", "Chain").eq("representations.0.selection", "name CA"), needs=("vmd",)),
+        Case("window_representation_refuses_tcl", "window_representation", lambda c: {"action": "add", "selection": "all; exit"},
+             after=("window_load",), check=lambda k, c: k.fails(), needs=("vmd",), note="text that could be Tcl never reaches VMD"),
+        Case("window_display", "window_display", lambda c: {"setting": "background", "value": "white"}, after=("window_load",),
+             check=lambda k, c: k.ok().eq("molecules.0.top", True), needs=("vmd",)),
+        Case("window_view", "window_view", lambda c: {"action": "center", "selection": "resid 20"}, after=("window_load",),
+             check=lambda k, c: k.ok(), needs=("vmd",)),
+        Case("window_animate", "window_animate", lambda c: {"action": "goto", "frame": 7}, after=("window_load",),
+             check=lambda k, c: k.ok().eq("frame", 7).eq("n_frames", D.N_FRAMES), needs=("vmd",)),
+        Case("window_animate_out_of_range", "window_animate", lambda c: {"action": "goto", "frame": 10 ** 6}, after=("window_load",),
+             check=lambda k, c: k.fails("frame"), needs=("vmd",)),
+        Case("window_query", "window_query", lambda c: {"selection": "protein"}, after=("window_animate",),
+             check=lambda k, c: k.ok().eq("natoms", c.universe(c.p("protein.pdb")).select_atoms("protein").n_atoms)
+             .near("rgyr", _independent_rg(c), 0.05), needs=("vmd",), note="radius of gyration by VMD against MDAnalysis"),
+        Case("window_query_bond", "window_query", lambda c: {"measure": "bond", "atoms": [0, 1]}, after=("window_animate",),
+             check=lambda k, c: k.ok().near("value", _bond_at_frame(c, 0, 1, 7), 0.01), needs=("vmd",), note="frame 7 of the window, against MDAnalysis frame 7"),
+        Case("window_snapshot", "window_snapshot", lambda c: {"out_png": c.out("window.png"), "quality": "tachyon"}, after=("window_representation_only",),
+             check=lambda k, c: k.ok().file("image").when(_png_not_blank(c.out("window.png")), "the picture is blank"), needs=("vmd",)),
+        Case("window_scene", "window_scene", lambda c: {"scene_spec": c.scene(), "topology": _top(c), "trajectory": _trj(c)}, after=("window_open",),
+             check=lambda k, c: k.ok().has("molecule").when(len(c.scene()["reps"]) >= 1, "the scene has no representation"), needs=("vmd",)),
+        Case("window_save", "window_save", lambda c: {"out_vmd": c.out("window_state.vmd")}, after=("window_scene",),
+             check=lambda k, c: k.ok().file("path").when("mol new" in open(c.out("window_state.vmd")).read(), "the saved state does not load a molecule"),
+             needs=("vmd",)),
         # ---- network (the live PDB)
         Case("search_pdb", "search_pdb", lambda c: {"query": "ubiquitin", "limit": 3},
              lambda k, c: k.ok().when(len(k.get("ids") or []) > 0, "no ids"), needs=("network",)),
@@ -472,6 +517,8 @@ def run(folder: str, only: Optional[Sequence[str]] = None, log: Optional[Callabl
     ctx = Context(folder, info)
     previous = os.environ.get(security.ENV_ROOTS)
     os.environ[security.ENV_ROOTS] = folder
+    home_before = os.environ.get("VMD_AGENT_HOME")              # the VMD window cases get a folder of their own: they never touch a window you have open
+    os.environ["VMD_AGENT_HOME"] = os.path.join(folder, ".agent_home")
     cwd = os.getcwd()
     os.chdir(folder)
     log = log or (lambda m: None)
@@ -512,6 +559,12 @@ def run(folder: str, only: Optional[Sequence[str]] = None, log: Optional[Callabl
             records.append(rec)
             log(f"{rec.status:5s} {case.id:34s} {seconds:6.2f} s" + ("" if not problems else "   " + "; ".join(problems)))
     finally:
+        from vmd_agent import vmdlink
+        vmdlink.stop()
+        if home_before is None:
+            os.environ.pop("VMD_AGENT_HOME", None)
+        else:
+            os.environ["VMD_AGENT_HOME"] = home_before
         os.chdir(cwd)
         if previous is None:
             os.environ.pop(security.ENV_ROOTS, None)

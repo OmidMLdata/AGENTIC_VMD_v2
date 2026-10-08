@@ -42,7 +42,7 @@ def test_the_tool_counts_in_the_docs_match_the_code():
     missing = [n for n in names if f"`{n}`" not in page or f"`{n}`" not in readme]
     assert not missing, f"tools the page or the README does not list: {missing}"
     total = len(names)
-    assert f"one list of {total} tools" in page and f"**{total} tools** in ten groups" in readme and len(toolset.LIBRARY) == 10
+    assert f"one list of {total} tools" in page and f"**{total} tools** in eleven groups" in readme and len(toolset.LIBRARY) == 11
     for group, _what, tools in toolset.LIBRARY:
         assert f"### {group}" in page and f"**{group}** ({len(tools)})" in readme, group
     for f in FILES:

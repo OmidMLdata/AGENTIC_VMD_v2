@@ -450,7 +450,7 @@ def build_parser():
     sp.add_argument("--no-stream", action="store_true",
                     help="show each answer when it is complete instead of as it is written")
     sp.add_argument("--tools", choices=["all", "auto"], default="all",
-                    help="which tools the model gets: all (the 44 tools and the workflow call), or auto (only the tools that fit each "
+                    help="which tools the model gets: all (the 55 tools and the workflow call), or auto (only the tools that fit each "
                          "question, and a way to ask for more); fewer tools suit small models better")
     sp = sub.add_parser("ui", help="the toolkit in a web page on this computer: your files, the chat with the seconds each step "
                         "took, and the whole jobs (opens your browser)")

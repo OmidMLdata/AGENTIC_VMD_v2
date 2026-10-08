@@ -52,7 +52,7 @@ def test_every_tool_is_asked_for_by_some_task_or_excused():
 def test_prompts_name_only_files_that_exist_or_are_made(prepared):
     folder, prep = prepared
     import re
-    made = {"ca.dcd", "frame5.pdb", "aligned.pdb", "build/sys", "mutant", "two", "membrane/mem", "tube.pdb", "blob2.dx", "fitted.pdb", "lig.dx", "out.png",
+    made = {"ca.dcd", "frame5.pdb", "aligned.pdb", "build/sys", "mutant", "two", "membrane/mem", "tube.pdb", "blob2.dx", "fitted.pdb", "lig.dx", "out.png", "view.png",
             "scene.png", "spin.mp4", "session", "recipe.tcl", "labelled.png", "pics", "job.sbatch", "report.md", "pdbs", "eq", "eq.namd", "movie.mp4", "dry.psf", "dry.pdb", "build/sys_ion.psf", "build/sys_ion.pdb", "provenance.json"}
     absent_on_purpose = {"missing.pdb", "missing.dcd", "/etc/hosts"}
     for t in M.TASKS:

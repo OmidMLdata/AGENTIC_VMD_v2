@@ -10,6 +10,11 @@ or write. Paths are resolved through symlinks, so `..`, symlink escapes and pref
 Docker image sets it to `/data`. The CLI is operator-run and is not sandboxed.
 `view_image` only serves image files.
 
+## The VMD window's bridge
+The `window_*` tools drive a running VMD through a small listener inside it ([Your VMD window](../guide/window.md#how-it-is-kept-safe)). It binds to 127.0.0.1 only, accepts only requests with a one-time token kept in a
+file that only the user can read, and has a fixed list of commands with no way to run Tcl, a program or read a file; every argument is checked in Python and again in VMD, and a request is taken apart as a list and
+never evaluated. It is as private as the user account: another program running as the same user could read the token.
+
 ## `run_tcl` is off by default
 Tcl can run any program, and **no filter can stop it**: command names can be built at run time
 (`set c ex; append c ec; $c cmd`, `catch $built_script`, `\x65xec`, `rename exec e`). A second audit confirmed this

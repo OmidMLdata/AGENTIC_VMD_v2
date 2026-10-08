@@ -8,8 +8,9 @@
     while ((m = re.exec(line)) !== null) out.push(m[1] !== undefined ? m[1] : m[2] !== undefined ? m[2] : m[3] !== undefined ? m[3] : m[4]);
     return out;
   }
-  const STYLES = ["Lines", "Licorice", "CPK", "VDW", "Points", "Trace", "Tube"];
-  const COLORS = ["Name", "Chain", "ResType", "Resid", "Index", "Mono"];
+  const STYLES = ["Lines", "Bonds", "DynamicBonds", "HBonds", "Points", "VDW", "CPK", "Licorice", "Beads", "Tube", "Trace", "Ribbons", "NewRibbons", "Cartoon", "NewCartoon", "PaperChain", "Twister", "QuickSurf", "MSMS", "Surf", "Dotted", "Solvent"];
+  const COLORS = ["Name", "Type", "Element", "ResName", "ResType", "ResID", "Chain", "SegName", "Structure", "Molecule", "Beta", "Occupancy", "Mass", "Charge", "Index", "Backbone", "Fragment", "Position"];
+  const colorWord = (t, at) => (String(t[at]).toLowerCase() === "colorid" && Number.isInteger(Number(t[at + 1])) ? "ColorID " + Number(t[at + 1]) : pick(t[at], COLORS));
   const pick = (value, list) => list.find(x => x.toLowerCase() === String(value).toLowerCase());
   const num = v => (v !== undefined && v !== "" && Number.isFinite(Number(v)) ? Number(v) : null);
   const onoff = v => ({ on: true, off: false, yes: true, no: false, "1": true, "0": false, true: true, false: false })[String(v).toLowerCase()];
@@ -20,11 +21,11 @@
     "             mol modcolor REP ID METHOD | mol showrep ID REP on|off | mol delrep REP ID        (styles: " + STYLES.join(" ") + "; colours: " + COLORS.join(" ") + ")",
     "Animation    animate goto N|start|end | animate forward|reverse|pause | animate speed FPS | animate style once|loop|rock",
     "Display      display projection Perspective|Orthographic | display depthcue on|off | display resetview | axes location Off|LowerLeft",
-    "             color Display Background black|white|gray | rotate x|y|z by DEGREES | scale by FACTOR | scale to FACTOR",
+    "             color Display Background black|white|gray | rotate x|y|z by DEGREES | scale by FACTOR",
     "Agent        files | look TOOL FILE | workflow NAME FILE... | ask QUESTION... | clear | help",
     "Terminal     tools | tool NAME [flags] | tool NAME --help | workflow     (the real command line, run in your files folder; a leading vmd-agent is accepted)",
-    "Selections   protein, nucleic, water, backbone, sidechain, hydrogen, all; name CA, resname LIG, chain A, resid 1 to 20, index 0 to 99, element C;",
-    "             within 5 of (resname LIG), same residue as (...), and / or / not, ( ).  Names may use * as a wildcard.",
+"Selections   VMD's own language, read by VMD: protein, water, backbone, name CA, resname LIG, chain A, resid 1 to 20, within 5 of resname LIG, same residue as ...",
+    "Window       Everything above acts on a real VMD window (it is opened when needed); the display shows VMD's own snapshots.",
   ];
 
   function parse(line) {
@@ -47,12 +48,12 @@
         case "top": return num(t[2]) !== null ? { cmd: "mol.top", id: num(t[2]) } : bad("usage: mol top ID");
         case "list": return { cmd: "mol.list" };
         case "representation": { const s = pick(t[2], STYLES); return s ? { cmd: "mol.default", style: s } : bad("styles: " + STYLES.join(", ")); }
-        case "color": { const c = pick(t[2], COLORS); return c ? { cmd: "mol.default", color: c } : bad("colours: " + COLORS.join(", ")); }
+        case "color": { const c = colorWord(t, 2); return c ? { cmd: "mol.default", color: c } : bad("colours: " + COLORS.join(", ") + ", ColorID N"); }
         case "selection": return t[2] ? { cmd: "mol.default", sel: t.slice(2).join(" ") } : bad('usage: mol selection "protein"');
         case "addrep": return { cmd: "mol.addrep", id: num(t[2]) };
         case "modselect": return num(t[2]) !== null && num(t[3]) !== null && t[4] ? { cmd: "mol.modrep", rep: num(t[2]), id: num(t[3]), sel: t.slice(4).join(" ") } : bad('usage: mol modselect REP ID "SELECTION"');
         case "modstyle": { const s = pick(t[4], STYLES); return num(t[2]) !== null && num(t[3]) !== null && s ? { cmd: "mol.modrep", rep: num(t[2]), id: num(t[3]), style: s } : bad("usage: mol modstyle REP ID STYLE (" + STYLES.join(", ") + ")"); }
-        case "modcolor": { const c = pick(t[4], COLORS); return num(t[2]) !== null && num(t[3]) !== null && c ? { cmd: "mol.modrep", rep: num(t[2]), id: num(t[3]), color: c } : bad("usage: mol modcolor REP ID METHOD (" + COLORS.join(", ") + ")"); }
+        case "modcolor": { const c = colorWord(t, 4); return num(t[2]) !== null && num(t[3]) !== null && c ? { cmd: "mol.modrep", rep: num(t[2]), id: num(t[3]), color: c } : bad("usage: mol modcolor REP ID METHOD (" + COLORS.join(", ") + ", ColorID N)"); }
         case "showrep": { const v = onoff(t[4]); return num(t[2]) !== null && num(t[3]) !== null && v !== undefined ? { cmd: "mol.modrep", id: num(t[2]), rep: num(t[3]), shown: v } : bad("usage: mol showrep ID REP on|off"); }
         case "delrep": return num(t[2]) !== null && num(t[3]) !== null ? { cmd: "mol.delrep", rep: num(t[2]), id: num(t[3]) } : bad("usage: mol delrep REP ID");
         default: return bad("mol what? (new, addfile, delete, top, list, representation, color, selection, addrep, modselect, modstyle, modcolor, showrep, delrep)");

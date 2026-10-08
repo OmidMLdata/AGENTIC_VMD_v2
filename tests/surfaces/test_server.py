@@ -49,7 +49,7 @@ def tool_names(server):
 
 def test_all_tools_are_registered_with_the_sdk(server):
     from vmd_agent import toolset
-    assert tool_names(server) == set(toolset.TOOLS) and len(toolset.TOOLS) == 45
+    assert tool_names(server) == set(toolset.TOOLS) and len(toolset.TOOLS) == 56
     assert set(toolset.library_tools()) <= tool_names(server) and "run_workflow" in tool_names(server)
 
 

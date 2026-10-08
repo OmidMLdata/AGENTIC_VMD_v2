@@ -45,7 +45,7 @@ Every other command is in [Every command](../guide/using.md#ways-to-work). The b
   (`vmd-agent bench models --smoke`: one or two tasks per kind of functionality) through the agent with `VMD_AGENT_LIVE_TOOLS` (default `all`, what the chat uses; `auto` and `core` also work), and fails if the share passed falls below
   `VMD_AGENT_LIVE_MIN_SUCCESS` (default 0.5; set it a little below what your model scores), if the server fails, or if a request that must be declined is answered with an invented result.
   To compare a change, run `bench models --smoke` before and after into the same `--out-dir` and read `summary.md`.
-* **Test every tool:** `vmd-agent bench tools` runs all 44 tools on a generated dataset whose answers are known by construction, with the seconds each took ([the tool test set](../benchmarks/tool-test-set.md)); the same cases run inside `pytest`.
+* **Test every tool:** `vmd-agent bench tools` runs all 55 tools on a generated dataset whose answers are known by construction, with the seconds each took ([the tool test set](../benchmarks/tool-test-set.md)); the same cases run inside `pytest`.
 * **`.gitignore`** keeps out caches and build output, editor files, everything vmd-agent writes while running (`vmd_scripts/`, `vmd_agent_output/`,
   `pdb_cache/`, `/data/`), anything that could hold a key (`.env`, `settings.json`, `/config/`), and VMD itself (`docker/vmd-dist/*`, which UIUC's
   licence forbids committing). A test checks that these stay ignored and that the test data stay tracked.

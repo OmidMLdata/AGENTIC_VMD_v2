@@ -56,16 +56,16 @@
         <button role="radio" data-mode="rotate" title="Rotate (R): drag to turn the molecule">Rotate</button>
         <button role="radio" data-mode="translate" title="Move (T): drag to move it; Shift-drag works in any mode">Move</button>
         <button role="radio" data-mode="scale" title="Zoom (S): drag up or down; the wheel always zooms">Zoom</button>
-        <button role="radio" data-mode="pick" title="Query (Q): click an atom to see what it is">Query</button>
       </div>
+      <button class="tool" id="snap-now" title="Take a new snapshot of the VMD window">Refresh</button>
+      <label class="inl livebox"><input type="checkbox" id="live" checked> live</label>
       <button class="tool" id="reps-btn" title="Graphics, Representations (Ctrl+R)">Graphics…</button>
     </header>
     <div id="display">
-      <canvas id="view" aria-label="Molecule display. Drag to rotate, scroll to zoom, double-click to reset the view."></canvas>
+      <img id="view" alt="A snapshot of the VMD window. Drag to rotate, scroll to zoom, double-click to reset the view." draggable="false" hidden>
       <div id="media"></div>
-      <div id="nodata"><div><b>no molecule drawn</b><span>mol new FILE in the console, or double-click a structure in Files</span></div></div>
+      <div id="nodata"><div><b id="nodata-msg"></b><button class="btn" id="open-vmd" type="button" hidden>Open VMD window</button></div></div>
       <div id="caption"></div>
-      <div id="pickinfo" hidden></div>
       <div id="repwin" class="floating" hidden role="dialog" aria-label="Graphical Representations">
         <div class="floathead"><strong>Graphical Representations</strong><span class="grow"></span><button class="tool icon" id="repwin-close" aria-label="Close"><svg class="ic"><use href="#i-close"/></svg></button></div>
         <div class="floatbody">
@@ -79,6 +79,7 @@
               <div class="chips" id="rep-presets"></div></fieldset>
             <div class="two"><fieldset><legend>Drawing Method</legend><select id="rep-style"></select></fieldset>
               <fieldset><legend>Coloring Method</legend><select id="rep-color"></select></fieldset></div>
+            <fieldset><legend>Material</legend><select id="rep-material"></select></fieldset>
             <div id="rep-id-row" hidden><fieldset><legend>ColorID</legend><select id="rep-colorid"></select></fieldset></div>
           </div>
         </div>
@@ -162,10 +163,8 @@
 <dialog id="chooser" aria-label="Choose a file"><div class="dlg"><h3 id="chooser-title">Choose a file</h3><ul id="chooser-list" role="listbox"></ul><form method="dialog"><button class="btn">Cancel</button></form></div></dialog>
 <div id="toasts" aria-live="polite"></div>
 
-<script src="/assets/selection.js"></script>
 <script src="/assets/commands.js"></script>
 <script src="/assets/markdown.js"></script>
-<script src="/assets/viewer.js"></script>
 <script src="/assets/app.js"></script>
 </body>
 </html>

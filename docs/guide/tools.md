@@ -1,12 +1,12 @@
 # The tool library
 
-Everything vmd-agent can do is a **tool**: one function that does one thing, with a JSON description, in [`toolset.py`](../../src/vmd_agent/toolset.py). There is **one list of 44 tools**, in ten groups. The chat gives them to
+Everything vmd-agent can do is a **tool**: one function that does one thing, with a JSON description, in [`toolset.py`](../../src/vmd_agent/toolset.py). There is **one list of 55 tools**, in eleven groups. The chat gives them to
 the model, the [MCP server](mcp.md) gives them to an AI app, `vmd-agent tool NAME` runs one from a terminal, the web page runs them for you, and the
 [tool test set](../benchmarks/tool-test-set.md) runs every one of them on data whose answers are known. They are the same functions in every case, so a number does not depend on how you asked for it.
 The count and the groups are checked by a test, so this page cannot drift from the code.
 
 **Tools and workflows are different things.** A tool does one thing. A [workflow](workflows.md) is a layer above the tools: it runs several of them in a fixed order, grades what they find and writes a
-report. There are six, and the agent reaches them through one call, `run_workflow` (with no name it lists them). They are not counted among the 44.
+report. There are six, and the agent reaches them through one call, `run_workflow` (with no name it lists them). They are not counted among the 55.
 
 The last column says whether a tool needs VMD installed. Tools that do not need it always work; a tool that needs it says so plainly when VMD is missing. Tools that run VMD save the exact Tcl they ran
 (`reproduce_script` in the result), so you can repeat the step in your own VMD.
@@ -47,6 +47,24 @@ Pictures, movies and scenes.
 | `color_key` | What each colour of a colouring method means | — |
 | `export_session` | Write a folder you can open in your own VMD (session.tcl, inputs, checksums) | VMD |
 | `run_tcl` | Run Tcl in headless VMD (off unless VMD_AGENT_ENABLE_TCL=1) | VMD |
+
+### Control your VMD window
+
+Drive the VMD you can see: what it loads, draws, shows and answers.
+
+| Tool | What it does | Needs |
+|---|---|---|
+| `window_open` | Open a VMD window (or reuse the open one) that the window_* tools control | VMD |
+| `window_load` | Load a structure, trajectory or density map into the VMD window | VMD |
+| `window_molecules` | List, show, hide, rename or delete the molecules in the VMD window | VMD |
+| `window_representation` | List, add, change or delete how the VMD window draws a molecule (selection, style, color) | VMD |
+| `window_display` | Set the VMD window's projection, background, axes, depth cueing, shadows | VMD |
+| `window_view` | Rotate, zoom, move, centre, save or restore the view in the VMD window | VMD |
+| `window_animate` | Go to a frame, play, or set the style and speed in the VMD window | VMD |
+| `window_query` | Ask the VMD window what a selection holds, or measure a bond, angle, dihedral or SASA | VMD |
+| `window_snapshot` | A picture of what the VMD window shows right now (VMD's own drawing) | VMD |
+| `window_scene` | Set up a whole scene in the VMD window from a description (representations, isosurfaces, view) | VMD |
+| `window_save` | Save the VMD window's state as a .vmd file that VMD opens again | VMD |
 
 ### Measure a simulation
 
@@ -138,12 +156,12 @@ the tool, the model's call and the command are one thing.
 
 ## Does the model see all of them at once?
 
-**By default, yes.** `vmd-agent chat` and the web page send the description of every tool the model may use with *every* question, and with the 44 tools and the workflow call that is about
-36,000 characters, roughly **9,000 tokens**, before the model has read your question.
+**By default, yes.** `vmd-agent chat` and the web page send the description of every tool the model may use with *every* question, and with the 55 tools and the workflow call that is about
+43,000 characters, roughly **10,900 tokens**, before the model has read your question.
 
 | `--tools` | Offered | Descriptions sent with every question |
 |---|---|---|
-| `all` (default) | the 44 tools and `run_workflow` | about 9,000 tokens |
+| `all` (default) | the 55 tools and `run_workflow` | about 10,900 tokens |
 | `auto` | the ones that fit the question, plus `offer_tools` | about 2,000 to 5,000 tokens, depending on the question |
 
 (`vmd-agent tools --size` measures this on your copy; 4 characters per token is a rough rule.) This matters for two reasons:

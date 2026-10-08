@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.27.0: the agent drives a real VMD window, and the page stops pretending to be VMD
+
+* **The VMD window** (`vmdlink.py`, `vmdkit/live_bridge.tcl`, `window_tools.py`): eleven `window_*` tools that start or find a VMD with its window and drive it: load, molecules, representations (any of VMD's
+  styles, colours and materials), display, view, animation, queries and measurements, snapshots, whole scenes, saved states. A small bridge inside VMD (127.0.0.1, one-time token, a fixed list of 23 commands, every argument checked twice,
+  nothing evaluated) takes the commands; the same tools serve the chat, the page, the command line (`vmd-agent tool window_*`, across separate commands) and an MCP client. The library is now 55 tools in eleven groups.
+* **The page is a remote for that window**: its display shows VMD's own snapshots, dragging, the wheel, the molecule list, the Representations window, the animation bar, the menus and the console all send commands to
+  VMD and read its state back. The canvas viewer and its JavaScript selection language, which imitated VMD, are removed (`structure/viewer.py`, `viewer.js`, `selection.js`).
+* **Selections are VMD's**: an invalid selection is refused with VMD's own message instead of being accepted and drawing nothing.
+* **A benchmark category for the window** (6 tasks and a decline task), graded by asking the VMD the model worked with what it holds afterwards (the representations, the frame, the display), run with a VMD with no window.
+* Tests: the bridge is attacked directly (wrong token, unknown command, `eval`, `[exit]`, relative and brace paths) and the answers are compared with MDAnalysis; the window tools run in the tool test set with no window.
+
 ## 0.26.0: every tool as a form, a terminal for developers, and local models found on disk
 
 * **A Tools tab**: every tool of the library as a form built from its own signature (`toolform.py`): drop-downs for files (by kind) and fixed choices, check boxes, number and text boxes, a box for a scene's JSON;

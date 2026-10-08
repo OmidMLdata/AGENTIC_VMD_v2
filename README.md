@@ -9,17 +9,18 @@ in setup instead of a local model; vmd-agent then just supplies the tools, like 
 
 ## Highlights
 
-* **An agent for VMD.** Describe what you want; the agent picks from **44 tools** in ten groups, runs them, and answers from their numbers. It says how each number was obtained.
+* **An agent for VMD.** Describe what you want; the agent picks from **55 tools** in eleven groups, runs them, and answers from their numbers. It says how each number was obtained.
 * **Open-source first.** Free models run locally through a private copy of Ollama, chosen to fit your memory. Nothing leaves your computer unless you choose an online model.
+* **An agent over your own VMD.** The agent drives the VMD window you can see: load a system, draw it as a cartoon or a surface, colour it, zoom to the ligand, step through frames, ask what is selected, take a picture. Every picture and number is VMD's own; nothing is imitated. [Your VMD window](docs/guide/window.md).
 * **A complete wrapper around VMD.** The library covers VMD itself: measurements, interactions, trajectory conversion, density maps, system building, scenes, movies and hand-offs to NAMD and
   a cluster. Each tool that runs VMD saves the exact Tcl it ran, so you can repeat it in your own VMD.
 * **Whole jobs, not only single tools.** Six workflows sit above the tools: each runs several of them in a fixed order, grades what it finds and writes a report with the checksums of your inputs and the Tcl of every step.
-* **Four ways to work, one library.** A web page that looks like VMD, with a molecule viewer and console, a numbered menu, a terminal chat, and one command, `vmd-agent tool`, that runs any tool.
+* **Four ways to work, one library.** A web page that looks like VMD and drives a real one, a numbered menu, a terminal chat, and one command, `vmd-agent tool`, that runs any tool.
 * **Honest answers.** Every number must come from a tool; a model that answers from memory is sent back to use one, a number no tool returned is sent back or flagged, and a request that cannot be answered
   is declined rather than guessed.
 * **Everything is timed.** You see how long each model call and each tool call took.
 * **Contained.** One private folder, no administrator rights, nothing installed system-wide. The agent can only read and write inside the files folder you choose.
-* **Pick a model by measuring.** A built-in benchmark scores any model on 58 tasks, one per kind of functionality, so you can choose the model that suits your work and your computer.
+* **Pick a model by measuring.** A built-in benchmark scores any model on 65 tasks, one per kind of functionality, so you can choose the model that suits your work and your computer.
 
 **You need** a Mac, Windows or Linux computer, an internet connection, and VMD (free, from UIUC) for VMD-quality pictures and the VMD-driven tools. **You do not need** Python, Git, Docker, ffmpeg, an account or any AI app.
 
@@ -58,7 +59,7 @@ choose who answers: a free model on your computer (recommended), an online servi
 
 | Way | What it is | Start it |
 |---|---|---|
-| **The web page** | A workbench laid out like VMD in your browser: menus and a command palette, a molecule list, a display with **representations** (VMD's selection language, drawing and colouring methods, several molecules), animation, a console that takes VMD's commands, the chat with every tool call shown with its progress and seconds, **a form for every tool** (drop-downs, check boxes, buttons), a tab that runs whole jobs, and a terminal for developers | `vmd-agent ui` |
+| **The web page** | A remote for a **real VMD window**, laid out like VMD in your browser: menus and a command palette, the molecule list, **representations** (selection, drawing method, colour, material), animation and a console, all acting on VMD, and a display that shows **VMD's own pictures**; plus the chat with every tool call shown with its progress and seconds, **a form for every tool** (drop-downs, check boxes, buttons), a tab that runs whole jobs, and a terminal for developers | `vmd-agent ui` |
 | **The menu** | Numbered choices in plain words: look at a structure, analyse a simulation, check a statement, connect an AI app | `vmd-agent` |
 | **The chat** | Ask in plain language in the terminal; answers stream as they are written, with the time each step took | `vmd-agent chat` |
 | **The command line** | Scripts and batches without any model: any tool of the library, with flags made from its parameters | `vmd-agent tool NAME ...` |
@@ -77,7 +78,7 @@ Put your structure and trajectory files in your files folder and ask for them by
 
 ## What it can do
 
-### The tool library: 44 tools in ten groups
+### The tool library: 55 tools in eleven groups
 
 A tool does one thing. Every tool is available to the chat, to an MCP client and to `vmd-agent tool NAME`; there is no second list. [Every tool, with what it does and whether it needs VMD](docs/guide/tools.md).
 
@@ -86,6 +87,7 @@ A tool does one thing. Every tool is available to the chat, to an MCP client and
 | **Look at this computer and your files** (4) | `probe_environment` · `inspect_files` · `detect_system` · `structure_stats` |
 | **Get a structure** (2) | `search_pdb` · `fetch_structure` |
 | **Draw** (10) | `visualize_and_interpret` · `render_image` · `render_movie` · `annotate_image` · `view_image` · `generate_visualization_recipe` · `list_representations` · `color_key` · `export_session` · `run_tcl` |
+| **Control your VMD window** (11) | `window_open` · `window_load` · `window_molecules` · `window_representation` · `window_display` · `window_view` · `window_animate` · `window_query` · `window_snapshot` · `window_scene` · `window_save` |
 | **Measure a simulation** (4) | `analyze_trajectory` · `measure_with_vmd` · `select_keyframes` · `periodic_box` |
 | **Interactions and structure quality** (5) | `find_interactions` · `secondary_structure` · `backbone_torsions` · `check_structure` · `align_structures` |
 | **Convert and write files** (2) | `convert_trajectory` · `write_structure` |
@@ -133,7 +135,7 @@ More: [architecture](docs/reference/architecture.md#the-agent-and-what-surrounds
 ## Choosing a model
 
 The suggested open-source models ([the list](docs/guide/models.md), each checked against the Ollama library) differ in how well they use tools. The built-in benchmark puts a model in front of the tools with 58
-plain-language requests in 14 kinds of functionality (inspecting files, claims, trajectories, VMD measurements, conversion, building, maps, rendering, video, whole jobs, hand-offs, records, network, and requests
+plain-language requests in 15 kinds of functionality (inspecting files, claims, trajectories, VMD measurements, conversion, building, maps, rendering, driving a VMD window, video, whole jobs, hand-offs, records, network, and requests
 that must be declined). Each task has the tools that answer it and the **correct answer**, worked out from data built to have known properties ([every prompt and its correct answer](docs/benchmarks/model-benchmark-tasks.md)),
 and is graded by a program, with the seconds of every model call and tool call.
 

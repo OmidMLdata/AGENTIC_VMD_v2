@@ -23,6 +23,8 @@ simpler built-in pictures. How much of VMD is wrapped is in [below](#how-much-of
 
 ## Driving VMD itself
 
+Two ways: headless (below), and a **live VMD window** that you can watch and work in while the agent drives it: [Your VMD window](window.md).
+
 **Is it a separate thing? No: these are tools of the [library](tools.md) like any other.** The ones marked "VMD" in its last column need VMD (the cryo-EM, map, NAMD and SLURM ones need not even that): no
 language model, no chat, no internet. They are VMD's own `measure` commands, its plugins, system building, density maps, scenes and a hand-off to the VMD GUI, run headless and returned as
 numbers. You can reach them in four ways, and every way gives the same answer:

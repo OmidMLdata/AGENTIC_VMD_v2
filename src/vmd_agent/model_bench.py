@@ -12,6 +12,7 @@ are rebuilt from the records. Nothing is stored in the repository: you run it on
 """
 from __future__ import annotations
 
+import contextlib
 import json
 import math
 import os
@@ -88,6 +89,28 @@ def skip_reason(task: M.Task, extras: Sequence[str], skip: Sequence[str], unmet:
 
 
 # -------------------------------------------------------------------- one run
+@contextlib.contextmanager
+def _window_isolated(work: str, task: "M.Task"):
+    """The window tasks run against a VMD with no window and a link folder of its own, so nothing appears on a screen and a window you have open is never touched.
+    The VMD is closed when the task is done (after it has been graded: the grader asks it)."""
+    if not (task.category == "window" or task.id.startswith("window_")):
+        yield
+        return
+    from vmd_agent import vmdlink
+    keep = {k: os.environ.get(k) for k in ("VMD_AGENT_HOME", "VMD_AGENT_WINDOW_HEADLESS")}
+    os.environ["VMD_AGENT_HOME"] = os.path.join(work, ".agent_home")
+    os.environ["VMD_AGENT_WINDOW_HEADLESS"] = "1"
+    try:
+        yield
+    finally:
+        vmdlink.stop()
+        for k, v in keep.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+
+
 def _strip_check(text: str) -> str:
     return text.split("\n\n" + CHECK_MARK)[0] if CHECK_MARK in text else text
 
@@ -102,6 +125,8 @@ def run_task(task: M.Task, model: str, base_url: str, api_key: Optional[str], ba
     os.environ[security.ENV_ROOTS] = os.path.realpath(work)
     cwd = os.getcwd()
     os.chdir(work)
+    isolation = contextlib.ExitStack()
+    isolation.enter_context(_window_isolated(work, task))
     rec: dict = {"model": model, "task": task.id, "category": task.category, "tools_profile": tools, "guard": guard,
                  "success": False, "tool_ok": False, "answer_ok": False, "grounded": None, "reason": "", "tools_called": [],
                  "tool_errors": 0, "answer": "", "error": None}
@@ -140,6 +165,7 @@ def run_task(task: M.Task, model: str, base_url: str, api_key: Optional[str], ba
                     "model_calls": clock["model_calls"], "n_tool_calls": len(calls),
                     "tokens_in": session.usage["input_tokens"], "tokens_out": session.usage["output_tokens"]})
     finally:
+        isolation.close()
         os.chdir(cwd)
         if previous is None:
             os.environ.pop(security.ENV_ROOTS, None)
@@ -162,6 +188,8 @@ def oracle_run(task: M.Task, base: str, truth: dict, work: str) -> dict:
     cwd = os.getcwd()
     os.chdir(work)
     calls: List[dict] = []
+    isolation = contextlib.ExitStack()
+    isolation.enter_context(_window_isolated(work, task))
     try:
         for name, args in oracle.plan(truth):
             try:
@@ -177,6 +205,7 @@ def oracle_run(task: M.Task, base: str, truth: dict, work: str) -> dict:
             why = f"grader error: {type(e).__name__}: {e}"
         wanted = True if task.decline else bool(run.called(*task.tools))
     finally:
+        isolation.close()
         os.chdir(cwd)
         if previous is None:
             os.environ.pop(security.ENV_ROOTS, None)

@@ -556,7 +556,7 @@ def _json_type(tp) -> dict:
 
 #: parameters a language model is never shown: it fills them with invented values (a made-up VMD path),
 #: and the toolkit already finds VMD by itself. They stay available to Python callers.
-HIDDEN_FROM_MODELS = ("vmd_path",)
+HIDDEN_FROM_MODELS = ("vmd_path", "headless")
 
 
 def tool_schema(fn: Callable) -> dict:
@@ -582,7 +582,7 @@ def tool_specs(names: Optional[List[str]] = None) -> List[dict]:
 
 
 # The tools that drive VMD itself, and the workflow entry point, register themselves into TOOLS on import.
-from vmd_agent import vmd_tools, workflows  # noqa: F401
+from vmd_agent import vmd_tools, window_tools, workflows  # noqa: F401
 
 #: the one call that reaches the workflows (a layer above the tools: it runs several of them in a fixed order)
 WORKFLOW_ENTRY = "run_workflow"
@@ -597,6 +597,10 @@ LIBRARY: List[tuple] = [
     ("Draw", "pictures, movies and scenes", [
         ("visualize_and_interpret", "optional"), ("render_image", "yes"), ("render_movie", "yes"), ("annotate_image", "no"), ("view_image", "no"),
         ("generate_visualization_recipe", "no"), ("list_representations", "no"), ("color_key", "no"), ("export_session", "yes"), ("run_tcl", "yes")]),
+    ("Control your VMD window", "drive the VMD you can see: what it loads, draws, shows and answers", [
+        ("window_open", "yes"), ("window_load", "yes"), ("window_molecules", "yes"), ("window_representation", "yes"), ("window_display", "yes"),
+        ("window_view", "yes"), ("window_animate", "yes"), ("window_query", "yes"), ("window_snapshot", "yes"), ("window_scene", "yes"),
+        ("window_save", "yes")]),
     ("Measure a simulation", "size, shape, flexibility, convergence, box", [
         ("analyze_trajectory", "no"), ("measure_with_vmd", "yes"), ("select_keyframes", "no"), ("periodic_box", "yes")]),
     ("Interactions and structure quality", "who touches whom, secondary structure, geometry", [

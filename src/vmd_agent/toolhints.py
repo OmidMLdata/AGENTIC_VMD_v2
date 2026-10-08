@@ -12,6 +12,7 @@ from __future__ import annotations
 import copy
 from typing import Dict, List
 
+from vmd_agent import vmdlink
 from vmd_agent.vmdkit import interactions, maps, measure, trajectory, volumetric
 
 #: (tool, parameter) -> the allowed values, for the parameters that take one of a fixed list
@@ -35,6 +36,18 @@ CHOICES: Dict[tuple, tuple] = {
     ("select_keyframes", "renderer"): ("auto", "vmd", "matplotlib"),
     ("visualize_and_interpret", "focus"): ("overview", "fold", "interactions", "surface", "pocket", "performance"),
     ("annotate_image", "panel_side"): ("right", "left"),
+    ("window_molecules", "action"): ("list", "top", "show", "hide", "rename", "delete", "clear"),
+    ("window_representation", "action"): ("list", "add", "modify", "delete", "only"),
+    ("window_representation", "style"): vmdlink.STYLES,
+    ("window_representation", "color"): vmdlink.COLORS,
+    ("window_representation", "material"): vmdlink.MATERIALS,
+    ("window_display", "setting"): tuple(vmdlink.DISPLAY),
+    ("window_view", "action"): ("reset", "rotate", "scale", "translate", "center", "save", "restore"),
+    ("window_view", "axis"): ("x", "y", "z"),
+    ("window_animate", "action"): ("goto", "forward", "reverse", "pause", "style", "speed"),
+    ("window_animate", "style"): ("once", "loop", "rock"),
+    ("window_query", "measure"): ("bond", "angle", "dihedral", "sasa"),
+    ("window_snapshot", "quality"): ("fast", "tachyon"),
 }
 
 #: parameter name -> what it means, where the name alone does not say

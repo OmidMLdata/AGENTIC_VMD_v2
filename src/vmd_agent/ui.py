@@ -26,11 +26,10 @@ import webbrowser
 from typing import Callable, Optional
 from urllib.parse import parse_qs, quote, unquote, urlparse
 
-from vmd_agent import agent as agent_mod, progress, security, toolform, toolset, workflows as workflows_mod
-from vmd_agent.structure import viewer
+from vmd_agent import agent as agent_mod, progress, security, toolform, toolset, vmdlink, workflows as workflows_mod
 
 ASSETS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ui_assets")
-SCRIPTS = {"style.css": "text/css; charset=utf-8", **{n: "text/javascript; charset=utf-8" for n in ("app.js", "viewer.js", "selection.js", "commands.js", "markdown.js")}}
+SCRIPTS = {"style.css": "text/css; charset=utf-8", **{n: "text/javascript; charset=utf-8" for n in ("app.js", "commands.js", "markdown.js")}}
 MAX_UPLOAD = 1_000_000_000                       # bytes
 KINDS = {".pdb": "structure", ".cif": "structure", ".mmcif": "structure", ".gro": "structure", ".psf": "structure",
          ".mol2": "structure", ".xyz": "structure", ".prmtop": "structure", ".dcd": "trajectory", ".xtc": "trajectory",
@@ -136,18 +135,7 @@ class State:
         self.token = secrets.token_urlsafe(24)
         self.busy = threading.Lock()
         self.session = agent_mod.Agent(base_url, model, api_key, tools=tools, echo=lambda m: None)
-        self.models: dict = {}                       # structures opened in the viewer, most recent last
-        self.model_lock = threading.Lock()
-
-    def model_for(self, topology: str, trajectory: Optional[str] = None) -> "viewer.Model":
-        """The viewer's model of a structure (and trajectory); opened once, then kept (the last eight)."""
-        key = (topology, trajectory)
-        with self.model_lock:
-            if key not in self.models:
-                self.models[key] = viewer.Model(topology, trajectory)
-                while len(self.models) > 8:
-                    self.models.pop(next(iter(self.models)))
-            return self.models[key]
+        self.window_lock = threading.Lock()          # one picture of the VMD window at a time
 
     def set_tools(self, profile: str) -> None:
         self.tools = profile
@@ -205,7 +193,7 @@ class State:
                 "vmd": env.get("vmd_path"), "vmd_version": env.get("vmd_version"), "tachyon": bool(env.get("tachyon_path")),
                 "ffmpeg": bool(env.get("ffmpeg")), "n_tools": len(toolset.library_tools()), "tools_in_chat": len(self.session.names), "profile": self.tools,
                 "profiles": {"all": len(toolset.ALL), "auto": 0},
-                "clock": self.session.clock}
+                "clock": self.session.clock, "window": {"connected": vmdlink.attach(timeout=1.0) is not None}}
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
@@ -274,8 +262,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
         elif url.path.startswith("/assets/") and url.path[8:] in SCRIPTS:
             with open(os.path.join(ASSETS, url.path[8:]), "rb") as fh:
                 self._send(200, fh.read(), SCRIPTS[url.path[8:]])
-        elif url.path in ("/api/structure", "/api/frame"):
-            self._structure(url.path, parse_qs(url.query))
+        elif url.path == "/api/window":
+            self._json(self._window_state())
+        elif url.path == "/api/window/snapshot":
+            self._window_snapshot(parse_qs(url.query).get("q", ["fast"])[0])
         elif url.path == "/api/status":
             self._json(self.state.status())
         elif url.path == "/api/model":
@@ -297,28 +287,6 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._serve_file(unquote(url.path[len("/files/"):]))
         else:
             self._send(404, b"not found", "text/plain")
-
-    def _structure(self, which: str, q: dict) -> None:
-        """The atoms of a structure for the viewer, or the coordinates of one frame."""
-        try:
-            top = security.check_path(os.path.join(self.state.root, q.get("path", [""])[0]))
-            traj_rel = q.get("traj", [""])[0]
-            traj = security.check_path(os.path.join(self.state.root, traj_rel)) if traj_rel else None
-            for f in (top, traj):
-                if f and not (os.path.isfile(f) and security.is_within(f, self.state.root)):
-                    raise FileNotFoundError(os.path.basename(f))
-            model = self.state.model_for(top, traj)
-            if which == "/api/frame":
-                i = int(q.get("i", ["0"])[0])
-                with self.state.model_lock:
-                    xyz = model.frame(i)
-                return self._json({"i": i, "xyz": [round(float(x), 2) for x in xyz.ravel()]})
-            with self.state.model_lock:
-                return self._json(model.describe())
-        except (security.SecurityError, FileNotFoundError):
-            return self._json({"error": "no such file in your files folder"}, 404)
-        except Exception as e:                                         # a file MDAnalysis cannot read is a message, not a crash
-            return self._json({"error": f"cannot show this file: {type(e).__name__}: {str(e)[:200]}"}, 415)
 
     def _serve_file(self, rel: str) -> None:
         try:
@@ -365,6 +333,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     return self._json({"error": "another job is still running; wait for it to finish"}, 409)
                 self.state.set_tools(profile)
                 return self._json(self.state.status())
+            if url.path == "/api/window":
+                return self._window_do(payload)
+            if url.path == "/api/window/open":
+                return self._window_open()
             if url.path == "/api/tool":
                 return self._stream(lambda emit: self._tool(payload, emit))
             if url.path == "/api/terminal":
@@ -379,6 +351,44 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._send(404, b"not found", "text/plain")
         except (ValueError, json.JSONDecodeError) as e:
             self._json({"error": str(e)}, 400)
+
+    # ---- the VMD window (see vmd_agent.vmdlink): the page is a remote for the real VMD, and shows VMD's own pictures
+    def _window_state(self) -> dict:
+        st = vmdlink.status()
+        st["choices"] = {"styles": list(vmdlink.STYLES), "colors": list(vmdlink.COLORS), "materials": list(vmdlink.MATERIALS),
+                         "backgrounds": list(vmdlink.BACKGROUNDS), "axes": list(vmdlink.AXES)}
+        return st
+
+    def _window_open(self) -> None:
+        try:
+            vmdlink.open_window()
+        except vmdlink.LinkError as e:
+            return self._json({**self._window_state(), "error": str(e)}, 409)
+        self._json(self._window_state())
+
+    def _window_do(self, payload: dict) -> None:
+        """One command for the VMD window, as the tool the agent would call; the answer is the tool's."""
+        name = str(payload.get("tool") or "")
+        if not name.startswith("window_") or name not in toolset.TOOLS:
+            return self._json({"ok": False, "error": "the page can send only the window_* tools to the VMD window"}, 400)
+        try:
+            args = toolform.coerce(name, payload.get("args") or {})
+        except ValueError as e:
+            return self._json({"ok": False, "error": str(e)}, 400)
+        self._json(toolset.TOOLS[name](**args))
+
+    def _window_snapshot(self, quality: str) -> None:
+        """A picture of the VMD window, drawn by VMD, as a PNG."""
+        if quality not in ("fast", "tachyon"):
+            quality = "fast"
+        out = os.path.join(self.state.root, ".window", "view.png")
+        with self.state.window_lock:
+            result = toolset.TOOLS["window_snapshot"](out_png=out, quality=quality)
+            if not result.get("ok"):
+                return self._json(result, 409)
+            with open(result["image"], "rb") as fh:
+                data = fh.read()
+        self._send(200, data, "image/png")
 
     def _model_start(self) -> None:
         """Start the private model server (the Ollama copy inside the vmd-agent folder), if there is one."""

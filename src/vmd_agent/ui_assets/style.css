@@ -133,17 +133,15 @@ pre.look { background: var(--field); border: 1px solid; border-color: var(--dk) 
 /* ---- display */
 #displaypane > header { }
 #display { position: relative; background: var(--display); min-height: 0; flex: 1; overflow: hidden; margin: 3px 3px 0; border: 1px solid; border-color: var(--dk) var(--hi) var(--hi) var(--dk); }
-#view { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; cursor: grab; }
-#view.drag { cursor: grabbing; } #view.pick { cursor: crosshair; }
+#view { position: absolute; inset: 0; width: 100%; height: 100%; display: block; object-fit: contain; touch-action: none; cursor: grab; user-select: none; -webkit-user-drag: none; }
 #media { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: #000; padding: 8px; }
 #media.on { display: flex; }
 #media img, #media video { max-width: 100%; max-height: 100%; }
 #media .back { position: absolute; top: 6px; right: 6px; }
 #nodata { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; color: #9a9a9a; pointer-events: none; padding: 16px; font-family: var(--mono); font-size: 11px; }
-#nodata b { display: block; font-weight: normal; margin-bottom: 2px; } #nodata code { color: #cfcfcf; }
+#nodata b { display: block; font-weight: normal; margin-bottom: 8px; max-width: 360px; } #nodata code { color: #cfcfcf; } #nodata button { pointer-events: auto; }
+.livebox { display: inline-flex; align-items: center; gap: 3px; margin: 0 4px; }
 #caption { position: absolute; left: 6px; bottom: 4px; color: #bdbdbd; font: 11px var(--mono); pointer-events: none; max-width: 80%; }
-#pickinfo { position: absolute; right: 6px; bottom: 4px; background: #000; color: #e8e8e8; border: 1px solid #777; padding: 2px 6px; font: 11px var(--mono); }
-#pickinfo b { color: #ffe14a; font-weight: normal; }
 
 /* ---- Graphical Representations (a window over the display) */
 .floating { position: absolute; width: 330px; max-width: calc(100% - 12px); max-height: calc(100% - 12px); display: flex; flex-direction: column; background: var(--face); color: var(--ink); border: 1px solid var(--ink); box-shadow: 3px 3px 0 rgba(0, 0, 0, .4), inset 1px 1px 0 var(--hi); z-index: 10; right: 6px; top: 6px; }

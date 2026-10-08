@@ -44,12 +44,13 @@ the records. Nothing is stored in the repository: you run it on your models and 
 | `build` | solvated system, mutation, merge, membrane, nanotube, a NAMD input | 6 |
 | `maps` | read a density map, scale it, fit a model into it, make a density | 4 |
 | `render` | one image, a scene, a rotating movie, a movie of a trajectory, an exported session, a script, a labelled figure, pictures without VMD | 9 |
+| `window` | drive a real VMD (with no window, here): load, draw as a cartoon and licorice, ask how many atoms, go to a frame, set the display, save a picture; each graded by asking VMD what it holds | 6 |
 | `video` | read a video's properties, check them against a request, pull out stills | 3 |
 | `workflows` | the whole jobs: has my run settled, an overview, list them, prepare a simulation | 4 |
 | `hand_off` | a SLURM script | 1 |
 | `records` | re-check recorded hashes, write a report from a session | 2 |
 | `network` | search the PDB, download an entry | 2 |
-| `decline` | requests that cannot or must not be done: a missing file, a path outside the folder, Tcl that is disabled, a quantity no tool measures, data that do not match | 5 |
+| `decline` | requests that cannot or must not be done: a missing file, a path outside the folder, Tcl that is disabled, a quantity no tool measures, data that do not match | 6 |
 
 Every prompt, the tools that answer it and **what a correct answer says** are in [the task list](model-benchmark-tasks.md); `vmd-agent bench models --list --reference` prints it, and `vmd-agent bench models --oracle` does every task perfectly with the real tools and grades that (no model), so a task that a perfect agent cannot pass shows up as a bug in the task. Tasks that need VMD, ffmpeg or the network are skipped (with the reason) when the computer lacks them, and are not counted.
 A test checks that every tool is asked for by some task or excused with a reason.

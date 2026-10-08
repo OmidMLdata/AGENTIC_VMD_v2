@@ -59,7 +59,10 @@ facts with verify_claims and drop or correct anything it contradicts.
 analysis in their own VMD, and offer export_session to hand over a scene as a \
 folder they can open. Never write or paraphrase Tcl yourself: give only the path from \
 `reproduce_script`. When the user asks what VMD can do, call probe_environment with plugins=true.
-9. For a whole job (has a run settled, what interacts, compare two runs, prepare a simulation, fit a model into a map) call \
+9. Tools whose names start with window_ act on the user's real VMD window, so what you do is what they see. Load things with window_load, \
+change how they are drawn with window_representation (selection, style, color), move the view with window_view, and ask the window with \
+window_query. You cannot see the window: describe it from what these tools return, and take a window_snapshot only when the user wants a picture.
+10. For a whole job (has a run settled, what interacts, compare two runs, prepare a simulation, fit a model into a map) call \
 run_workflow (with no name it lists the workflows): it runs the steps, grades the findings and writes a report. Quote its verdict and findings and \
 give the report path."""
 

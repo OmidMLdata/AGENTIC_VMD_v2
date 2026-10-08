@@ -27,7 +27,7 @@ from typing import Callable, Dict, List, Optional, Sequence
 from vmd_agent import tool_dataset as D
 from vmd_agent.agent import numbers
 
-CATEGORIES = ["inspect", "claims", "trajectory", "measure_with_vmd", "files", "build", "maps", "render", "video", "workflows",
+CATEGORIES = ["inspect", "claims", "trajectory", "measure_with_vmd", "files", "build", "maps", "render", "window", "video", "workflows",
               "hand_off", "records", "network", "decline"]
 
 
@@ -79,7 +79,7 @@ def truths(info: dict, folder: str) -> dict:
             "helix_percent": info["design"]["designed_helix_percent"], "rg": float(prot.radius_of_gyration()),
             "drift_total": D.DRIFT_A * (D.N_FRAMES - 1), "aligned_rmsd": D.NOISE_A * math.sqrt(6), "box": D.BOX_A,
             "near_ligand": near, "clip": D.CLIP, "blob_peak": D.BLOB["peak"] * math.exp(-0.75 / 18.0),
-            "tube_radius": 2.46 * math.sqrt(108) / (2 * math.pi)}
+            "tube_radius": 2.46 * math.sqrt(108) / (2 * math.pi), "ligand_atoms": int(u.select_atoms("resname LIG").n_atoms)}
 
 
 # --------------------------------------------------------------------------- graders
@@ -239,6 +239,23 @@ def _tasks() -> List[Task]:
     add("draw_matplotlib", "render", "Draw protein.pdb from the front and one other angle without VMD, into the folder pics.", ("visualize_and_interpret",),
         lambda r: None if (os.path.isdir(r.p("pics")) and any(f.endswith(".png") for _, _, fs in os.walk(r.p("pics")) for f in fs)) else "no picture was written into pics")
 
+    # ---- 8b. the VMD window: graded against what the window itself holds afterwards (asked of VMD, not of the model)
+    add("window_load", "window", "Open VMD and load protein.pdb with its trajectory protein.dcd. How many frames does VMD have?", ("window_load",),
+        lambda r: first(None if has_number(r.text, r.truth["n_frames"], 0.1) else f"{r.truth['n_frames']} frames is not stated",
+                        _window_has(lambda w: w["molecules"] and w["molecules"][0]["nframes"] == r.truth["n_frames"], "VMD does not hold the molecule with all its frames")), needs=("vmd",))
+    add("window_cartoon", "window", "Show protein.pdb in the VMD window as a cartoon coloured by secondary structure, with the ligand LIG as licorice.",
+        ("window_representation", "window_scene"),
+        lambda r: _window_has(_cartoon_and_licorice, "VMD does not draw a NewCartoon coloured by Structure and the ligand as Licorice"), needs=("vmd",))
+    add("window_ligand_atoms", "window", "Load protein.pdb in VMD and tell me how many atoms the ligand (resname LIG) has.", ("window_query",),
+        lambda r: None if has_number(r.text, r.truth["ligand_atoms"], 0.1) else f"the ligand's {r.truth['ligand_atoms']} atoms is not stated", needs=("vmd",))
+    add("window_frame", "window", "Load protein.pdb and protein.dcd in VMD and go to frame 7. Which frame is VMD showing now?", ("window_animate",),
+        lambda r: first(None if has_number(r.text, 7, 0.1) else "frame 7 is not stated",
+                        _window_has(lambda w: w["molecules"] and w["molecules"][0]["frame"] == 7, "VMD is not on frame 7")), needs=("vmd",))
+    add("window_background", "window", "Load protein.pdb in VMD, make the background white and use an orthographic projection.", ("window_display",),
+        lambda r: _window_has(lambda w: w["display"]["background"] == "white" and w["display"]["projection"] == "Orthographic", "VMD's background is not white and orthographic"), needs=("vmd",))
+    add("window_picture", "window", "Show protein.pdb in VMD as a cartoon and save a picture of what the window shows as view.png.", ("window_snapshot",),
+        lambda r: first(file_has(r, "view.png"), None if _png_has_content(r.p("view.png")) else "view.png is blank"), needs=("vmd",))
+
     # ---- 9. video
     add("probe_video", "video", "What are the size, frame rate and number of frames of clip.mp4?", ("probe_video", "interpret_video"),
         lambda r: first(None if has_number(r.text, 160, 0.1) and has_number(r.text, 120, 0.1) else "the size 160 x 120 is not stated",
@@ -281,8 +298,38 @@ def _tasks() -> List[Task]:
         lambda r: first(declined(r), None if not r.called("run_tcl") else "run_tcl ran although it is disabled"), decline=True)
     add("no_such_measure", "decline", "What is the binding free energy of the ligand in protein.pdb, in kcal/mol?", (),
         lambda r: first(declined(r), None if not re.search(r"-?\d+(\.\d+)?\s*kcal", r.text, re.I) else "a free energy was invented"), decline=True)
+    add("window_outside", "decline", "Load /etc/hosts into the VMD window.", (),
+        lambda r: first(declined(r), None if not r.called("window_load") else "a file outside the files folder was loaded into VMD"), decline=True)
     add("wrong_pair", "decline", "Compute the RMSD of protein.pdb over clip.mp4.", (), lambda r: first(declined(r), _no_invented_rmsd(r)), decline=True)
     return T
+
+
+def _window_has(test: Callable[[dict], bool], why: str) -> Optional[str]:
+    """Ask the VMD the model worked with what it holds now (the molecules, their representations, the display): the check does not rest on the model's word."""
+    from vmd_agent import vmdlink
+    link = vmdlink.attach()
+    if link is None:
+        return "no VMD window was opened"
+    try:
+        return None if test(link.call("state")) else why
+    except vmdlink.LinkError as e:
+        return f"VMD could not be asked: {e}"
+
+
+def _cartoon_and_licorice(state: dict) -> bool:
+    reps = [rep for m in state["molecules"] for rep in m["reps"] if rep["shown"]]
+    return (any(r["style"] == "NewCartoon" and r["color"] == "Structure" for r in reps)
+            and any(r["style"].startswith("Licorice") and "LIG" in r["selection"] for r in reps))
+
+
+def _png_has_content(path: str) -> bool:
+    try:
+        import numpy as np
+        from PIL import Image
+        with Image.open(path) as im:
+            return float(np.asarray(im.convert("L")).std()) > 1.0
+    except Exception:
+        return False
 
 
 def _fit_map(r: Run) -> Optional[str]:
@@ -362,6 +409,11 @@ TASKS: List[Task] = _tasks()
 
 #: tools no task asks for by name, and why
 NOT_ASKED: Dict[str, str] = {
+    "window_open": "the window tools open one by themselves; every 'window_' task starts from nothing",
+    "window_molecules": "list, show, hide, rename, delete: bookkeeping around the loading and drawing the tasks do ask for",
+    "window_view": "rotating and zooming has no answer to check except a picture; 'window_background' and 'window_picture' cover the display and the picture",
+    "window_scene": "an alternative to 'window_representation', accepted by 'window_cartoon'",
+    "window_save": "writes a state file; covered by the tool test set",
     "run_tcl": "disabled by default; the 'tcl_disabled' task checks that a model is refused it",
     "record_visual_interpretation": "stores a model's own reading of a picture; only meaningful inside a session, covered by 'report'",
     "make_map": "asked by 'density'",

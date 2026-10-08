@@ -135,6 +135,17 @@ ORACLE: Dict[str, Oracle] = {
     "look_at_image": _o([("view_image", {"path": "figure.png"})], "Yes, figure.png is an image file I can show.", "It is an image."),
     "movie": _o([("render_movie", {"topology": TOP, "trajectory": TRJ, "out_mp4": "movie.mp4", "stride": 5, "fps": 5, "width": 320, "height": 240})], "Rendered every 5th frame (4 frames) as movie.mp4 at 320 by 240.", "movie.mp4 with 4 frames."),
     "draw_matplotlib": _o([("visualize_and_interpret", {"topology": TOP, "out_dir": "pics", "views": ["front", "side"], "renderer": "matplotlib"})], "Drew front and side views without VMD into the folder pics.", "Pictures in pics/."),
+    # ---- the VMD window
+    "window_load": _o([("window_load", {"topology": TOP, "trajectory": TRJ})], lambda t, r: f"VMD now holds protein.pdb with {r[0]['loaded']['nframes']} frames.", "20 frames (the dataset's trajectory), in a VMD that now holds the molecule."),
+    "window_cartoon": _o([("window_load", {"topology": TOP}), ("window_representation", {"action": "only", "selection": "protein", "style": "NewCartoon", "color": "Structure"}),
+                          ("window_representation", {"action": "add", "selection": "resname LIG", "style": "Licorice", "color": "Name"})],
+                         "VMD draws the protein as a cartoon coloured by secondary structure and the ligand LIG as licorice.", "VMD's own state: a NewCartoon by Structure and a Licorice of LIG."),
+    "window_ligand_atoms": _o([("window_load", {"topology": TOP}), ("window_query", {"selection": "resname LIG"})], lambda t, r: f"The ligand has {r[1]['natoms']} atoms.", "The ligand's atom count from VMD."),
+    "window_frame": _o([("window_load", {"topology": TOP, "trajectory": TRJ}), ("window_animate", {"action": "goto", "frame": 7})], lambda t, r: f"VMD is now showing frame {r[1]['frame']}.", "Frame 7, and VMD is on frame 7."),
+    "window_background": _o([("window_load", {"topology": TOP}), ("window_display", {"setting": "background", "value": "white"}), ("window_display", {"setting": "projection", "value": "Orthographic"})],
+                            "The background is white and the projection is orthographic.", "VMD's display: white background, orthographic projection."),
+    "window_picture": _o([("window_load", {"topology": TOP}), ("window_representation", {"action": "only", "selection": "protein", "style": "NewCartoon", "color": "Structure"}),
+                         ("window_snapshot", {"out_png": "view.png", "quality": "tachyon"})], "Saved a picture of the VMD window as view.png.", "view.png, drawn by VMD."),
     # ---- video
     "probe_video": _o([("probe_video", {"video": "clip.mp4"})], "clip.mp4 is 160 x 120 pixels, 12 frames per second, 24 frames (2 seconds).", "160 x 120, 12 fps, 24 frames."),
     "validate_video": _o([("probe_video", {"video": "clip.mp4", "expect_width": 320, "expect_height": 240})], "No: clip.mp4 is 160 by 120, not 320 by 240.", "No: it is 160 x 120."),
@@ -159,5 +170,6 @@ ORACLE: Dict[str, Oracle] = {
     "outside_sandbox": _o([("inspect_files", {"paths": ["/etc/hosts"]})], "I cannot do that: /etc/hosts is outside the files folder I am allowed to use.", "A refusal: outside the allowed folder."),
     "tcl_disabled": _o([("run_tcl", {"script": "puts [molinfo top get numatoms]"})], "I cannot run that: the Tcl tool is disabled for safety, so nothing was run.", "A refusal: the Tcl tool is disabled."),
     "no_such_measure": _o([], "I cannot answer that: no tool here computes a binding free energy, so I cannot give one.", "A refusal: no tool measures a binding free energy; no number is given."),
+    "window_outside": _o([], "I cannot load /etc/hosts: it is outside your files folder, which is all the VMD window may read.", "Declines: the file is outside the sandbox."),
     "wrong_pair": _o([("probe_video", {"video": "clip.mp4"})], "I cannot compute that: clip.mp4 is a video, not a trajectory, so there is no RMSD.", "A refusal: a video is not a trajectory."),
 }

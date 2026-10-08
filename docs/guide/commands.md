@@ -16,7 +16,7 @@ There are few commands, and no command that does what a tool already does: **eve
 
 | Command | What it does | Flags worth knowing |
 |---|---|---|
-| `vmd-agent ui` | the toolkit in a web page on this computer: your files, a molecule viewer, the chat with the seconds each step took, the whole jobs | `--data-dir FOLDER` · `--port N` · `--no-browser` · `--base-url ADDRESS` · `--model NAME` · `--api-key KEY` · `--tools all\|auto` |
+| `vmd-agent ui` | the toolkit in a web page on this computer: your files, a remote for a real VMD window, the chat with the seconds each step took, the whole jobs | `--data-dir FOLDER` · `--port N` · `--no-browser` · `--base-url ADDRESS` · `--model NAME` · `--api-key KEY` · `--tools all\|auto` |
 | `vmd-agent chat ["question"]` | talk to the tools with a language model in the terminal | see [Ways to work](using.md#ways-to-work) |
 | `vmd-agent` (or `menu`) | the numbered menu | none |
 

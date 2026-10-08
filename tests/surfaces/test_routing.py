@@ -137,7 +137,7 @@ def test_in_auto_the_model_is_sent_only_the_tools_that_fit_and_a_way_to_ask_for_
         srv.shutdown()
     sent, sent_all = _tool_names(requests[0]), _tool_names(requests[1])
     assert "analyze_trajectory" in sent and "run_workflow" in sent and "build_system" not in sent and routing.OFFER in sent
-    assert len(sent) < 0.4 * len(sent_all) and len(sent_all) == 45 and routing.OFFER not in sent_all
+    assert len(sent) < 0.4 * len(sent_all) and len(sent_all) == 56 and routing.OFFER not in sent_all
     assert len(json.dumps(requests[0]["tools"])) < 0.5 * len(json.dumps(requests[1]["tools"]))        # and so are the tokens it costs
 
 

@@ -74,7 +74,7 @@ def test_the_page_needs_the_key_and_the_right_host(page):
 
 def test_status_files_and_workflows(page):
     status = json.loads(page.req("GET", "/api/status")[1])
-    assert status["model"] == "m" and status["n_tools"] == 44 and status["data_dir"] == os.path.realpath(page.root)
+    assert status["model"] == "m" and status["n_tools"] == 55 and status["data_dir"] == os.path.realpath(page.root)
     assert status["model_ready"] in (True, False) and "ffmpeg" in status
     files = json.loads(page.req("GET", "/api/files")[1])["files"]
     assert [f["path"] for f in files] == ["1ubq.pdb"] and files[0]["kind"] == "structure"
@@ -178,38 +178,19 @@ def test_the_page_is_served_as_files_with_a_strict_policy_and_no_inline_script(p
     html = body.decode()
     assert status == 200 and "<script>" not in html and 'onclick=' not in html and ' style="' not in html
     assert headers["Content-Security-Policy"].startswith("default-src 'self'") and "unsafe-inline" not in headers["Content-Security-Policy"]
-    for name, ctype in (("style.css", "text/css"), ("app.js", "text/javascript"), ("viewer.js", "text/javascript"), ("selection.js", "text/javascript"),
-                        ("commands.js", "text/javascript"), ("markdown.js", "text/javascript")):
+    for name, ctype in (("style.css", "text/css"), ("app.js", "text/javascript"), ("commands.js", "text/javascript"), ("markdown.js", "text/javascript")):
         s, b, h = page.req("GET", "/assets/" + name)
         assert s == 200 and h["Content-Type"].startswith(ctype) and len(b) > 500
         assert page.req("GET", "/assets/" + name, cookie=False)[0] == 403
     assert page.req("GET", "/assets/index.html")[0] == 404 and page.req("GET", "/assets/..%2Fui.py")[0] == 404
 
 
-def test_the_viewer_gets_atoms_bonds_and_other_frames(page):
-    shutil.copy(os.path.join(DATA, "ubq_md", "protein.pdb"), os.path.join(page.root, "md.pdb"))
-    shutil.copy(os.path.join(DATA, "ubq_md", "protein.dcd"), os.path.join(page.root, "md.dcd"))
-    s, body, _ = page.req("GET", "/api/structure?path=md.pdb&traj=md.dcd")
-    mol = json.loads(body)
-    assert s == 200 and mol["frames"] > 1 and len(mol["xyz"]) == 3 * mol["n_atoms"] and len(mol["bonds"]) > mol["n_atoms"] * 0.8
-    assert not mol["reduced"] and len(mol["element"]) == mol["n_atoms"] and mol["radius"] > 5
-    f0 = json.loads(page.req("GET", "/api/frame?path=md.pdb&traj=md.dcd&i=0")[1])["xyz"]
-    f3 = json.loads(page.req("GET", "/api/frame?path=md.pdb&traj=md.dcd&i=3")[1])["xyz"]
-    assert len(f0) == len(f3) == len(mol["xyz"]) and f0 != f3                              # the same atoms, moved
-    assert page.req("GET", "/api/structure?path=..%2F..%2Fetc%2Fpasswd")[0] == 404
-    assert page.req("GET", "/api/structure?path=missing.pdb")[0] == 404
-    open(os.path.join(page.root, "notes.pdb"), "w").write("this is not a structure\n")
-    s, body, _ = page.req("GET", "/api/structure?path=notes.pdb")
-    assert s == 415 and "cannot show" in json.loads(body)["error"]
-    assert page.req("GET", "/api/structure", cookie=False)[0] == 403
-
-
 def test_the_tools_the_chat_offers_can_be_changed_from_the_page(page):
     s, body, _ = page.post("/api/profile", {"tools": "auto"})
     status = json.loads(body)
-    assert s == 200 and status["profile"] == "auto" and status["profiles"]["all"] == 45
+    assert s == 200 and status["profile"] == "auto" and status["profiles"]["all"] == 56
     assert page.post("/api/profile", {"tools": "nonsense"})[0] == 400
-    assert json.loads(page.post("/api/profile", {"tools": "all"})[1])["tools_in_chat"] == 45
+    assert json.loads(page.post("/api/profile", {"tools": "all"})[1])["tools_in_chat"] == 56
 
 
 def _closed_port():
@@ -262,7 +243,7 @@ def test_every_tool_is_described_for_a_form_and_can_be_run_from_it(page):
     from vmd_agent import toolset
     cat = json.loads(page.req("GET", "/api/tools")[1])
     names = [t["name"] for g in cat["groups"] for t in g["tools"]]
-    assert names == toolset.library_tools() and len(cat["groups"]) == 10
+    assert names == toolset.library_tools() and len(cat["groups"]) == 11
     detect = next(t for g in cat["groups"] for t in g["tools"] if t["name"] == "detect_system")
     topo = next(p for p in detect["params"] if p["name"] == "topology")
     assert topo["required"] and topo["role"] == "structure" and topo["kind"] == "string" and all(p["name"] != "vmd_path" for p in detect["params"])
@@ -306,3 +287,43 @@ def test_local_models_on_disk_are_listed_even_when_no_server_runs(tmp_path):
         (tmp_path / "manifests" / ref).write_text("{}")
     assert ollama_local.installed_models(str(tmp_path)) == ["gemma4:e4b", "granite4.1:8b", "someone/custom:latest"]
     assert ollama_local.installed_models(str(tmp_path / "nothing")) == []
+
+
+@pytest.fixture()
+def vmd_window(page):
+    """A VMD with no window under the page (the commands are the same as for a window, so a test opens none)."""
+    from vmd_agent import vmdlink
+    vmdlink.open_window(headless=True)
+    yield
+    vmdlink.stop()
+
+
+def test_the_page_says_so_when_no_vmd_window_is_open_and_refuses_anything_but_window_tools(page, monkeypatch):
+    from vmd_agent import vmdlink
+    state = json.loads(page.req("GET", "/api/window")[1])
+    assert state["connected"] is False and "NewCartoon" in state["choices"]["styles"] and "black" in state["choices"]["backgrounds"]
+    r = json.loads(page.post("/api/window", {"tool": "window_molecules", "args": {}})[1])
+    assert r["ok"] is False and "window_open" in r["error"]
+    assert page.post("/api/window", {"tool": "detect_system", "args": {"topology": "1ubq.pdb"}})[0] == 400          # the page cannot use this door for other tools
+    assert page.post("/api/window", {"tool": "window_molecules", "args": {}}, cookie=False)[0] == 403
+    assert page.req("GET", "/api/window/snapshot", cookie=False)[0] == 403
+    monkeypatch.setattr(vmdlink, "open_window", lambda *a, **k: (_ for _ in ()).throw(vmdlink.LinkError("VMD was not found")))
+    s, body, _ = page.post("/api/window/open", {})
+    assert s == 409 and "VMD was not found" in json.loads(body)["error"]
+
+
+@pytest.mark.requires_vmd
+def test_the_page_drives_a_vmd_and_shows_vmds_own_picture(page, vmd_window):
+    load = json.loads(page.post("/api/window", {"tool": "window_load", "args": {"topology": "1ubq.pdb"}})[1])
+    assert load["ok"] and load["loaded"]["natoms"] > 100
+    rep = json.loads(page.post("/api/window", {"tool": "window_representation", "args": {"action": "only", "selection": "protein", "style": "NewCartoon", "color": "Structure"}})[1])
+    assert rep["ok"] and rep["representations"][0]["style"] == "NewCartoon"
+    bad = json.loads(page.post("/api/window", {"tool": "window_representation", "args": {"action": "modify", "rep": 0, "selection": "name CAA and ("}})[1])
+    assert bad["ok"] is False and "selection" in bad["error"]                                                      # VMD's own parser is the judge
+    state = json.loads(page.req("GET", "/api/window")[1])
+    assert state["connected"] and state["molecules"][0]["reps"][0]["selection"] == "protein" and state["display"]["background"] == "black"
+    s, body, headers = page.req("GET", "/api/window/snapshot?q=tachyon")
+    assert s == 200 and headers["Content-Type"] == "image/png" and body[:8] == b"\x89PNG\r\n\x1a\n" and len(body) > 2000
+    assert json.loads(page.req("GET", "/api/status")[1])["window"]["connected"] is True
+    events = page.events("/api/tool", {"name": "window_query", "args": {"selection": "protein"}})
+    assert 0 < next(e for e in events if e["type"] == "tool_result")["result"]["natoms"] <= state["molecules"][0]["natoms"]
