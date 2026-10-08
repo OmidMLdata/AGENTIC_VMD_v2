@@ -23,7 +23,7 @@ Ask in plain language, e.g. "what is in protein.pdb?" or "does the RMSD drift in
 def main(base_url: Optional[str] = None, model: Optional[str] = None,
          api_key: Optional[str] = None, roots: Optional[List[str]] = None,
          max_turns: int = 20, temperature: float = 0.0,
-         prompt: Optional[str] = None, check_model: bool = True, tools: str = "all", stream: bool = True,
+         prompt: Optional[str] = None, check_model: bool = True, tools: str = "auto", stream: bool = True,
          out=None, input_fn: Callable[[str], str] = input) -> int:
     """Run the chat. With ``prompt`` it answers once and exits; otherwise it is
     an interactive session. Returns a process exit code."""

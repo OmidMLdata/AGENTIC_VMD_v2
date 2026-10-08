@@ -12,6 +12,7 @@ import os
 from typing import List, Optional
 
 from vmd_agent import security
+from vmd_agent.window_present import shows_in_window
 from vmd_agent.toolset import _p, tool
 from vmd_agent.vmdkit import build, interactions, measure as measure_mod
 from vmd_agent.vmdkit import maps, prepare, scene, script, structure, volumetric
@@ -56,6 +57,7 @@ def measure_with_vmd(topology: str, trajectory: Optional[str] = None, kind: str 
 
 
 @tool()
+@shows_in_window
 def find_interactions(topology: str, trajectory: Optional[str] = None, kind: str = "hbonds",
                      selection: str = "protein", selection2: Optional[str] = None, cutoff: float = 0.0,
                      angle_cutoff: float = 20.0, first: int = 0, last: int = -1, step: int = 1, top: int = 15,
@@ -69,6 +71,7 @@ def find_interactions(topology: str, trajectory: Optional[str] = None, kind: str
 
 
 @tool()
+@shows_in_window
 def secondary_structure(topology: str, trajectory: Optional[str] = None, selection: str = "protein",
                             first: int = 0, last: int = -1, step: int = 1, vmd_path: Optional[str] = None) -> dict:
     """Secondary structure of every residue in every frame, computed by VMD (STRIDE): helix/strand fractions
@@ -78,6 +81,7 @@ def secondary_structure(topology: str, trajectory: Optional[str] = None, selecti
 
 
 @tool()
+@shows_in_window
 def backbone_torsions(topology: str, trajectory: Optional[str] = None, selection: str = "protein", frame: int = 0,
                           vmd_path: Optional[str] = None) -> dict:
     """phi/psi angles of one frame from VMD, classified into coarse Ramachandran regions; lists outlier residues."""
@@ -86,6 +90,7 @@ def backbone_torsions(topology: str, trajectory: Optional[str] = None, selection
 
 
 @tool()
+@shows_in_window
 def check_structure(topology: str, trajectory: Optional[str] = None, selection: str = "protein", frame: int = 0,
                         vmd_path: Optional[str] = None) -> dict:
     """VMD's structurecheck plugin on one frame: chirality errors, cis peptide bonds and chain gaps."""
@@ -94,6 +99,7 @@ def check_structure(topology: str, trajectory: Optional[str] = None, selection: 
 
 
 @tool()
+@shows_in_window
 def align_structures(mobile: str, reference: str, mobile_selection: str = "name CA",
                          reference_selection: Optional[str] = None, out_pdb: Optional[str] = None,
                          vmd_path: Optional[str] = None) -> dict:
@@ -135,6 +141,7 @@ def write_structure(topology: str, trajectory: Optional[str], out_path: str, fmt
 
 
 @tool()
+@shows_in_window
 def make_map(topology: str, trajectory: Optional[str], out_dx: str, kind: str = "density",
                selection: str = "protein", resolution: float = 1.0, mass_weighted: bool = True, first: int = 0,
                last: int = -1, step: int = 1, cutoff: float = 2.0, vmd_path: Optional[str] = None) -> dict:
@@ -147,6 +154,7 @@ def make_map(topology: str, trajectory: Optional[str], out_dx: str, kind: str = 
 
 
 @tool()
+@shows_in_window
 def inspect_map(path: str) -> dict:
     """What a density map file holds (OpenDX, CCP4/MRC, Gaussian cube, Situs): grid, spacing, range, integral and
     suggested isosurface levels. Works without VMD."""
@@ -154,6 +162,7 @@ def inspect_map(path: str) -> dict:
 
 
 @tool()
+@shows_in_window
 def build_system(input_pdb: str, out_prefix: str, selection: str = "protein", solvate: bool = True,
                      padding: float = 10.0, ionize: bool = True, salt_concentration: float = 0.15,
                      histidine: str = "HSD", vmd_path: Optional[str] = None) -> dict:
@@ -167,6 +176,7 @@ def build_system(input_pdb: str, out_prefix: str, selection: str = "protein", so
 
 
 @tool()
+@shows_in_window
 def mutate_residue(psf: str, pdb: str, out_prefix: str, segid: str, resid: int, new_resname: str,
                        vmd_path: Optional[str] = None) -> dict:
     """Mutate one residue in a PSF/PDB pair (VMD mutator plugin), e.g. segid P0, resid 6, new_resname ALA. Use a dry system (build_system with solvate=false): it failed on a solvated one."""
@@ -175,6 +185,7 @@ def mutate_residue(psf: str, pdb: str, out_prefix: str, segid: str, resid: int, 
 
 
 @tool()
+@shows_in_window
 def merge_structures(psf_a: str, pdb_a: str, psf_b: str, pdb_b: str, out_prefix: str,
                          vmd_path: Optional[str] = None) -> dict:
     """Combine two PSF/PDB systems into one (VMD topotools); warns when segment names collide."""
@@ -183,6 +194,7 @@ def merge_structures(psf_a: str, pdb_a: str, psf_b: str, pdb_b: str, out_prefix:
 
 
 @tool()
+@shows_in_window
 def build_membrane(out_prefix: str, lipid: str = "POPC", x_size: float = 80.0, y_size: float = 80.0,
                        force_field: str = "c36", vmd_path: Optional[str] = None) -> dict:
     """Build a POPC or POPE lipid bilayer patch (VMD membrane plugin, CHARMM): PSF/PDB, lipids per leaflet and the
@@ -192,6 +204,7 @@ def build_membrane(out_prefix: str, lipid: str = "POPC", x_size: float = 80.0, y
 
 
 @tool()
+@shows_in_window
 def build_nanotube(out_pdb: str, n: int = 6, m: int = 6, length_nm: float = 10.0, material: str = "C-C",
                        vmd_path: Optional[str] = None) -> dict:
     """Build a single-wall nanotube of chirality (n, m), carbon (C-C) or boron nitride (B-N), as a PDB; the radius
@@ -201,6 +214,7 @@ def build_nanotube(out_pdb: str, n: int = 6, m: int = 6, length_nm: float = 10.0
 
 
 @tool()
+@shows_in_window
 def export_session(scene_spec: dict, topology: Optional[str], trajectory: Optional[str], out_dir: str,
                        copy_inputs: bool = True, vmd_path: Optional[str] = None) -> dict:
     """Use when the user wants to open or keep a scene in their own VMD. topology and trajectory are the user's own
@@ -213,6 +227,7 @@ def export_session(scene_spec: dict, topology: Optional[str], trajectory: Option
 
 
 @tool()
+@shows_in_window
 def fit_to_map(model: str, map_file: str, resolution: float = 8.0, selection: str = "protein",
                    out_pdb: Optional[str] = None) -> dict:
     """Cryo-EM: move a model as a rigid body to where it fits a density map (OpenDX, CCP4/MRC, cube, Situs) best, and report
@@ -223,6 +238,7 @@ def fit_to_map(model: str, map_file: str, resolution: float = 8.0, selection: st
 
 
 @tool()
+@shows_in_window
 def combine_maps(map_a: str, op: str, out_dx: str, map_b: Optional[str] = None, value: Optional[float] = None) -> dict:
     """Combine or clean density maps and write OpenDX. op: add, subtract, multiply, average, mask (A where B >= value),
     threshold, clamp, smooth (blur of `value` angstrom), normalize, scale. Two-map operations need map_b on the same grid.

@@ -449,8 +449,8 @@ def build_parser():
                     help="do not check that the server lists the model")
     sp.add_argument("--no-stream", action="store_true",
                     help="show each answer when it is complete instead of as it is written")
-    sp.add_argument("--tools", choices=["all", "auto"], default="all",
-                    help="which tools the model gets: all (the 55 tools and the workflow call), or auto (only the tools that fit each "
+    sp.add_argument("--tools", choices=["all", "auto"], default="auto",
+                    help="which tools the model gets: all (the 57 tools and the workflow call), or auto (only the tools that fit each "
                          "question, and a way to ask for more); fewer tools suit small models better")
     sp = sub.add_parser("ui", help="the toolkit in a web page on this computer: your files, the chat with the seconds each step "
                         "took, and the whole jobs (opens your browser)")
@@ -460,7 +460,7 @@ def build_parser():
     sp.add_argument("--base-url", help="model server address (default: your saved setting)")
     sp.add_argument("--model", help="model name (default: your saved setting)")
     sp.add_argument("--api-key", help="API key if the server needs one")
-    sp.add_argument("--tools", choices=["all", "auto"], default="all", help="which tools the chat gets (auto: only those that fit each question)")
+    sp.add_argument("--tools", choices=["all", "auto"], default="auto", help="which tools the chat gets (auto, the default: only those that fit each question; all: every tool)")
     sp = sub.add_parser("mcp-check", help="check an MCP server install the way a "
                         "real client uses it (needs the mcp SDK, Python >= 3.10)")
     sp.add_argument("--roots", nargs="+", help="allowed root directories to give the server")
@@ -593,7 +593,7 @@ def build_parser():
     b.add_argument("--only", nargs="+", metavar="TASK", help="only these tasks")
     b.add_argument("--smoke", action="store_true", help="only the small set meant for checking a change to the agent (one or two tasks per category)")
     b.add_argument("--repeats", type=int, default=1, help="ask each task this many times; at temperature 0 a model repeats itself, so also set --temperature (for example 0.4) to sample its variation")
-    b.add_argument("--tools", choices=["all", "auto"], default="all", help="which tools the model is offered: all, or auto (only those that fit the question; see docs/tools.md)")
+    b.add_argument("--tools", choices=["all", "auto"], default="auto", help="which tools the model is offered: auto (the default: only those that fit the question), or all (see docs/guide/tools.md)")
     b.add_argument("--max-turns", type=int, default=12)
     b.add_argument("--temperature", type=float, default=0.0)
     b.add_argument("--no-guard", action="store_true", help="turn off the chat's checks (the nudge to use a tool, the number check): a raw model")

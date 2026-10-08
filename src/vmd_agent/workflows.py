@@ -332,14 +332,21 @@ def list_named() -> dict:
 
 # ---------------------------------------------------------------- the workflow entry point (not a tool: a layer above them)
 @tool()
-def run_workflow(name: Optional[str] = None, files: Optional[List[str]] = None, out_dir: str = "workflow_report", options: Optional[dict] = None) -> dict:
+def run_workflow(name: Optional[str] = None, files: Optional[List[str]] = None, out_dir: str = "workflow_report", options: Optional[dict] = None,
+                 show_in_window: bool = False) -> dict:
     """With no name: list the named workflows, what each does, which files it needs and whether it needs VMD. With a name: run a whole job on the user's files, in one call. USE THIS (not a single measurement) when asked whether a run has settled
     or equilibrated, to compare two runs, to prepare a simulation, to fit a model into a cryo-EM map, or for an overview of a structure.
     name and the files it needs, in order: equilibration_check [topology, trajectory]; structure_overview [structure];
     interaction_report [topology, trajectory]; compare_runs [topology, trajectory_a, trajectory_b]; prepare_simulation
     [structure]; cryoem_fit [model, map]. It runs the checks, grades the findings (ok / note / warning / problem), gives a verdict
     and writes report.md and report.html into out_dir. options: {"selection": "protein"}, {"partner": "resname LIG"}, {"padding": 10},
-    {"resolution": 6}."""
+    {"resolution": 6}. show_in_window=true also draws the outcome in the VMD window (the structure with its findings highlighted, the fitted model in
+    its map, the built system, the two runs side by side), so you see it in VMD itself."""
     if not name:
         return list_named()
-    return run_named(name, [_p(f) for f in files or []], _p(out_dir) or out_dir, options)
+    paths, out = [_p(f) for f in files or []], _p(out_dir) or out_dir
+    result = run_named(name, paths, out, options)
+    if show_in_window and isinstance(result, dict) and result.get("ok", True) is not False:
+        from vmd_agent import window_present
+        result["window"] = window_present.present_workflow(name, paths, result, out)
+    return result

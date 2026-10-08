@@ -48,6 +48,25 @@ PARAPHRASES = [
 #: a second paraphrased set, written after the first had been used to widen the router's vocabulary: 20 of its 24 were routed correctly
 #: before the four last misses were fixed ("integrity", "dihedrals", "spinning", "join"), so expect a router like this to miss roughly one
 #: question in six it has not seen; the model's `offer_tools` is how it recovers.
+WINDOW_QUESTIONS = [
+    ("Show the ligand as licorice in my VMD", {"window_representation"}),
+    ("Zoom in on residue 25 and rotate it 90 degrees", {"window_view"}),
+    ("Open it in VMD", {"window_load", "window_open"}),
+    ("Color the protein by secondary structure on screen", {"window_representation"}),
+    ("Go to frame 20 in the window", {"window_animate"}),
+    ("How many atoms does chain A have in VMD?", {"window_query"}),
+    ("Put the background to white and use orthographic projection", {"window_display"}),
+    ("Draw it the way you would for a figure", {"window_visualize"}),
+    ("Make a turntable movie of the window", {"window_movie"}),
+    ("Take a screenshot of what VMD shows", {"window_snapshot"}),
+]
+
+
+def test_questions_about_the_vmd_window_reach_a_window_tool():
+    missed = [q for q, want in WINDOW_QUESTIONS if not (want & set(routing.select(q, ALL)))]
+    assert not missed, missed
+
+
 FRESH = [
     ("Plot how the protein's size changes frame by frame", {"analyze_trajectory", "measure_with_vmd"}),
     ("Where does the protein flex the most?", {"analyze_trajectory", "measure_with_vmd"}),
@@ -137,7 +156,7 @@ def test_in_auto_the_model_is_sent_only_the_tools_that_fit_and_a_way_to_ask_for_
         srv.shutdown()
     sent, sent_all = _tool_names(requests[0]), _tool_names(requests[1])
     assert "analyze_trajectory" in sent and "run_workflow" in sent and "build_system" not in sent and routing.OFFER in sent
-    assert len(sent) < 0.4 * len(sent_all) and len(sent_all) == 56 and routing.OFFER not in sent_all
+    assert len(sent) < 0.4 * len(sent_all) and len(sent_all) == 58 and routing.OFFER not in sent_all
     assert len(json.dumps(requests[0]["tools"])) < 0.5 * len(json.dumps(requests[1]["tools"]))        # and so are the tokens it costs
 
 

@@ -160,7 +160,7 @@ def test_every_tool_is_a_command_with_a_summary_and_a_valid_example():
     from vmd_agent import cli, toolcli, toolset
     p, _, _ = _all_commands()
     names = toolset.library_tools()
-    assert len(names) == 55 and set(toolcli.SUMMARY) == set(names) == set(toolcli.EXAMPLES)
+    assert len(names) == 57 and set(toolcli.SUMMARY) == set(names) == set(toolcli.EXAMPLES)
     for n in names:
         example = toolcli.EXAMPLES[n]
         words = shlex.split(example)

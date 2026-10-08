@@ -257,15 +257,9 @@ def window_snapshot(out_png: str = "window.png", quality: str = "fast") -> dict:
             "summary": f"Saved {os.path.basename(r['path'])} ({r['width']} x {r['height']}), drawn by VMD ({r['renderer']})."}
 
 
-@tool()
-@_live
-def window_scene(scene_spec: dict, topology: Optional[str] = None, trajectory: Optional[str] = None) -> dict:
-    """Set up a whole scene in the VMD window at once, from the same description as render_image: {reps: [{selection, style, color, material,
-    params}], isosurfaces: [{file, isovalue, color, style: solid|wireframe|points}], background, frame, rotate: [[axis, degrees]], zoom,
-    projection, axes, depthcue, shadows, ambient_occlusion}. With topology (and trajectory) it loads them first; without, it redraws the
-    top molecule. The user can then keep working in the window; use window_save to keep the scene."""
+def apply_scene(win: vmdlink.Window, scene_spec: dict, topology: Optional[str] = None, trajectory: Optional[str] = None) -> dict:
+    """Set up a scene (the description render_image takes) in the VMD window: load, representations, isosurfaces, display and view."""
     spec = scene.validate(scene_spec)
-    win = _window(open_if_needed=True)
     if topology:
         top = _p(topology)
         r = win.new_molecule(top)
@@ -296,6 +290,102 @@ def window_scene(scene_spec: dict, topology: Optional[str] = None, trajectory: O
     if spec["zoom"] != 1.0:
         win.view("scale", spec["zoom"])
     return _done(win, f"Scene set up: {len(spec['reps'])} representation(s) and {len(spec['isosurfaces'])} isosurface(s) on molecule {mid}.", molecule=mid)
+
+
+@tool()
+@_live
+def window_scene(scene_spec: dict, topology: Optional[str] = None, trajectory: Optional[str] = None) -> dict:
+    """Set up a whole scene in the VMD window at once, from the same description as render_image: {reps: [{selection, style, color, material,
+    params}], isosurfaces: [{file, isovalue, color, style: solid|wireframe|points}], background, frame, rotate: [[axis, degrees]], zoom,
+    projection, axes, depthcue, shadows, ambient_occlusion}. With topology (and trajectory) it loads them first; without, it redraws the
+    top molecule. The user can then keep working in the window; use window_save to keep the scene."""
+    scene.validate(scene_spec)
+    return apply_scene(_window(open_if_needed=True), scene_spec, topology, trajectory)
+
+
+@tool()
+@_live
+def window_visualize(topology: Optional[str] = None, trajectory: Optional[str] = None, focus: str = "overview", representation: Optional[str] = None,
+                     color_method: Optional[str] = None, show_water: bool = False, background: str = "white") -> dict:
+    """Draw a system in the VMD window the way generate_visualization_recipe would: it detects what the system holds (protein chains, ligands, ions,
+    water, lipids, nucleic acids) and draws each part in a fitting way, with the recipe's own scene settings. Same choices as visualize_and_interpret, but
+    in VMD itself. With topology (and trajectory) it loads them first, or reuses the molecule if it is already in the window; without, it redraws the top
+    molecule. focus: overview, fold, interactions, surface, pocket, performance. representation forces one style (for example QuickSurf). Returns what
+    was drawn, why, and a legend of what each colour and shape means."""
+    from vmd_agent import window_present as W
+    win = _window(open_if_needed=True)
+    if topology:
+        held = W._molecule_holding(win, topology)
+        mid = int(held["id"]) if held else int(W.load(win, topology, trajectory)["id"])
+        top_path, trj_path = topology, trajectory
+    else:
+        mid = _top(win, None)
+        files = next(m["files"] for m in win.molecules() if m["id"] == mid)
+        top_path, trj_path = files[0], (files[1] if len(files) > 1 else None)
+    out = W.visualize(win, mid, top_path, trj_path, focus=focus, representation=representation, color_method=color_method, show_water=show_water, background=background)
+    win.top(mid)
+    return _done(win, f"Drew molecule {mid} in the VMD window the way the recipe draws it: {len(out['representations'])} representation(s).", **out)
+
+
+@tool()
+@_live
+def window_movie(out_mp4: str = "window_movie.mp4", action: str = "trajectory", stride: int = 1, first: int = 0, last: int = -1, fps: int = 12,
+                 frames: int = 36, degrees: float = 360.0, axis: str = "y", quality: str = "fast") -> dict:
+    """A movie of the VMD window, drawn by VMD and encoded with ffmpeg. action: trajectory (play the top molecule's frames from `first` to `last`,
+    every `stride`th) or spin (a turntable: the view turns `degrees` about `axis` over `frames` frames). quality: fast (the window's own picture) or
+    tachyon (VMD's built-in ray tracer, slower). The view is put back afterwards."""
+    import tempfile
+    from vmd_agent import progress
+    from vmd_agent.environment import find_ffmpeg
+    from vmd_agent.evidence import media
+    if action not in ("trajectory", "spin"):
+        raise security.InvalidInput("action must be one of: trajectory, spin")
+    if quality not in ("fast", "tachyon"):
+        raise security.InvalidInput("quality must be fast or tachyon")
+    ffmpeg = find_ffmpeg()
+    if not ffmpeg:
+        raise vmdlink.LinkError("ffmpeg was not found, so a movie cannot be encoded")
+    win = _window()
+    mid = _top(win, None)
+    out = _p(out_mp4)
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    if action == "trajectory":
+        n = next(m["nframes"] for m in win.molecules() if m["id"] == mid)
+        last = n - 1 if last < 0 or last >= n else last
+        indices = list(range(max(0, first), last + 1, max(1, stride)))
+    else:
+        indices = list(range(int(frames)))
+    if not 1 <= len(indices) <= 720:
+        raise security.InvalidInput("a movie has from 1 to 720 frames")
+    start_frame = next(m["frame"] for m in win.molecules() if m["id"] == mid)
+    win.view("save", "_vmdagent_movie")
+    from PIL import Image
+    with tempfile.TemporaryDirectory(dir=os.path.dirname(out)) as tmp:
+        try:
+            for k, idx in enumerate(indices):
+                progress.report(f"frame {k + 1} of {len(indices)}", (k + 1) / len(indices))
+                if action == "trajectory":
+                    win.animate("goto", idx)
+                elif k:
+                    win.view("rotate", axis, float(degrees) / len(indices))
+                png = os.path.join(tmp, f"f{k:05d}.png")
+                win.snapshot(png, quality)
+                with Image.open(png) as im:                                    # yuv420p needs even sides
+                    w, h = im.size
+                    if w % 2 or h % 2:
+                        im.crop((0, 0, w - w % 2, h - h % 2)).save(png)
+        finally:
+            win.view("restore", "_vmdagent_movie")
+            if action == "trajectory":
+                win.animate("goto", start_frame)
+        import subprocess
+        cmd = [ffmpeg, "-y", "-loglevel", "error", "-framerate", str(int(fps)), "-i", os.path.join(tmp, "f%05d.png"), "-pix_fmt", "yuv420p", "-movflags", "+faststart", out]
+        done = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+        if done.returncode != 0 or not os.path.isfile(out):
+            raise vmdlink.LinkError("ffmpeg could not encode the movie: " + done.stderr[-300:])
+    check = media.validate_video(out, expect_fps=float(fps), expect_n_frames=len(indices))
+    return {"ok": True, "movie": out, "n_frames": len(indices), "fps": fps, "validation": check, "summary": f"A {len(indices)}-frame movie of the VMD window ({action}) is saved as {os.path.basename(out)}.",
+            "next_step": "Call interpret_video on `movie` to sample and verify stills before describing it."}
 
 
 @tool()

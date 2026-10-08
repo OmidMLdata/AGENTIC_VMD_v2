@@ -74,6 +74,6 @@ def test_the_docs_say_how_much_context_the_tool_descriptions_take():
     from vmd_agent import toolhints
     from vmd_agent.llm_client import to_openai_tools
     page = open(os.path.join(ROOT, "docs", "guide", "tools.md"), encoding="utf-8").read()
-    said = int(re.search(r"^\| `all` \(default\) \|[^|]*\| about ([\d,]+) tokens \|$", page, flags=re.M).group(1).replace(",", ""))
+    said = int(re.search(r"^\| `all` \|[^|]*\| about ([\d,]+) tokens \|$", page, flags=re.M).group(1).replace(",", ""))
     tokens = len(json.dumps(to_openai_tools(toolhints.enrich(toolset.tool_specs(list(toolset.ALL)))))) / 4
     assert abs(tokens - said) < 0.12 * said, f"about {tokens:.0f} tokens now, the page says about {said}: update docs/guide/tools.md"

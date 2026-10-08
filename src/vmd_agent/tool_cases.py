@@ -439,6 +439,12 @@ def _cases() -> List[Case]:
              check=lambda k, c: k.ok().file("image").when(_png_not_blank(c.out("window.png")), "the picture is blank"), needs=("vmd",)),
         Case("window_scene", "window_scene", lambda c: {"scene_spec": c.scene(), "topology": _top(c), "trajectory": _trj(c)}, after=("window_open",),
              check=lambda k, c: k.ok().has("molecule").when(len(c.scene()["reps"]) >= 1, "the scene has no representation"), needs=("vmd",)),
+        Case("window_visualize", "window_visualize", lambda c: {"topology": _top(c), "trajectory": _trj(c)}, after=("window_open",),
+             check=lambda k, c: k.ok().has("system_type", "visual_legend", "what_to_look_for").when(len(k.get("representations") or []) >= 2, "a protein with a ligand needs at least two representations")
+             .when(any("LIG" in (r.get("selection") or "") for r in k.get("representations") or []), "the ligand was not drawn"), needs=("vmd",),
+             note="the representations the recipe chooses for this system, drawn by VMD"),
+        Case("window_movie", "window_movie", lambda c: {"out_mp4": c.out("window_spin.mp4"), "action": "spin", "frames": 6, "fps": 6}, after=("window_scene",),
+             check=lambda k, c: k.ok().eq("n_frames", 6).file("movie").eq("validation.ok", True), needs=("vmd", "ffmpeg")),
         Case("window_save", "window_save", lambda c: {"out_vmd": c.out("window_state.vmd")}, after=("window_scene",),
              check=lambda k, c: k.ok().file("path").when("mol new" in open(c.out("window_state.vmd")).read(), "the saved state does not load a molecule"),
              needs=("vmd",)),

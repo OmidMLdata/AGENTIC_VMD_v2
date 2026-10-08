@@ -643,8 +643,9 @@ async function loadWorkflows() {
   const l = el("label", null, "Job"); l.htmlFor = "wfname"; box.append(l); const sel = el("select"); sel.id = "wfname";
   for (const k of Object.keys(workflows)) sel.append(new Option(k.replace(/_/g, " "), k));
   const why = el("div", "does"); why.id = "wfdoes"; sel.onchange = renderSlots; const slots = el("div"); slots.id = "slots"; box.append(sel, why, slots);
+  const show = el("label", "showbox"), cb = el("input"); cb.type = "checkbox"; cb.id = "wf-show"; cb.checked = true; show.append(cb, document.createTextNode(" also show the outcome in my VMD window")); show.htmlFor = "wf-show";
   const run = el("button", "btn primary", "Run"); run.id = "runwf"; run.onclick = () => runWorkflow($("#wfname").value, $$("#slots select").map(s => s.value));
-  const out = el("div"); out.id = "wfout"; box.append(run, out);
+  const out = el("div"); out.id = "wfout"; box.append(show, run, out);
   renderSlots();
 }
 function renderSlots() {
@@ -665,7 +666,7 @@ async function runWorkflow(name, chosen) {
   S.busy = true; $("#runwf").disabled = true;
   const prog = el("div", "does", "starting…"), bar = el("div", "bar"); bar.append(el("div")); bar.hidden = true; out.append(prog, bar);
   clog("cmd", `workflow ${name} ${chosen.join(" ")}`);
-  await stream("/api/workflow", { name, files: chosen }, ev => {
+  await stream("/api/workflow", { name, files: chosen, show_in_window: $("#wf-show").checked }, ev => {
     if (ev.type === "tool_progress") { prog.textContent = ev.text; clog("job", "  " + ev.text); if (ev.fraction != null) { bar.hidden = false; bar.firstChild.style.width = Math.round(ev.fraction * 100) + "%"; } }
     else if (ev.type === "error") { out.append(el("div", "banner", "Something went wrong: " + ev.text)); clog("err", "✗ " + ev.text); }
     else if (ev.type === "workflow") {
@@ -677,7 +678,7 @@ async function runWorkflow(name, chosen) {
       for (const s of r.steps || []) { const tr = el("tr"); tr.append(el("td", null, s.n), el("td", null, s.label + (s.ok ? "" : "  (failed)")), el("td", null, s.tool), el("td", null, Number(s.seconds).toFixed(2))); t.append(tr); clog(s.ok ? "ok" : "err", `  ${s.ok ? "✓" : "✗"} ${s.tool}  ${Number(s.seconds).toFixed(2)} s  ${s.label}`); }
       out.append(t, figs(ev.images));
       if (ev.report_html) { const a = el("a", null, "Open the report (report.html)"); a.href = url(ev.report_html); a.target = "_blank"; a.rel = "noopener"; const d = el("div", "linkrow"); d.append(a); out.append(d); }
-      loadFiles();
+      loadFiles(); if ($("#wf-show").checked) V.refresh(true);
     }
   });
   S.busy = false; $("#runwf").disabled = false;

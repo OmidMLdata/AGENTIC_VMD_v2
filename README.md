@@ -9,7 +9,7 @@ in setup instead of a local model; vmd-agent then just supplies the tools, like 
 
 ## Highlights
 
-* **An agent for VMD.** Describe what you want; the agent picks from **55 tools** in eleven groups, runs them, and answers from their numbers. It says how each number was obtained.
+* **An agent for VMD.** Describe what you want; the agent picks from **57 tools** in eleven groups, runs them, and answers from their numbers. It says how each number was obtained.
 * **Open-source first.** Free models run locally through a private copy of Ollama, chosen to fit your memory. Nothing leaves your computer unless you choose an online model.
 * **An agent over your own VMD.** The agent drives the VMD window you can see: load a system, draw it as a cartoon or a surface, colour it, zoom to the ligand, step through frames, ask what is selected, take a picture. Every picture and number is VMD's own; nothing is imitated. [Your VMD window](docs/guide/window.md).
 * **A complete wrapper around VMD.** The library covers VMD itself: measurements, interactions, trajectory conversion, density maps, system building, scenes, movies and hand-offs to NAMD and
@@ -20,7 +20,7 @@ in setup instead of a local model; vmd-agent then just supplies the tools, like 
   is declined rather than guessed.
 * **Everything is timed.** You see how long each model call and each tool call took.
 * **Contained.** One private folder, no administrator rights, nothing installed system-wide. The agent can only read and write inside the files folder you choose.
-* **Pick a model by measuring.** A built-in benchmark scores any model on 65 tasks, one per kind of functionality, so you can choose the model that suits your work and your computer.
+* **Pick a model by measuring.** A built-in benchmark scores any model on 67 tasks, one per kind of functionality, so you can choose the model that suits your work and your computer.
 
 **You need** a Mac, Windows or Linux computer, an internet connection, and VMD (free, from UIUC) for VMD-quality pictures and the VMD-driven tools. **You do not need** Python, Git, Docker, ffmpeg, an account or any AI app.
 
@@ -78,7 +78,7 @@ Put your structure and trajectory files in your files folder and ask for them by
 
 ## What it can do
 
-### The tool library: 55 tools in eleven groups
+### The tool library: 57 tools in eleven groups
 
 A tool does one thing. Every tool is available to the chat, to an MCP client and to `vmd-agent tool NAME`; there is no second list. [Every tool, with what it does and whether it needs VMD](docs/guide/tools.md).
 
@@ -87,7 +87,7 @@ A tool does one thing. Every tool is available to the chat, to an MCP client and
 | **Look at this computer and your files** (4) | `probe_environment` · `inspect_files` · `detect_system` · `structure_stats` |
 | **Get a structure** (2) | `search_pdb` · `fetch_structure` |
 | **Draw** (10) | `visualize_and_interpret` · `render_image` · `render_movie` · `annotate_image` · `view_image` · `generate_visualization_recipe` · `list_representations` · `color_key` · `export_session` · `run_tcl` |
-| **Control your VMD window** (11) | `window_open` · `window_load` · `window_molecules` · `window_representation` · `window_display` · `window_view` · `window_animate` · `window_query` · `window_snapshot` · `window_scene` · `window_save` |
+| **Control your VMD window** (13) | `window_open` · `window_load` · `window_molecules` · `window_representation` · `window_display` · `window_view` · `window_animate` · `window_query` · `window_snapshot` · `window_scene` · `window_visualize` · `window_movie` · `window_save` |
 | **Measure a simulation** (4) | `analyze_trajectory` · `measure_with_vmd` · `select_keyframes` · `periodic_box` |
 | **Interactions and structure quality** (5) | `find_interactions` · `secondary_structure` · `backbone_torsions` · `check_structure` · `align_structures` |
 | **Convert and write files** (2) | `convert_trajectory` · `write_structure` |
@@ -123,7 +123,7 @@ tools raised, the methods, the SHA-256 of every input and the Tcl of every VMD s
 
 One module runs the model, the tools and the checks, and every screen is a thin front end on it, so the chat, the web page and the benchmark behave the same.
 
-* **Routing.** `--tools auto` offers the model only the tools that fit the question, plus a way to ask for more; `--tools all` (the default) gives it the whole library.
+* **Routing.** `--tools auto` offers the model only the tools that fit the question, plus a way to ask for more; `--tools all` gives it the whole library (about 12,000 tokens of descriptions, most of a small model's context).
   [Which tools a model sees](docs/guide/tools.md#does-the-model-see-all-of-them-at-once).
 * **Argument repair.** A number written as text, `RMSD` for `rmsd`, a missing folder in a file name, a trajectory given as the topology: put right when there is only one way to read it, and the result says so.
 * **Plain results.** The results models misread most start with a one-sentence summary, and parameters whose names do not say what they do are described to the model.

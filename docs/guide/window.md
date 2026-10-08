@@ -14,7 +14,7 @@ There are two ways VMD is used, and they do different jobs:
 
 ## The tools
 
-Eleven tools in the group **Control your VMD window** (see [the library](tools.md)). They need a VMD with a window (or, for tests and servers, one without; see below).
+Thirteen tools in the group **Control your VMD window** (see [the library](tools.md)). They need a VMD with a window (or, for tests and servers, one without; see below).
 
 | Tool | What it does |
 |---|---|
@@ -28,6 +28,8 @@ Eleven tools in the group **Control your VMD window** (see [the library](tools.m
 | `window_query` | what a selection holds (atoms, residues, chains, centre, extent, radius of gyration), a bond, angle, dihedral or SASA |
 | `window_snapshot` | a picture of the window (VMD's own picture, or its built-in ray tracer with `--quality tachyon`) |
 | `window_scene` | set up a whole scene at once from the same description `render_image` takes |
+| `window_visualize` | draw a system the way the recipe would (what it holds, each part drawn to suit) and say what the colours mean |
+| `window_movie` | a movie of the window: the trajectory played, or a turntable, drawn by VMD and encoded with ffmpeg |
 | `window_save` | save the window's state as a `.vmd` file that VMD opens again |
 
 ```bash
@@ -40,11 +42,34 @@ vmd-agent tool window_snapshot --out view.png
 
 Each of those is a separate command, and they act on the same window: vmd-agent remembers it (in `live/link.json` in its folder, readable only by you).
 
+## Everything else the toolkit does, in your VMD window
+
+The window is not a separate feature: the tools that find something worth looking at can show it. Add `show_in_window` (`--show-in-window` on the command line, a check box in the page's forms) and the tool does what it always
+did and then draws the result in VMD, opening it if needed. The result gains a `window` entry saying what was drawn.
+
+| What the toolkit does | In the VMD window |
+|---|---|
+| `visualize_and_interpret`, `generate_visualization_recipe` | `window_visualize` draws the recipe's own choices (a cartoon for the protein, licorice for a ligand, spheres for ions, ...) with the legend; `visualize_and_interpret --show-in-window` does it as well as writing the images |
+| `render_image` (scene), `export_session` | `window_scene`, and `--show-in-window` on either; `window_snapshot` is the picture, `window_save` the state file |
+| `render_movie` | `window_movie` (the trajectory played, or a turntable) |
+| `find_interactions` | the residues of the most persistent hydrogen bonds, salt bridges or contacts drawn as licorice (with VMD's H-bond drawing for hydrogen bonds) |
+| `backbone_torsions` | the Ramachandran outliers in red, on the frame that was checked |
+| `check_structure`, `secondary_structure` | the structure, on the frame checked; secondary structure as a cartoon coloured by VMD's own assignment |
+| `select_keyframes` | the window goes to the first informative frame and the list is returned to step through |
+| `align_structures` | the reference and the superposed structure, in two colours |
+| `fit_to_map`, `make_map`, `combine_maps`, `inspect_map` | the map as an isosurface (at the map's mean plus three standard deviations unless you say), with the fitted model inside it |
+| `build_system`, `mutate_residue`, `merge_structures`, `build_membrane`, `build_nanotube` | the built system, loaded and drawn |
+| `run_workflow` | the outcome of the whole job: the structure with its outliers or interactions, the two runs side by side, the fitted model in its map, the built system |
+
+Not drawn, because there is nothing to see: the numbers of `analyze_trajectory`, `measure_with_vmd` and `periodic_box` (use `window_query` for what the window itself can measure), the claim checks and records, the video
+tools (a movie of the window is one `window_movie` away), `convert_trajectory` and `write_structure` (load the file they wrote with `window_load`).
+
 ## From the page, the chat and the agent
 
 * **The web page** (`vmd-agent ui`) is a remote for the window. Its display shows VMD's snapshots; dragging the picture rotates the real VMD view, the wheel zooms it, a double click resets it. The molecule
   list, the Representations window, the animation bar, the menus and the console all send the commands above and then read VMD's state back. Changes made in VMD's own window show up in the page within a few
   seconds. Nothing on the page is drawn by the page.
+* **The page's forms and the Whole jobs tab** have the check box *show in my VMD window*; the display updates when a job finishes.
 * **The chat** can use the same tools: *"Show the ligand as licorice and the protein as a cartoon coloured by secondary structure"*, *"How many atoms does chain A have?"*, *"Go to frame 20"*, *"Zoom in on residue 25"*.
   The model cannot see the window; it reads what the tools return (the representations, the counts, the frame) and says what it did. Ask for a snapshot when you want a picture.
 * **Without VMD installed** the page says so and the other tools still draw built-in pictures; the window tools need VMD.

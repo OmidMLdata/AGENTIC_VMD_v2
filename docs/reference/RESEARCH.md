@@ -144,7 +144,7 @@ split molecule, damaged coordinates) the toolkit says so in the result, not only
 
 #### 3.2 Surfaces
 
-The same functions are exposed three ways: a Python library, a command line (`vmd-agent`, whose `tool` command runs any tool, with `workflow` and `bench` beside it), an MCP server with 55 tools in eleven groups (27 at the time of the original study design, others that drive VMD itself, some merged since) and the `run_workflow` call, and a built-in chat front end (`vmd-agent chat`) that gives the same tools to any
+The same functions are exposed three ways: a Python library, a command line (`vmd-agent`, whose `tool` command runs any tool, with `workflow` and `bench` beside it), an MCP server with 57 tools in eleven groups (27 at the time of the original study design, others that drive VMD itself, some merged since) and the `run_workflow` call, and a built-in chat front end (`vmd-agent chat`) that gives the same tools to any
 OpenAI-compatible model, local open-source or hosted, so no MCP client is required. The
 original project this work extends exposed 24 tools and 16 command-line subcommands; all were retained (Section 12.1).
 

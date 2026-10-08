@@ -48,10 +48,10 @@ GROUPS: Dict[str, Tuple[Tuple[str, ...], str]] = {
     "network": (("search_pdb", "fetch_structure"),
                 r"\b(download\w*|fetch\w*|grab\w*|pull\w* .{0,30}from|search the pdb|find (pdb )?entries|pdb entr\w+|from (the )?(pdb|rcsb|protein data bank)|alphafold|uniprot|rcsb)\b|\b[1-9][A-Za-z0-9]{3}\b(?=[ ,.?]|$)"),
     "window": (("window_open", "window_load", "window_molecules", "window_representation", "window_display", "window_view", "window_animate",
-                "window_query", "window_snapshot", "window_scene", "window_save"),
+                "window_query", "window_snapshot", "window_scene", "window_visualize", "window_movie", "window_save"),
                r"\b(my vmd|the vmd window|vmd window|in vmd|open vmd|open it in|on screen|in the window|show (me|it|them)|highlight|hide|zoom\w*|"
                r"rotate|spin|centre|center on|focus on|colou?r (it|them|the)|make it|label\w*|screenshot|snapshot|licorice|cartoon|surface|"
-               r"background|projection|orthographic|perspective|look at|put it)\b"),
+               r"background|projection|orthographic|perspective|look at|put it|for a figure|turntable)\b"),
     "tcl": (("run_tcl",), r"\btcl\b"),
 }
 _COMPILED = {g: re.compile(p, re.I) for g, (_, p) in GROUPS.items()}

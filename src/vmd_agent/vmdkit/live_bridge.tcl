@@ -110,10 +110,11 @@ proc ::vmdagent_link::top_mol {} {
 
 # ---- molecules
 proc ::vmdagent_link::mol_obj {m top} {
-    set file [lindex [molinfo $m get filename] 0]
+    set files [lindex [molinfo $m get filename] 0]      ;# molinfo gives one list per molecule: its file names
+    set file [lindex $files 0]
     return [jobj id $m name [js [molinfo $m get name]] natoms [molinfo $m get numatoms] nframes [molinfo $m get numframes] \
         frame [molinfo $m get frame] top [jb [expr {$m == $top}]] shown [jb [molinfo $m get drawn]] active [jb [molinfo $m get active]] \
-        numreps [molinfo $m get numreps] file [js $file]]
+        numreps [molinfo $m get numreps] file [js $file] files [jarr [lmap f $files {js $f}]]]
 }
 proc ::vmdagent_link::rep_obj {m i} {
     return [jobj index $i style [js [lindex [molinfo $m get [list [list rep $i]]] 0]] selection [js [lindex [molinfo $m get [list [list selection $i]]] 0]] \

@@ -146,6 +146,9 @@ ORACLE: Dict[str, Oracle] = {
                             "The background is white and the projection is orthographic.", "VMD's display: white background, orthographic projection."),
     "window_picture": _o([("window_load", {"topology": TOP}), ("window_representation", {"action": "only", "selection": "protein", "style": "NewCartoon", "color": "Structure"}),
                          ("window_snapshot", {"out_png": "view.png", "quality": "tachyon"})], "Saved a picture of the VMD window as view.png.", "view.png, drawn by VMD."),
+    "window_figure": _o([("window_load", {"topology": TOP}), ("window_visualize", {})], lambda t, r: "VMD draws the protein as a cartoon coloured by secondary structure (helices, sheets and coil) and the ligand as licorice coloured by element.",
+                        "The recipe's drawing; the cartoon colours are secondary structure."),
+    "window_spin": _o([("window_load", {"topology": TOP}), ("window_movie", {"out_mp4": "spin.mp4", "action": "spin", "frames": 6, "fps": 6})], "Saved a 6-frame turntable movie of the VMD window as spin.mp4.", "spin.mp4 with 6 frames."),
     # ---- video
     "probe_video": _o([("probe_video", {"video": "clip.mp4"})], "clip.mp4 is 160 x 120 pixels, 12 frames per second, 24 frames (2 seconds).", "160 x 120, 12 fps, 24 frames."),
     "validate_video": _o([("probe_video", {"video": "clip.mp4", "expect_width": 320, "expect_height": 240})], "No: clip.mp4 is 160 by 120, not 320 by 240.", "No: it is 160 x 120."),

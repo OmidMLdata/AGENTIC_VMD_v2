@@ -48,6 +48,11 @@ CHOICES: Dict[tuple, tuple] = {
     ("window_animate", "style"): ("once", "loop", "rock"),
     ("window_query", "measure"): ("bond", "angle", "dihedral", "sasa"),
     ("window_snapshot", "quality"): ("fast", "tachyon"),
+    ("window_movie", "action"): ("trajectory", "spin"),
+    ("window_movie", "axis"): ("x", "y", "z"),
+    ("window_movie", "quality"): ("fast", "tachyon"),
+    ("window_visualize", "focus"): ("overview", "fold", "interactions", "surface", "pocket", "performance"),
+    ("window_visualize", "background"): vmdlink.BACKGROUNDS,
 }
 
 #: parameter name -> what it means, where the name alone does not say
@@ -76,6 +81,7 @@ PARAM_HELP: Dict[str, str] = {
     "kind": "which measurement or analysis",
     "op": "the operation",
     "value": "the number the operation needs",
+    "show_in_window": "also draw the result in the VMD window (opened if needed), so you see it in VMD itself",
 }
 _MAX_ENUM = 14
 

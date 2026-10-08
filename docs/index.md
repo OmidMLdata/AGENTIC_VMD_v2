@@ -13,7 +13,7 @@ The [README](../README.md) is the way in. These pages are the detail, in the ord
 | [Whole jobs](guide/workflows.md) | workflows and reports |
 | [VMD](guide/vmd.md) | which VMD versions, and the tools that drive VMD itself |
 | [Your VMD window](guide/window.md) | the agent driving a real VMD window: the tools, the page, how it is kept safe, what it cannot do |
-| [The tool library](guide/tools.md) | the 55 tools in eleven groups, how a model is offered them, and who gets which |
+| [The tool library](guide/tools.md) | the 57 tools in eleven groups, how a model is offered them, and who gets which |
 
 **Choose a model** (`benchmarks/`), and **reference** (`reference/`)
 

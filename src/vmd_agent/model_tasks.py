@@ -256,6 +256,13 @@ def _tasks() -> List[Task]:
     add("window_picture", "window", "Show protein.pdb in VMD as a cartoon and save a picture of what the window shows as view.png.", ("window_snapshot",),
         lambda r: first(file_has(r, "view.png"), None if _png_has_content(r.p("view.png")) else "view.png is blank"), needs=("vmd",))
 
+    add("window_figure", "window", "Draw protein.pdb in the VMD window the way you would for a figure, and tell me what the colours mean.", ("window_visualize",),
+        lambda r: first(_window_has(_cartoon_and_licorice, "VMD does not draw the protein as a cartoon and the ligand LIG as licorice"),
+                        mentions(r.text, r"helix|sheet|strand|secondary")), needs=("vmd",))
+    add("window_spin", "window", "Load protein.pdb in VMD and make a 6-frame turntable movie of the window, saved as spin.mp4.", ("window_movie",),
+        lambda r: first(file_has(r, "spin.mp4"), None if (r.called("window_movie") and r.called("window_movie")["result"].get("n_frames") == 6) else "the movie does not have 6 frames"),
+        needs=("vmd", "ffmpeg"))
+
     # ---- 9. video
     add("probe_video", "video", "What are the size, frame rate and number of frames of clip.mp4?", ("probe_video", "interpret_video"),
         lambda r: first(None if has_number(r.text, 160, 0.1) and has_number(r.text, 120, 0.1) else "the size 160 x 120 is not stated",
@@ -318,8 +325,8 @@ def _window_has(test: Callable[[dict], bool], why: str) -> Optional[str]:
 
 def _cartoon_and_licorice(state: dict) -> bool:
     reps = [rep for m in state["molecules"] for rep in m["reps"] if rep["shown"]]
-    return (any(r["style"] == "NewCartoon" and r["color"] == "Structure" for r in reps)
-            and any(r["style"].startswith("Licorice") and "LIG" in r["selection"] for r in reps))
+    return (any(r["style"].split()[0] == "NewCartoon" and r["color"] == "Structure" for r in reps)
+            and any(r["style"].split()[0] == "Licorice" and "LIG" in r["selection"] for r in reps))
 
 
 def _png_has_content(path: str) -> bool:

@@ -25,7 +25,7 @@ src/vmd_agent/
   wizard.py       `vmd-agent setup` and the plain-language menu behind a bare `vmd-agent`
   platform_info.py  OS, CPU, Docker, GPU, Ollama; where VMD and client configs live on each OS
   launcher.py     `vmd-agent start` / `doctor`: picks native or Docker from the facts and runs it
-  toolset.py      the tool library (55 tools in eleven groups: `LIBRARY`) and the `run_workflow` entry, as plain functions + JSON schemas (no MCP, no AI client)
+  toolset.py      the tool library (57 tools in eleven groups: `LIBRARY`) and the `run_workflow` entry, as plain functions + JSON schemas (no MCP, no AI client)
   vmdlink.py      the live link to a real VMD window: the bridge program that runs inside VMD (vmdkit/live_bridge.tcl), the fixed command set, validation
   window_tools.py the window_* tools (what the agent, the page and the command line use to drive the window)
   toolform.py     the tool library described for a form, and the page's terminal

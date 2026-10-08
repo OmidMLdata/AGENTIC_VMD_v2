@@ -126,7 +126,7 @@ def images_in(result, root: str, found: Optional[list] = None) -> list:
 class State:
     """Everything the page's requests share: the sandbox, the model connection, the chat, and one-job-at-a-time."""
 
-    def __init__(self, data_dir: str, base_url: str, model: str, api_key: Optional[str], tools: str = "all"):
+    def __init__(self, data_dir: str, base_url: str, model: str, api_key: Optional[str], tools: str = "auto"):
         self.root = os.path.realpath(data_dir)
         os.makedirs(self.root, exist_ok=True)
         os.environ[security.ENV_ROOTS] = self.root
@@ -547,7 +547,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         out = os.path.join(self.state.root, f"{name}_report")
         started = time.time()
         with progress.listen(lambda m, f=None: emit({"type": "tool_progress", "name": name, "text": str(m), "fraction": f})):
-            result = toolset.TOOLS["run_workflow"](name=name, files=files, out_dir=out)
+            result = toolset.TOOLS["run_workflow"](name=name, files=files, out_dir=out, show_in_window=bool(payload.get("show_in_window")))
         rel = lambda p: os.path.relpath(p, self.state.root).replace(os.sep, "/") if isinstance(p, str) and os.path.isabs(p) else p   # noqa: E731
         emit({"type": "workflow", "seconds": round(time.time() - started, 3), "result": result,
               "report_md": rel(result.get("report")), "report_html": rel(result.get("report_html")),
@@ -559,7 +559,7 @@ class Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
 
 
 def make_server(data_dir: str, port: int = 0, base_url: Optional[str] = None, model: Optional[str] = None,
-                api_key: Optional[str] = None, tools: str = "all") -> Server:
+                api_key: Optional[str] = None, tools: str = "auto") -> Server:
     """The server, bound to this computer only (port 0 picks a free one). ``server.state.token`` is the one-time key."""
     base_url, model, api_key = agent_mod.resolve_connection(base_url, model, api_key)
     state = State(data_dir, base_url, model, api_key, tools)
@@ -574,7 +574,7 @@ def address(srv: Server) -> str:
 
 
 def main(data_dir: Optional[str] = None, port: int = 0, open_browser: bool = True, base_url: Optional[str] = None,
-         model: Optional[str] = None, api_key: Optional[str] = None, tools: str = "all", say: Callable = lambda m: print(m, flush=True)) -> int:
+         model: Optional[str] = None, api_key: Optional[str] = None, tools: str = "auto", say: Callable = lambda m: print(m, flush=True)) -> int:
     from vmd_agent import settings
     data_dir = data_dir or (security.allowed_roots() or [None])[0] or settings.get("data_dir") or os.getcwd()
     try:

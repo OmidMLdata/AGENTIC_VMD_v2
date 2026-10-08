@@ -98,6 +98,8 @@ A task marked *needs VMD / ffmpeg / network* is skipped (and not counted) on a c
 | `window_frame` *(needs vmd)* | Load protein.pdb and protein.dcd in VMD and go to frame 7. Which frame is VMD showing now? | `window_animate` | Frame 7, and VMD is on frame 7. |
 | `window_background` *(needs vmd)* | Load protein.pdb in VMD, make the background white and use an orthographic projection. | `window_display` | VMD's display: white background, orthographic projection. |
 | `window_picture` *(needs vmd)* | Show protein.pdb in VMD as a cartoon and save a picture of what the window shows as view.png. | `window_snapshot` | view.png, drawn by VMD. |
+| `window_figure` *(needs vmd)* | Draw protein.pdb in the VMD window the way you would for a figure, and tell me what the colours mean. | `window_visualize` | The recipe's drawing; the cartoon colours are secondary structure. |
+| `window_spin` *(needs vmd, ffmpeg)* | Load protein.pdb in VMD and make a 6-frame turntable movie of the window, saved as spin.mp4. | `window_movie` | spin.mp4 with 6 frames. |
 
 ## video
 

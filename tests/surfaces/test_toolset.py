@@ -21,12 +21,12 @@ LIBRARY = {
     "build_system", "mutate_residue", "merge_structures", "build_membrane", "build_nanotube", "prepare_namd", "write_slurm_script",
     "probe_video", "interpret_video", "verify_claims", "record_visual_interpretation", "assemble_report", "verify_provenance",
     "window_open", "window_load", "window_molecules", "window_representation", "window_display", "window_view", "window_animate", "window_query",
-    "window_snapshot", "window_scene", "window_save",
+    "window_snapshot", "window_scene", "window_visualize", "window_movie", "window_save",
 }
 
 
 def test_the_registry_holds_every_tool():
-    assert set(toolset.library_tools()) == LIBRARY and len(toolset.library_tools()) == 55
+    assert set(toolset.library_tools()) == LIBRARY and len(toolset.library_tools()) == 57
     assert set(toolset.TOOLS) == LIBRARY | {"run_workflow"}                  # the workflows are reached through one call, not 6 tools
 
 
@@ -41,7 +41,7 @@ def test_the_library_is_one_grouped_list():
 def test_importing_the_tools_does_not_need_the_mcp_sdk():
     code = ("import sys\n"
             "from vmd_agent import toolset\n"
-            "assert len(toolset.TOOLS) == 56\n"
+            "assert len(toolset.TOOLS) == 58\n"
             "assert 'mcp' not in sys.modules, 'toolset imported the MCP SDK'\n")
     r = subprocess.run([sys.executable, "-c", code], capture_output=True,
                        text=True, env={**os.environ, "PYTHONWARNINGS": "ignore"})

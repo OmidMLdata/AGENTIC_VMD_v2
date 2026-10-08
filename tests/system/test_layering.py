@@ -20,7 +20,7 @@ FOUNDATION = ("environment", "security", "llm_client", "platform_info", "setting
               "models", "ollama_local", "progress")
 
 COMPOSERS = ("auto", "cli", "server", "mcp_check", "toolset", "chat", "agent",
-             "launcher", "wizard", "vmd_tools", "toolcli", "toolform", "vmdlink", "window_tools", "workflows", "reporting", "ui", "tool_cases", "tool_dataset", "model_tasks", "model_bench", "toolhints", "__init__")
+             "launcher", "wizard", "vmd_tools", "toolcli", "toolform", "vmdlink", "window_tools", "window_present", "workflows", "reporting", "ui", "tool_cases", "tool_dataset", "model_tasks", "model_bench", "toolhints", "__init__")
 
 ALLOWED = {
     "inputs": set(),

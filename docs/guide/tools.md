@@ -1,6 +1,6 @@
 # The tool library
 
-Everything vmd-agent can do is a **tool**: one function that does one thing, with a JSON description, in [`toolset.py`](../../src/vmd_agent/toolset.py). There is **one list of 55 tools**, in eleven groups. The chat gives them to
+Everything vmd-agent can do is a **tool**: one function that does one thing, with a JSON description, in [`toolset.py`](../../src/vmd_agent/toolset.py). There is **one list of 57 tools**, in eleven groups. The chat gives them to
 the model, the [MCP server](mcp.md) gives them to an AI app, `vmd-agent tool NAME` runs one from a terminal, the web page runs them for you, and the
 [tool test set](../benchmarks/tool-test-set.md) runs every one of them on data whose answers are known. They are the same functions in every case, so a number does not depend on how you asked for it.
 The count and the groups are checked by a test, so this page cannot drift from the code.
@@ -64,6 +64,8 @@ Drive the VMD you can see: what it loads, draws, shows and answers.
 | `window_query` | Ask the VMD window what a selection holds, or measure a bond, angle, dihedral or SASA | VMD |
 | `window_snapshot` | A picture of what the VMD window shows right now (VMD's own drawing) | VMD |
 | `window_scene` | Set up a whole scene in the VMD window from a description (representations, isosurfaces, view) | VMD |
+| `window_visualize` | Draw a system in the VMD window the way the recipe would (what it holds, drawn to suit), with a legend | VMD |
+| `window_movie` | A movie of the VMD window: the trajectory played, or a turntable | VMD |
 | `window_save` | Save the VMD window's state as a .vmd file that VMD opens again | VMD |
 
 ### Measure a simulation
@@ -156,13 +158,13 @@ the tool, the model's call and the command are one thing.
 
 ## Does the model see all of them at once?
 
-**By default, yes.** `vmd-agent chat` and the web page send the description of every tool the model may use with *every* question, and with the 55 tools and the workflow call that is about
-43,000 characters, roughly **10,900 tokens**, before the model has read your question.
+**Not by default, because it would not fit.** Sending the description of every tool with *every* question takes about 49,000 characters, roughly **12,200 tokens**, before the model has read your question, and
+the private Ollama keeps a 16,384-token context. So the chat and the web page offer only the tools that fit each question (`--tools auto`, the default), and `--tools all` sends everything.
 
 | `--tools` | Offered | Descriptions sent with every question |
 |---|---|---|
-| `all` (default) | the 55 tools and `run_workflow` | about 10,900 tokens |
-| `auto` | the ones that fit the question, plus `offer_tools` | about 2,000 to 5,000 tokens, depending on the question |
+| `auto` (default) | the ones that fit the question, plus `offer_tools` | about 2,500 to 6,000 tokens, depending on the question |
+| `all` | the 57 tools and `run_workflow` | about 12,200 tokens |
 
 (`vmd-agent tools --size` measures this on your copy; 4 characters per token is a rough rule.) This matters for two reasons:
 
@@ -188,7 +190,7 @@ The web page has a "chat tools" menu in its status bar to switch between them wi
 | Where | Tools | Why |
 |---|---|---|
 | The MCP server and `vmd-agent tools` | all of them | an AI app can handle a long list |
-| `vmd-agent chat` and the web page | all at once by default; `--tools auto` narrows them per question | a small local model chooses better from a shorter list |
+| `vmd-agent chat` and the web page | the ones that fit each question by default (`--tools auto`); `--tools all` for every tool | a small local model chooses better from a shorter list, and the full list takes most of its context |
 | The benchmark's arms (`vmd-agent bench agent-run`) | **their own small sets**: `vmd_agent` 10, `vmd_agent_no_verify` 9, `vmd_agent_no_keyframes` 9, `python_mdanalysis` 4, `vmd_plain` 4 | an arm is a controlled experiment: what does the toolkit add over a model that writes its own code? Each arm also gets `list_files`, `read_text_file` and `submit_answer`, which exist only inside the benchmark |
 
 The benchmark's tools are separate on purpose: they are confined to one task's folder, they have no way to draw or download, and `submit_answer` ends the task. They are the "internal" tools of the

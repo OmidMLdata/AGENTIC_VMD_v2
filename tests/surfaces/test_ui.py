@@ -74,7 +74,7 @@ def test_the_page_needs_the_key_and_the_right_host(page):
 
 def test_status_files_and_workflows(page):
     status = json.loads(page.req("GET", "/api/status")[1])
-    assert status["model"] == "m" and status["n_tools"] == 55 and status["data_dir"] == os.path.realpath(page.root)
+    assert status["model"] == "m" and status["n_tools"] == 57 and status["data_dir"] == os.path.realpath(page.root)
     assert status["model_ready"] in (True, False) and "ffmpeg" in status
     files = json.loads(page.req("GET", "/api/files")[1])["files"]
     assert [f["path"] for f in files] == ["1ubq.pdb"] and files[0]["kind"] == "structure"
@@ -188,9 +188,9 @@ def test_the_page_is_served_as_files_with_a_strict_policy_and_no_inline_script(p
 def test_the_tools_the_chat_offers_can_be_changed_from_the_page(page):
     s, body, _ = page.post("/api/profile", {"tools": "auto"})
     status = json.loads(body)
-    assert s == 200 and status["profile"] == "auto" and status["profiles"]["all"] == 56
+    assert s == 200 and status["profile"] == "auto" and status["profiles"]["all"] == 58
     assert page.post("/api/profile", {"tools": "nonsense"})[0] == 400
-    assert json.loads(page.post("/api/profile", {"tools": "all"})[1])["tools_in_chat"] == 56
+    assert json.loads(page.post("/api/profile", {"tools": "all"})[1])["tools_in_chat"] == 58
 
 
 def _closed_port():

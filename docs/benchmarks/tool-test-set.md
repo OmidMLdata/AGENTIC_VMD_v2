@@ -1,6 +1,6 @@
 # The tool test set
 
-A test set for **every one of the 55 [tools](../guide/tools.md)** and the workflow call: a small generated dataset whose properties are known by construction, and
+A test set for **every one of the 57 [tools](../guide/tools.md)** and the workflow call: a small generated dataset whose properties are known by construction, and
 one or more cases per tool that run the real tool on it and check the answer. It answers "does each tool still do what it says, on
 this computer, with this VMD?" and it is the quickest way to see what your setup can and cannot do.
 

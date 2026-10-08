@@ -40,6 +40,7 @@ HELP_SHORT = {  # one-line help for flags whose name alone is not enough
     "paths": "the files to describe", "claims": "the statements to check, each in quotes", "identifier": "PDB ID, UniProt accession or a web address",
     "query": "what to search for", "video": "the video file", "image_path": "the image to annotate", "color_method": "VMD colouring method (Chain, Name, ResType, Structure, Beta ...)",
     "name": "the representation to describe (for example QuickSurf)", "script": "Tcl for VMD (needs VMD_AGENT_ENABLE_TCL=1)",
+    "show_in_window": "also draw the result in the VMD window (opened if needed)",
     "analyses": "what to measure: rmsd rmsf rgyr hbonds contacts distance sasa density convergence", "session_dir": "a folder that records this run for a report",
 }
 SUMMARY: Dict[str, str] = {   # what the tool does, in the words of a person at a terminal
@@ -68,6 +69,8 @@ SUMMARY: Dict[str, str] = {   # what the tool does, in the words of a person at 
     "window_query": "ask the VMD window what a selection holds, or measure a bond, angle, dihedral or SASA",
     "window_snapshot": "a picture of what the VMD window shows right now (VMD's own drawing)",
     "window_scene": "set up a whole scene in the VMD window from a description (representations, isosurfaces, view)",
+    "window_visualize": "draw a system in the VMD window the way the recipe would (what it holds, drawn to suit), with a legend",
+    "window_movie": "a movie of the VMD window: the trajectory played, or a turntable",
     "window_save": "save the VMD window's state as a .vmd file that VMD opens again",
     "run_tcl": "run Tcl in headless VMD (off unless VMD_AGENT_ENABLE_TCL=1)",
     "analyze_trajectory": "measure a simulation: RMSD, flexibility, size, contacts, hydrogen bonds, SASA, convergence",
@@ -125,6 +128,8 @@ EXAMPLES: Dict[str, str] = {
     "window_query": "vmd-agent tool window_query --selection \"resname LIG\"",
     "window_snapshot": "vmd-agent tool window_snapshot --out window.png",
     "window_scene": "vmd-agent tool window_scene run.pdb run.dcd --scene scene.json",
+    "window_visualize": "vmd-agent tool window_visualize run.pdb run.dcd --focus pocket",
+    "window_movie": "vmd-agent tool window_movie --out spin.mp4 --action spin --frames 36",
     "window_save": "vmd-agent tool window_save --out session.vmd",
     "run_tcl": "VMD_AGENT_ENABLE_TCL=1 vmd-agent tool run_tcl 'puts [vmd_version]'",
     "analyze_trajectory": "vmd-agent tool analyze_trajectory run.psf run.dcd --analyses rmsd rgyr --step 5",

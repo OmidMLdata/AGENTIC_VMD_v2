@@ -33,6 +33,7 @@ from vmd_agent.visual import render as render_mod
 from vmd_agent.evidence import media, report as report_mod
 from vmd_agent import auto as auto_mod
 from vmd_agent import security
+from vmd_agent.window_present import shows_in_window
 
 #: name -> callable, in registration order
 TOOLS: Dict[str, Callable] = {}
@@ -235,6 +236,7 @@ def fetch_structure(identifier: str, out_dir: str = "structures",
 
 
 @tool()
+@shows_in_window
 def visualize_and_interpret(topology: str, trajectory: Optional[str] = None,
                             out_dir: str = "vmd_agent_output",
                             views: Optional[List[str]] = None,
@@ -273,6 +275,7 @@ def visualize_and_interpret(topology: str, trajectory: Optional[str] = None,
 
 
 @tool()
+@shows_in_window
 def render_image(topology: Optional[str] = None, trajectory: Optional[str] = None,
                  frame: int = -1, out_png: str = "vmd_render.png",
                  width: int = 1600, height: int = 1200,
@@ -388,6 +391,7 @@ def analyze_trajectory(topology: str, trajectory: str,
 
 
 @tool()
+@shows_in_window
 def select_keyframes(topology: str, trajectory: str, k: int = 9,
                      selection: str = "protein", sel2: Optional[str] = None,
                      out_dir: Optional[str] = None, render: bool = False,
@@ -600,7 +604,7 @@ LIBRARY: List[tuple] = [
     ("Control your VMD window", "drive the VMD you can see: what it loads, draws, shows and answers", [
         ("window_open", "yes"), ("window_load", "yes"), ("window_molecules", "yes"), ("window_representation", "yes"), ("window_display", "yes"),
         ("window_view", "yes"), ("window_animate", "yes"), ("window_query", "yes"), ("window_snapshot", "yes"), ("window_scene", "yes"),
-        ("window_save", "yes")]),
+        ("window_visualize", "yes"), ("window_movie", "yes"), ("window_save", "yes")]),
     ("Measure a simulation", "size, shape, flexibility, convergence, box", [
         ("analyze_trajectory", "no"), ("measure_with_vmd", "yes"), ("select_keyframes", "no"), ("periodic_box", "yes")]),
     ("Interactions and structure quality", "who touches whom, secondary structure, geometry", [

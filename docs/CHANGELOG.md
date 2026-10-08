@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.28.0: what the tools find can be shown in your VMD window
+
+* **`show_in_window`** on the tools that find something to look at (`find_interactions`, `backbone_torsions`, `check_structure`, `secondary_structure`, `select_keyframes`, `align_structures`, `fit_to_map`, `make_map`,
+  `combine_maps`, `inspect_map`, the five build tools, `visualize_and_interpret`, `render_image`, `export_session`) and on `run_workflow`: the tool runs as before, then the result is drawn in the VMD window
+  (`window_present.py`): the persistent salt bridges as licorice, the Ramachandran outliers in red, a fitted model inside its map, two superposed structures, a built system, the outcome of a whole job.
+* **`window_visualize`** draws a system the way the recipe does, from the same representation choices (`recipes.planned_reps`, now shared by the Tcl recipe and the window), and returns the legend;
+  **`window_movie`** makes a movie of the window (the trajectory, or a turntable). The library is 57 tools.
+* **The chat and the page offer the tools that fit each question by default** (`--tools auto`): the 57 tools' descriptions took about 12,000 tokens of a 16,384-token context. `--tools all` remains.
+* The Whole jobs tab can show the outcome in the VMD window; a benchmark has two more window tasks (the figure drawing, a turntable).
+
 ## 0.27.0: the agent drives a real VMD window, and the page stops pretending to be VMD
 
 * **The VMD window** (`vmdlink.py`, `vmdkit/live_bridge.tcl`, `window_tools.py`): eleven `window_*` tools that start or find a VMD with its window and drive it: load, molecules, representations (any of VMD's
