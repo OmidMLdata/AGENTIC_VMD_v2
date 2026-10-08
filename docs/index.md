@@ -6,6 +6,7 @@ The [README](../README.md) is the way in. These pages are the detail, in the ord
 
 | Page | What is in it |
 |---|---|
+| [Why use it](guide/why.md) | what it adds over using VMD and your own scripts: checked answers, statistics, repeatable steps, safe access, whole jobs |
 | [Install and set up](guide/install.md) | the installer, the setup questions, who answers, where everything lives, other ways to install, troubleshooting |
 | [Ways to work](guide/using.md) | the web page, the menu, the chat, the commands; the wall-clock time of every execution |
 | [The command line](guide/commands.md) | every command, and how a tool becomes a command |

@@ -9,6 +9,17 @@ vmd-agent then just hands them its tools.
 
 You need a Mac, Windows or Linux computer and an internet connection. VMD itself is free from UIUC and worth having, because pictures and many of the tools use it. You don't need Python, Git, Docker or an account.
 
+## Why use it
+
+* **Answers you can check.** Every number in an answer comes from a tool. A statement about your system, such as "76 residues and the radius of gyration stays below 13 Å", comes back supported, contradicted or "can't tell", with the evidence.
+* **Statistics on top of VMD.** Convergence tests with effective sample sizes, careful wording ("no drift detected" is not "converged"), and key frames chosen where something changes. Where it matters, VMD and the toolkit each measure and the report says whether they agree.
+* **Everything can be repeated.** Each VMD step saves its exact Tcl, and a whole-job report records input checksums, methods and caveats.
+* **A safe way to let a model near VMD.** A fixed set of validated commands, a files-folder sandbox and a loopback-only link, with no raw Tcl or shell handed over.
+* **One place for the whole toolbox,** from fetching and converting to building systems, fitting cryo-EM maps and writing NAMD and SLURM files, reachable from a web page, a chat, scripts and MCP clients.
+* **A real VMD.** It drives the window you can see, and every picture is VMD's own.
+
+More: [Why use vmd-agent](docs/guide/why.md).
+
 ## Install
 
 Open a terminal (on a Mac, press `Cmd` + `Space` and type `Terminal`; on Windows, search the Start menu for `PowerShell`), paste one line, and answer a few questions.
@@ -153,7 +164,7 @@ tests/             the test suite, laid out like the package
 
 ## Documentation
 
-[All the pages](docs/index.md): [Install and set up](docs/guide/install.md) · [Ways to work](docs/guide/using.md) · [The command line](docs/guide/commands.md) · [Models](docs/guide/models.md) ·
+[All the pages](docs/index.md): [Why use it](docs/guide/why.md) · [Install and set up](docs/guide/install.md) · [Ways to work](docs/guide/using.md) · [The command line](docs/guide/commands.md) · [Models](docs/guide/models.md) ·
 [Whole jobs](docs/guide/workflows.md) · [VMD](docs/guide/vmd.md) · [Your VMD window](docs/guide/window.md) · [The tool library](docs/guide/tools.md) · [MCP clients](docs/guide/mcp.md) · [Docker](docs/guide/docker.md) ·
 [The model benchmark](docs/benchmarks/model-benchmark.md) · [Development](docs/reference/development.md) · [Architecture](docs/reference/architecture.md) · [Methods](docs/reference/methods.md) ·
 [Security](docs/reference/security.md) · [Research paper](docs/reference/RESEARCH.md) · [Changelog](docs/CHANGELOG.md)

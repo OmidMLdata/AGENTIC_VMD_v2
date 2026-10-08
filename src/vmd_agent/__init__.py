@@ -28,7 +28,7 @@ Design contract
   time axis) and what they cannot show.
 """
 
-__version__ = "0.30.2"
+__version__ = "0.30.3"
 
 from vmd_agent.inputs.inspection import inspect_files
 from vmd_agent.structure.detect import detect_system

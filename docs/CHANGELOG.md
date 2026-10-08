@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.30.3: why use it
+
+* A new page, [Why use vmd-agent](guide/why.md), and a short section in the README: checked answers, statistics beyond VMD, repeatable steps, safe access for a model, one toolbox, a real VMD, whole jobs.
+
 ## 0.30.2: the page no longer freezes on a streaming table
 
 * **Fixed a freeze**: when a model's answer streamed a Markdown table, the header row arrived before its separator row and the page's renderer looped forever on it (the chat stayed busy, the page stopped responding).
