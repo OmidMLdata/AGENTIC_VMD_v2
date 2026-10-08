@@ -41,7 +41,7 @@ function choose(title, items) {                          // a small list dialog:
 function dot(cls, label, value) { const s = el("span"); s.append(el("span", "dot " + cls), document.createTextNode(label + " "), el("b", null, value)); return s; }
 async function loadStatus() {
   const s = S.status = await getJSON("/api/status");
-  $("#ver").textContent = "v" + s.version; document.title = "vmd-agent " + s.version;
+  $("#ver").textContent = "vmd-agent " + s.version; document.title = "vmd-agent " + s.version;
   const left = $("#statusleft"); left.textContent = "";
   left.append(dot(s.model_ready ? "ok" : "bad", "model", s.model), dot(s.vmd ? "ok" : "warn", "VMD", s.vmd ? (s.vmd_version || "found") : "not found"), dot(s.ffmpeg ? "ok" : "warn", "ffmpeg", s.ffmpeg ? "ready" : "missing"));
   $("#folder").textContent = s.data_dir.split(/[\\/]/).slice(-2).join("/"); $("#folder").title = s.data_dir;
@@ -378,7 +378,6 @@ $("#q").addEventListener("input", autosize);
 $("#q").addEventListener("keydown", e => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); send($("#q").value); } });
 $("#composer").onsubmit = e => { e.preventDefault(); send($("#q").value); };
 $("#new").onclick = async () => { await api("/api/reset", {}); log.textContent = ""; $("#welcome").classList.remove("gone"); clog("job", "new conversation"); loadStatus(); };
-["What is in my files?", "Has my run settled?", "Which hydrogen bonds persist?", "What can VMD do here?"].forEach(h => { const b = el("button", "hint", h); b.type = "button"; b.onclick = () => { $("#q").value = h; $("#q").focus(); }; $("#hints").append(b); });
 
 // ------------------------------------------------------------------------------------------------ whole jobs
 let workflows = {};
@@ -456,6 +455,7 @@ act("view.fit", "Display", "Fit all drawn molecules", () => { V.fit(); V.resetVi
 act("anim.play", "Animation", "Play or pause", () => (S.anim.timer ? stopAnim() : playAnim(1)), { key: "Space" });
 act("anim.next", "Animation", "Next frame", () => { const m = V.topMol; if (m) { stopAnim(); gotoFrame(m.frame + 1); } }, { key: "→" });
 act("anim.prev", "Animation", "Previous frame", () => { const m = V.topMol; if (m) { stopAnim(); gotoFrame(m.frame - 1); } }, { key: "←" });
+act("ext.palette", "Extensions", "Search actions…", () => openPalette(), { key: "Ctrl K" });
 act("ext.chat", "Extensions", "Chat with the agent", () => showTab("chat"), { key: "Ctrl J" });
 act("ext.jobs", "Extensions", "Whole jobs (workflows)…", () => showTab("jobs"));
 act("ext.console", "Extensions", "Go to the console", () => { $("#console").classList.remove("min"); $("#conin").focus(); }, { key: "/" });
@@ -464,7 +464,7 @@ act("help.console", "Help", "Console commands", () => { $("#console").classList.
 act("help.about", "Help", "About vmd-agent", () => $("#about").showModal());
 const MENUS = [["File", ["file.add", "file.save", "file.refresh"]], ["Molecule", ["mol.new", "mol.addfile", "-", "mol.toggle", "mol.inspect", "-", "mol.delete"]], ["Graphics", ["reps.open", "rep.add", "rep.delete"]],
                ["Display", ["proj.persp", "proj.ortho", "-", "display.depth", "display.axes", "-", "bg.black", "bg.gray", "bg.white", "-", "view.reset", "view.fit"]], ["Mouse", ["mouse.rotate", "mouse.translate", "mouse.scale", "mouse.pick"]],
-               ["Animation", ["anim.play", "anim.prev", "anim.next"]], ["Extensions", ["ext.chat", "ext.jobs", "ext.console"]], ["Help", ["help.shortcuts", "help.console", "help.about"]]];
+               ["Animation", ["anim.play", "anim.prev", "anim.next"]], ["Extensions", ["ext.palette", "-", "ext.chat", "ext.jobs", "ext.console"]], ["Help", ["help.shortcuts", "help.console", "help.about"]]];
 function closeMenus(except) { $$(".menu.open").forEach(m => { if (m === except) return; m.classList.remove("open"); const d = $(".dropdown", m); if (d) d.remove(); $("button", m).setAttribute("aria-expanded", "false"); }); }
 function buildMenus() {
   const nav = $("#menus"); nav.textContent = "";
@@ -510,7 +510,6 @@ $("#pal-in").onkeydown = e => {
   else if (e.key === "ArrowUp") { e.preventDefault(); palette.at = Math.max(0, palette.at - 1); renderPalette(); }
   else if (e.key === "Enter") { e.preventDefault(); runPalette(palette.at); }
 };
-$("#palette-btn").onclick = openPalette;
 $("#palette").addEventListener("click", e => { if (e.target.id === "palette") $("#palette").close(); });
 function fillShortcuts() {
   const t = $("#sc-table"); t.textContent = "";
@@ -542,7 +541,7 @@ function splitter(id, opts) {
 }
 function theme(mode) {
   const root = document.documentElement; if (mode === "auto") root.removeAttribute("data-theme"); else root.dataset.theme = mode; store.set("theme", mode);
-  $("#theme").title = "Colour theme: " + mode + " (click to change)";
+  $("#theme").title = "Colour theme: " + mode + " (click to change)"; $("#theme").textContent = "theme: " + mode;
 }
 $("#theme").onclick = () => theme({ auto: "light", light: "dark", dark: "auto" }[store.get("theme", "auto")]);
 

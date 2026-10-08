@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.24.1: the web page looks like VMD's windows
+
+* Flat grey faces, bevelled buttons, sunken white lists, small type, square corners and no accent colour: the Molecules list, a black display, Graphical Representations (Selected Atoms, Drawing Method,
+  Coloring Method), a console with a `vmd >` prompt and a status bar of sunken fields. The chat is a plain transcript (You / Agent) with one line per tool call; the logo, the search button, the suggestion chips
+  and the rounded cards are gone (Ctrl/⌘ K and Extensions, Search actions remain).
+
 ## 0.24.0: one tool library, workflows above it, and no second set of commands
 
 * **One list of 44 tools, in ten groups** (`toolset.LIBRARY`). The old division into "the original 27" and "the 24 that drive VMD" is gone, and so are the `core` and `vmd` chat profiles (`--tools` is now
