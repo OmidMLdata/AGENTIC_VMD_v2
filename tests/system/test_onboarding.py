@@ -375,3 +375,42 @@ def test_the_tools_may_not_touch_the_data_folder_even_inside_the_files_folder(tm
     security.check_path(str(tmp_path / "1ubq.pdb"))
     with pytest.raises(security.SecurityError):
         security.check_path(str(tmp_path / ".vmd-agent" / "config" / "settings.json"))
+
+
+def test_the_installers_folder_is_only_a_fallback_after_the_working_folder(tmp_path, monkeypatch, bare):
+    inst, work = tmp_path / "inst", tmp_path / "work"
+    inst.mkdir(); work.mkdir()
+    monkeypatch.setenv(settings.ENV_INSTALL, str(inst))
+    monkeypatch.chdir(work)
+    assert settings.home_dir() == str(inst) and settings.config_dir() == str(inst / "config")
+    folder = settings.make_local(str(work))
+    assert settings.home_dir() == os.path.realpath(folder)
+
+
+def test_setup_moves_the_model_and_settings_into_the_working_folder_only_when_agreed(tmp_path, monkeypatch, bare):
+    inst, work = tmp_path / "inst", tmp_path / "work"
+    (inst / "ollama" / "models").mkdir(parents=True); (inst / "ollama" / "models" / "blob").write_text("weights")
+    (inst / "config").mkdir(); (inst / "config" / "settings.json").write_text('{"vmd_path": "/v"}')
+    work.mkdir()
+    monkeypatch.setenv(settings.ENV_INSTALL, str(inst))
+    monkeypatch.chdir(work)
+    no = Typed(["1", "n"])                                   # "in this folder", then decline the move
+    wizard.step_home(no)
+    assert (inst / "ollama").is_dir() and not (work / ".vmd-agent" / "ollama").exists()
+    yes = Typed([""])
+    wizard.step_home(yes)                                    # already a working folder: just offers the move
+    assert (work / ".vmd-agent" / "ollama" / "models" / "blob").read_text() == "weights" and not (inst / "ollama").exists()
+    assert (work / ".vmd-agent" / "config" / "settings.json").is_file() and "Moved" in yes.text
+    from vmd_agent import ollama_local
+    assert ollama_local.models_dir().startswith(os.path.realpath(work))
+
+
+def test_a_running_model_server_is_never_moved(tmp_path, monkeypatch, bare):
+    inst, work = tmp_path / "inst", tmp_path / "work"
+    (inst / "ollama").mkdir(parents=True); work.mkdir()
+    monkeypatch.setenv(settings.ENV_INSTALL, str(inst))
+    monkeypatch.chdir(work)
+    monkeypatch.setattr(wizard, "_server_running", lambda: True)
+    io_ = Typed(["1", ""])
+    wizard.step_home(io_)
+    assert (inst / "ollama").is_dir() and "is running" in io_.text

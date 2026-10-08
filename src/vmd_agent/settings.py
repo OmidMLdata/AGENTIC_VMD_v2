@@ -9,8 +9,10 @@ copy of the model server and its models) is decided in this order:
 
 1. ``VMD_AGENT_CONFIG_DIR`` (settings only) or ``VMD_AGENT_HOME`` (everything, in ``$VMD_AGENT_HOME``);
 2. a ``.vmd-agent`` folder in the current folder or one above it: the **working folder** keeps its own data
-   (``vmd-agent setup`` offers to create it), so the project can be moved or deleted as one piece;
-3. the usual per-user place for each OS (``~/Library/Application Support/vmd-agent`` on macOS,
+   (``vmd-agent setup`` offers to create it and to move the model there), so the project can be moved or
+   deleted as one piece;
+3. ``VMD_AGENT_INSTALL``, the installer's folder (the installer's launcher sets it);
+4. the usual per-user place for each OS (``~/Library/Application Support/vmd-agent`` on macOS,
    ``%APPDATA%\\vmd-agent`` on Windows, ``~/.config/vmd-agent`` elsewhere).
 
 The settings file is readable by the user only where the OS allows it, because it may hold an API key.
@@ -25,6 +27,7 @@ from typing import Any, Dict, Optional
 
 ENV_DIR = "VMD_AGENT_CONFIG_DIR"
 ENV_HOME = "VMD_AGENT_HOME"
+ENV_INSTALL = "VMD_AGENT_INSTALL"              # set by the installer's launcher: the folder holding the program itself
 LOCAL = ".vmd-agent"                           # the folder a working folder keeps its own data in
 KEYS = ("data_dir", "vmd_path", "llm_url", "llm_model", "llm_key", "setup_done",
         "ollama_mode", "ollama_port")
@@ -63,6 +66,35 @@ def make_local(folder: str) -> str:
     return d
 
 
+def previous_home() -> str:
+    """Where vmd-agent's data is kept when the working folder has none: the installer's folder or the per-user folder."""
+    return os.environ.get(ENV_INSTALL) or home_dir(env={})
+
+
+def movable(src: str, dst: str) -> list:
+    """What ``move_data`` would move from ``src`` into ``dst``: the private model server with its models and the settings file."""
+    out = []
+    if os.path.realpath(src) == os.path.realpath(dst):
+        return out
+    if os.path.isdir(os.path.join(src, "ollama")) and not os.path.exists(os.path.join(dst, "ollama")):
+        out.append("ollama")
+    if os.path.isfile(os.path.join(src, "config", "settings.json")) and not os.path.exists(os.path.join(dst, "config", "settings.json")):
+        out.append(os.path.join("config", "settings.json"))
+    return out
+
+
+def move_data(src: str, dst: str) -> list:
+    """Move the things ``movable`` lists from ``src`` into ``dst`` (a rename, so instant and with no second copy on the same disk;
+    across disks it copies and then removes). Returns what was moved. Never overwrites."""
+    import shutil
+    done = []
+    for rel in movable(src, dst):
+        os.makedirs(os.path.dirname(os.path.join(dst, rel)), exist_ok=True)
+        shutil.move(os.path.join(src, rel), os.path.join(dst, rel))
+        done.append(rel)
+    return done
+
+
 def config_dir(system_name: Optional[str] = None, home: Optional[str] = None,
                env: Optional[Dict[str, str]] = None) -> str:
     """The folder holding the settings file, for the given OS (default: this one)."""
@@ -73,6 +105,8 @@ def config_dir(system_name: Optional[str] = None, home: Optional[str] = None,
         return os.path.join(env[ENV_HOME], "config")
     if env is os.environ and local_home():     # the working folder keeps its own settings
         return os.path.join(local_home(), "config")
+    if env.get(ENV_INSTALL):
+        return os.path.join(env[ENV_INSTALL], "config")
     import platform
     name = (system_name or platform.system()).lower()
     home = home if home is not None else os.path.expanduser("~")
@@ -96,6 +130,8 @@ def home_dir(system_name: Optional[str] = None, home: Optional[str] = None,
         return env[ENV_HOME]
     if env is os.environ and local_home():
         return local_home()
+    if env.get(ENV_INSTALL):
+        return env[ENV_INSTALL]
     import platform
     name = (system_name or platform.system()).lower()
     home = home if home is not None else os.path.expanduser("~")

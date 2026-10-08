@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.30.0: the model and settings can be moved into the working folder
+
+* **`vmd-agent setup --home here`** (or answering the question) offers to **move** the private Ollama with its models and the settings from the installer's or per-user folder into `.vmd-agent` in the working folder: a rename, nothing
+  copied or overwritten, refused while the model server runs.
+* The installer's launcher now sets `VMD_AGENT_INSTALL` (the folder holding the program) instead of `VMD_AGENT_HOME`, which an environment can still set to override everything; a working folder's `.vmd-agent` now wins over the installer's folder.
+
 ## 0.29.0: vmd-agent's own data can live in the working folder
 
 * **`.vmd-agent` in the working folder**: settings, the VMD window link and a private Ollama with its models resolve to a `.vmd-agent` folder in the current folder or any folder above it, before the per-user folder

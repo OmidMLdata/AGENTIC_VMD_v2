@@ -127,34 +127,66 @@ def step_vmd(io: IO, vmd_hint: Optional[str] = None, assume_yes: bool = False) -
     return None
 
 
+def _server_running() -> bool:
+    import socket
+    try:
+        with socket.create_connection(("127.0.0.1", ollama_local.port()), timeout=0.5):
+            return True
+    except OSError:
+        return False
+
+
+def _offer_move(io: IO, dst: str, assume_yes: bool) -> None:
+    """Offer to move the model server and models (and the settings) from the old place into ``dst``."""
+    src = settings.previous_home()
+    items = settings.movable(src, dst)
+    if not items:
+        return
+    size = ""
+    if "ollama" in items:
+        try:
+            total = sum(os.path.getsize(os.path.join(dp, f)) for dp, _d, fs in os.walk(os.path.join(src, "ollama")) for f in fs if os.path.isfile(os.path.join(dp, f)))
+            size = f" ({total / 1e9:.1f} GB)"
+        except OSError:
+            pass
+    io.say(f"  Found earlier data in {src}: {', '.join(items)}{size}.")
+    if "ollama" in items and _server_running():
+        io.say("  The private model server is running; stop it (or close the chat page) and run  vmd-agent setup --home here  again to move it. Skipped.")
+        items = [i for i in items if i != "ollama"]
+    if items and (assume_yes or io.confirm("  Move it into the working folder? (a rename on the same disk, so instant; nothing is copied or lost)", True)):
+        moved = settings.move_data(src, dst)
+        io.say(f"  Moved: {', '.join(moved)}." if moved else "  Nothing moved.")
+
+
 def step_home(io: IO, where: Optional[str] = None, assume_yes: bool = False) -> str:
     """Where vmd-agent keeps its own data. ``where`` is 'here' (a .vmd-agent folder in this folder) or 'user'
-    (the per-user folder); None asks. Returns the folder in use. Nothing is moved or deleted."""
+    (the installer's or per-user folder); None asks. Returns the folder in use. Earlier data is moved only if you agree."""
     if os.environ.get(settings.ENV_HOME) or os.environ.get(settings.ENV_DIR):
         io.say(f"\nvmd-agent's own data folder was chosen by the environment: {settings.home_dir()}")
         return settings.home_dir()
     existing = settings.local_home()
-    if existing:
-        io.say(f"\nvmd-agent keeps its own data in {existing} (it belongs to this working folder).")
-        return existing
     here = os.path.join(os.getcwd(), settings.LOCAL)
-    if where is None:
-        if assume_yes:
-            where = "user"
-        else:
-            io.say("\nWhere should vmd-agent keep its own data (your settings, the link to your VMD window, and the free model if you use one)?")
-            pick = io.choose("  Choose one", [f"In this folder: {here} (recommended: delete or move the folder and everything goes with it; the model needs a few GB here)",
-                                              f"In one place for your whole account: {settings.home_dir()}"], default=1)
-            where = "here" if pick == 1 else "user"
-    if where != "here":
-        io.say(f"  vmd-agent keeps its own data in {settings.home_dir()}.")
-        return settings.home_dir()
-    before = settings.load()                               # carry earlier choices over; nothing is deleted from the old place
-    folder = settings.make_local(os.getcwd())
-    if before and not settings.load():
-        settings.save(**{k: v for k, v in before.items() if k in settings.KEYS})
-    io.say(f"  vmd-agent keeps its own data in {folder} (Git ignores it).")
-    return folder
+    if not existing:
+        if where is None:
+            if assume_yes:
+                where = "user"
+            else:
+                io.say("\nWhere should vmd-agent keep its own data (your settings, the link to your VMD window, and the free model if you use one)?")
+                pick = io.choose("  Choose one", [f"In this folder: {here} (recommended: delete or move the folder and everything goes with it; the model needs a few GB here)",
+                                                  f"In one place for your whole account: {settings.previous_home()}"], default=1)
+                where = "here" if pick == 1 else "user"
+        if where != "here":
+            io.say(f"  vmd-agent keeps its own data in {settings.home_dir()}.")
+            return settings.home_dir()
+        before = settings.load()                           # carry earlier choices over
+        existing = settings.make_local(os.getcwd())
+        if before and not settings.load():
+            settings.save(**{k: v for k, v in before.items() if k in settings.KEYS})
+        io.say(f"  vmd-agent keeps its own data in {existing} (Git ignores it).")
+    else:
+        io.say(f"\nvmd-agent keeps its own data in {existing} (it belongs to this working folder).")
+    _offer_move(io, os.path.realpath(existing), assume_yes and where == "here")
+    return existing
 
 
 def step_data_dir(io: IO, data_dir: Optional[str] = None, assume_yes: bool = False) -> str:

@@ -57,7 +57,7 @@ say "Step 2 of 3: installing vmd-agent into $VMD_AGENT_HOME (downloads Python an
 RUN="$VMD_AGENT_HOME/bin/vmd-agent"
 {
   printf '#!/bin/sh\n'
-  printf 'VMD_AGENT_HOME="%s"; export VMD_AGENT_HOME\n' "$VMD_AGENT_HOME"
+  printf 'VMD_AGENT_INSTALL="%s"; export VMD_AGENT_INSTALL\n' "$VMD_AGENT_HOME"
   printf 'exec "%s/internal-bin/vmd-agent" "$@"\n' "$VMD_AGENT_HOME"
 } > "$RUN"
 chmod +x "$RUN"

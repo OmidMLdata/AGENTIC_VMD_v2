@@ -42,7 +42,7 @@ if ($LASTEXITCODE -ne 0) { Die "installing vmd-agent failed (see the message abo
 
 # A launcher that always sets the folder, so settings and downloads stay inside it.
 $run = Join-Path $Home_ "bin\vmd-agent.cmd"
-Set-Content -Path $run -Encoding ASCII -Value "@echo off`r`nset VMD_AGENT_HOME=$Home_`r`n`"$Home_\internal-bin\vmd-agent.exe`" %*"
+Set-Content -Path $run -Encoding ASCII -Value "@echo off`r`nset VMD_AGENT_INSTALL=$Home_`r`n`"$Home_\internal-bin\vmd-agent.exe`" %*"
 
 Say "Step 3 of 3: setup"
 & $run setup
