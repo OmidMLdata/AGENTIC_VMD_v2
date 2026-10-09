@@ -115,7 +115,7 @@ A task marked *needs VMD / ffmpeg / network* is skipped (and not counted) on a c
 |---|---|---|---|
 | `settled` | Has my run settled? Use protein.pdb and protein.dcd. | `run_workflow` | Yes, settled: no drift, with the verdict and the report location. |
 | `overview` | Give me an overview of the quality of the structure protein.pdb. | `run_workflow`, `detect_system`, `structure_stats` | A verdict with findings; a protein-ligand complex. |
-| `which_workflows` | Which whole-job workflows do you offer? | `run_workflow` | The six workflows by name. |
+| `which_workflows` | Which whole-job workflows do you offer? | `run_workflow` | The eleven workflows by name. |
 | `prepare` *(needs vmd)* | Prepare protein.pdb for a NAMD simulation: check it, build a solvated neutral system, and write the input. | `run_workflow`, `prepare_namd` | A checked input, a solvated neutral system and a NAMD input. |
 
 ## hand_off

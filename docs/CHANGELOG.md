@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.35.0: five more whole jobs (eleven in all)
+
+* **`flexibility_report`**: which residues are most flexible and most rigid, the size, and whether helix and strand content holds over the run.
+* **`ligand_report`**: does the ligand stay bound: its distance from the protein over time, how often it is in contact, the residues that touch it, its hydrogen bonds; it warns when too few frames were analysed to say so.
+* **`trajectory_qc`**: can the trajectory be trusted: loads with its topology, frame count, the header's time step, molecules split across the periodic box, the unit cell over time, first-frame geometry.
+* **`compare_structures`**: two structures superposed: RMSD before and after, what each contains, the superposed structure written out.
+* **`check_claims`**: each statement you give graded supported, contradicted or not checkable, with what can be checked.
+* The chat is pointed at the right job for questions about flexibility, a ligand staying bound, trusting a trajectory, and comparing structures. With `show_in_window`, the flexible residues, the ligand and its contacts, or the two superposed structures are drawn (checked against a real VMD); the jobs that produce statements say there is nothing to draw.
+* **The guard also checks claims that a tool or workflow was run**: an answer that says `trajectory_qc` was run when it was not is sent back. Found by a real model embellishing a ligand answer. The agent's instructions also say not to explain mechanisms no tool measured.
+* Fixed a stale count in the tool page (it said 55 tools).
+
 ## 0.34.1: a first-run checklist, and a way to ask the version
 
 * **[First-run checklist](reference/first-run-checklist.md)**: a walk-through for a person on a fresh computer (install, setup, saying no to the download and doing it later, the page, first questions, things it must refuse, removing it) and what to report.

@@ -168,3 +168,22 @@ def test_a_job_that_changed_nothing_in_the_window_says_so_and_the_agent_can_tell
     r2 = T["run_workflow"](name="equilibration_check", files=["protein.pdb", "protein.dcd"], out_dir=os.path.join(folder, "eq2"), show_in_window=True)
     assert r2["window"]["changed"] is True                                         # an empty window now holds the system
     assert not agent.unsupported_claims(said, [{"name": "run_workflow", "result": r2}], [])
+
+
+@vmd
+def test_the_new_jobs_show_what_they_found_or_say_there_is_nothing_to_draw(folder):
+    for f in ("sample.pdb", "sample.dcd"):
+        shutil.copy(os.path.join(DATA, "sample", f), os.path.join(folder, f))
+    out = lambda n: os.path.join(folder, n)                                                            # noqa: E731
+    r = T["run_workflow"](name="flexibility_report", files=["protein.pdb", "protein.dcd"], out_dir=out("flex"), show_in_window=True)
+    assert r["window"]["ok"] and r["window"]["changed"] and any(x["selection"].startswith("resid ") for x in reps_of(state()))     # the most flexible residues are drawn
+    assert [str(i) for i in r["facts"]["flexible_residues"]]
+    vmdlink.stop()
+    r = T["run_workflow"](name="ligand_report", files=["sample.pdb", "sample.dcd"], out_dir=out("lig"), show_in_window=True)
+    assert r["window"]["ok"] and r["window"]["changed"] and any("LIG" in x["selection"] for x in reps_of(state()))                 # the ligand is drawn
+    vmdlink.stop()
+    r = T["run_workflow"](name="compare_structures", files=["1ubq.pdb", "protein.pdb"], out_dir=out("cmp"), show_in_window=True)
+    assert r["window"]["ok"] and len(state()["molecules"]) == 2                                                                    # reference and superposed copy
+    vmdlink.stop()
+    r = T["run_workflow"](name="trajectory_qc", files=["protein.pdb", "protein.dcd"], out_dir=out("qc"), show_in_window=True)
+    assert r["window"]["ok"] and r["window"]["changed"] is False and "nothing to draw" in r["window"]["summary"]

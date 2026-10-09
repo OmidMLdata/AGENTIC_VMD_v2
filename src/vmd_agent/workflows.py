@@ -62,7 +62,7 @@ class _Run:
         if path and os.path.isfile(path):
             self.d["figures"].append(path)                              # type: ignore[union-attr]
 
-    def finish(self, verdict: str, out_dir: str, rerun: str) -> dict:
+    def finish(self, verdict: str, out_dir: str, rerun: str, facts: Optional[dict] = None) -> dict:
         self.d["verdict"] = verdict
         self.d["rerun"] = rerun
         written = reporting.write_report(self.d, out_dir)
@@ -71,7 +71,7 @@ class _Run:
                 "finding_counts": counts, "steps": [{k: s[k] for k in ("n", "tool", "label", "ok", "seconds", "summary")}
                                                     for s in self.d["steps"]],   # type: ignore[union-attr]
                 "report": os.path.abspath(written["report_md"]), "report_html": os.path.abspath(written["report_html"]),
-                "out_dir": os.path.abspath(out_dir)}
+                "out_dir": os.path.abspath(out_dir), **({"facts": facts} if facts else {})}
 
     def worst(self) -> str:
         found = {f["level"] for f in self.d["findings"]}                # type: ignore[union-attr]
@@ -292,6 +292,215 @@ def cryoem_fit(model: str, map_file: str, out_dir: str, options: dict) -> dict:
     return run.finish(_verdict(run, "Fitted; check the picture"), out_dir, f"vmd-agent workflow cryoem_fit {model} {map_file}")
 
 
+def _claims_from(options: dict) -> List[str]:
+    """The statements to check: ``claims`` (a list, or one string with statements separated by ';' or new lines) and/or ``claims_file`` (one per line)."""
+    raw = options.get("claims") or []
+    items = [raw] if isinstance(raw, str) else list(raw)
+    out: List[str] = []
+    for item in items:
+        out += [s.strip() for s in str(item).replace("\n", ";").split(";") if s.strip()]
+    if options.get("claims_file"):
+        with open(security.check_path(str(options["claims_file"])), encoding="utf-8") as fh:
+            out += [ln.strip() for ln in fh if ln.strip() and not ln.lstrip().startswith("#")]
+    return out
+
+
+def flexibility_report(topology: str, trajectory: str, out_dir: str, options: dict) -> dict:
+    sel, top_n = options.get("selection", "protein"), max(1, int(options.get("top", 5)))
+    run = _Run("flexibility_report", "Which parts move?", "Which residues are flexible or rigid, and does the fold stay intact?",
+               {"topology": os.path.basename(topology), "trajectory": os.path.basename(trajectory), "selection": sel}, [topology, trajectory], 3)
+    run.step("inspect_files", "classify the files", paths=[topology, trajectory])
+    an = run.step("analyze_trajectory", "fluctuation per residue and overall size", topology=topology, trajectory=trajectory, analyses=["rmsf", "rgyr"],
+                  selection=sel, out_dir=os.path.join(out_dir, "analysis"))
+    ss = run.step("secondary_structure", "secondary structure in every frame (VMD)", topology=topology, trajectory=trajectory, selection=sel,
+                  step=max(1, int(options.get("step", 1))))
+    res = an.get("results", {}) if an.get("ok", True) is not False else {}
+    flexible: List[int] = []
+    rmsf = res.get("rmsf") or {}
+    values = {int(k): float(v) for k, v in (rmsf.get("rmsf_values") or {}).items()}
+    if values:
+        ranked = sorted(values.items(), key=lambda kv: -kv[1])
+        flexible = [r for r, _ in ranked[:top_n]]
+        median = sorted(values.values())[len(values) // 2]
+        run.finding("note", "most flexible residues: " + ", ".join(f"{r} ({v:.2f} A)" for r, v in ranked[:top_n]) + ".")
+        run.finding("note", "most rigid residues: " + ", ".join(f"{r} ({v:.2f} A)" for r, v in ranked[::-1][:top_n]) + ".")
+        s = rmsf.get("summary") or {}
+        run.finding("note", f"fluctuation per residue: mean {s.get('mean', 0):.2f} A, from {min(values.values()):.2f} to {max(values.values()):.2f} A "
+                            f"(median {median:.2f} A).")
+        if rmsf.get("note"):
+            run.finding("note", str(rmsf["note"]))
+        run.figure(rmsf.get("plot"))
+    rg = res.get("rgyr") or {}
+    if rg.get("interpretation"):
+        run.finding("note", f"Radius of gyration: {rg['interpretation']}")
+    run.figure(rg.get("plot"))
+    frames = ss.get("per_frame") or [] if ss.get("ok") else []
+    if frames:
+        first, last = frames[0], frames[-1]
+        ordered0, ordered1 = first["helix"] + first["strand"], last["helix"] + last["strand"]
+        run.finding("note", f"secondary structure (VMD, STRIDE): helix {ss['mean_helix']:.0%} and strand {ss['mean_strand']:.0%} of residues on average over {ss['n_frames']} frames.")
+        if abs(ordered1 - ordered0) > 0.10:
+            run.finding("warning", f"the share of residues in helix or strand went from {ordered0:.0%} in the first frame to {ordered1:.0%} in the last: the fold may be changing.")
+        else:
+            run.finding("ok", f"the share of residues in helix or strand is steady ({ordered0:.0%} in the first frame, {ordered1:.0%} in the last).")
+    run.finding("note", "A single trajectory shows how this run moved, not how flexible the protein is in general: fluctuations from short runs depend on the time sampled.")
+    return run.finish(_verdict(run, "Flexibility and secondary structure measured"), out_dir, f"vmd-agent workflow flexibility_report {topology} {trajectory}",
+                      facts={"flexible_residues": flexible})
+
+
+def ligand_report(topology: str, trajectory: str, out_dir: str, options: dict) -> dict:
+    prot, cutoff = options.get("protein", "protein"), float(options.get("cutoff", 4.0))
+    step = max(1, int(options.get("step", 1)))
+    run = _Run("ligand_report", "Is the ligand staying bound?", "Does the ligand stay in its pocket, and which residues hold it?",
+               {"topology": os.path.basename(topology), "trajectory": os.path.basename(trajectory), "protein": prot, "contact cutoff (A)": cutoff},
+               [topology, trajectory], 5)
+    det = run.step("detect_system", "find the ligand", topology=topology)
+    lig = options.get("ligand") or (det.get("suggested_selections") or {}).get("ligand")
+    if not lig or not ((det.get("components") or {}).get("ligands_or_other") or {}).get("present") and not options.get("ligand"):
+        run.finding("problem", "no ligand was found in this system. Name it with --option ligand=\"resname XXX\" (any selection works).")
+        return run.finish("No ligand to report on.", out_dir, f"vmd-agent workflow ligand_report {topology} {trajectory}")
+    an = run.step("analyze_trajectory", "distance and contacts between the ligand and the protein", topology=topology, trajectory=trajectory,
+                  analyses=["distance", "contacts"], selection=lig, sel2=prot, cutoff=cutoff, step=step, out_dir=os.path.join(out_dir, "analysis"))
+    hb = run.step("find_interactions", "hydrogen bonds between them", topology=topology, trajectory=trajectory, kind="hbonds", selection=prot,
+                  selection2=lig, step=step)
+    ct = run.step("find_interactions", "which residues touch the ligand", topology=topology, trajectory=trajectory, kind="contacts", selection=lig,
+                  selection2=prot, cutoff=cutoff, step=step)
+    res = an.get("results", {}) if an.get("ok", True) is not False else {}
+    run.finding("note", f"ligand: {lig}.")
+    dist = res.get("distance") or {}
+    if dist.get("summary"):
+        s, st = dist["summary"], (dist.get("stationarity") or {})
+        run.finding("note", f"distance between the centres of mass of the ligand and the protein: mean {s['mean']:.2f} A, from {s['min']:.2f} to {s['max']:.2f} A "
+                            f"(last frame {s['last']:.2f} A). {dist.get('interpretation', '')}".strip())
+        drift = st.get("half_comparison") or {}
+        if drift and abs(drift.get("z", 0)) > 3 and abs(drift.get("diff", 0)) > 1.0:
+            run.finding("warning", f"the ligand's distance from the protein centre differs by {abs(drift['diff']):.1f} A between the first and second half of the run: "
+                                   "it may be moving (or leaving) the pocket. Look at the trajectory.")
+        run.figure(dist.get("plot"))
+    nfr = an.get("n_frames")
+    if nfr is not None and nfr < 20:
+        run.finding("warning", f"only {nfr} frame(s) were analysed: too few to say that a ligand stays bound. The numbers describe these frames only.")
+    con = res.get("contacts") or {}
+    if con.get("summary"):
+        frac = con.get("fraction_frames_in_contact")
+        run.finding("ok" if frac is not None and frac >= 0.99 else "warning", f"the ligand is within {cutoff:g} A of the protein in {frac:.0%} of the frames "
+                    f"(mean {con['summary']['mean']:.1f} atom pairs per frame)." + ("" if frac is not None and frac >= 0.99 else " It loses contact at times: check whether it leaves the pocket."))
+        run.figure(con.get("plot"))
+    touching: List[int] = []
+    if ct.get("ok"):
+        pairs = ct.get("most_persistent") or []
+        for p in pairs:                                               # the ligand is the first selection, so the protein residue is `b`
+            try:
+                touching.append(int(str(p["b"]).split(":")[1]))
+            except (IndexError, ValueError):
+                pass
+        held = [p for p in pairs if p["occupancy"] >= 0.8]
+        run.finding("note", f"{ct['n_pairs_ever']} protein residue(s) touch the ligand at some point; {len(held)} in at least 80% of the frames"
+                            + (": " + ", ".join(f"{p['b']} ({p['occupancy']:.0%})" for p in held[:8]) + "." if held else "."))
+    if hb.get("ok"):
+        held = [p for p in (hb.get("most_persistent") or []) if p["occupancy"] >= 0.5]
+        run.finding("ok" if held else "note", f"hydrogen bonds with the protein: {hb['n_pairs_ever']} distinct pair(s); " +
+                    (", ".join(f"{p['a']} - {p['b']} ({p['occupancy']:.0%})" for p in held[:5]) + " present in at least half of the frames." if held else "none persists in half of the frames."))
+    run.finding("note", "The distance is between centres of mass and is not corrected for the periodic box; a ligand that jumps across the box looks as if it left. This job does not check for that: run the trajectory_qc workflow separately.")
+    return run.finish(_verdict(run, "Ligand binding measured over the run"), out_dir, f"vmd-agent workflow ligand_report {topology} {trajectory}",
+                      facts={"ligand": lig, "touching_residues": touching[:12]})
+
+
+def trajectory_qc(topology: str, trajectory: str, out_dir: str, options: dict) -> dict:
+    run = _Run("trajectory_qc", "Can I trust this trajectory?", "Does the trajectory match its topology, and is it free of the usual problems?",
+               {"topology": os.path.basename(topology), "trajectory": os.path.basename(trajectory)}, [topology, trajectory], 4)
+    info = run.step("inspect_files", "classify the files", paths=[topology, trajectory])
+    chk = run.step("check_structure", "check the first frame (chirality, cis peptides, gaps)", topology=topology, trajectory=trajectory, frame=0)
+    an = run.step("analyze_trajectory", "frame count, time axis, periodic-box jumps", topology=topology, trajectory=trajectory, analyses=["rgyr"],
+                  selection=options.get("selection", "protein"), out_dir=os.path.join(out_dir, "analysis"))
+    box = run.step("periodic_box", "unit cell over time", topology=topology, trajectory=trajectory, step=max(1, int(options.get("step", 1))))
+    if info.get("ok", True) is not False:
+        for m in info.get("missing") or []:
+            run.finding("note", str(m))
+        run.finding("ok" if info.get("ready_to_load") else "warning", "the topology and trajectory can be loaded together." if info.get("ready_to_load")
+                    else "the files may not load together: check the order and that the topology matches.")
+    if an.get("error") and an.get("ok") is not False:
+        run.finding("problem", f"the trajectory could not be read with this topology: {an['error']}")
+    n = an.get("n_frames")
+    if n is not None:
+        run.finding("warning" if n < 10 else "note", f"{n} frame(s) analysed." + (" Very few: statistics from this are weak." if n < 10 else ""))
+    ta = an.get("time_axis") or {}
+    if ta.get("warning"):
+        run.finding("warning", str(ta["warning"]))
+    pbc = an.get("pbc") or {}
+    if pbc.get("n_jump_frames") or pbc.get("n_split_frames"):
+        run.finding("warning", f"the molecule is split across the periodic box in {pbc.get('n_split_frames', 0)} frame(s) and jumps between frames in {pbc.get('n_jump_frames', 0)}: "
+                               "unwrap or re-centre before trusting distances, RMSD or contacts.")
+    elif pbc.get("checked"):
+        run.finding("ok", "no periodic-box jumps or split molecules were found.")
+    if box.get("ok") and box.get("has_unit_cell") and box.get("volume_change_fraction") is not None:
+        frac = box["volume_change_fraction"]
+        run.finding("warning" if frac > 0.05 else "ok", f"the box volume changes by {frac:.2%} over the run" + (" (more than 5%: unusual for a constant-volume run)." if frac > 0.05 else "."))
+    elif box.get("ok"):
+        run.finding("note", "the trajectory carries no unit-cell information.")
+    if chk.get("ok"):
+        bad = [f"{chk[k]} {w}" for k, w in (("chirality_errors", "chirality error(s)"), ("cis_peptides", "cis peptide(s)"), ("chain_gaps", "chain gap(s)")) if chk.get(k)]
+        run.finding("warning" if bad else "ok", ("the first frame has " + "; ".join(bad) + ".") if bad else "the first frame has no chirality errors, cis peptides or chain gaps.")
+    for c in an.get("notes", []) or []:
+        if str(c) != str(ta.get("warning")):
+            run.finding("note", str(c))
+    return run.finish(_verdict(run, "No problem found with the trajectory"), out_dir, f"vmd-agent workflow trajectory_qc {topology} {trajectory}")
+
+
+def compare_structures(structure_a: str, structure_b: str, out_dir: str, options: dict) -> dict:
+    sel = options.get("selection", "name CA")
+    run = _Run("compare_structures", "How different are two structures?", "How far apart are these two structures after superposing them?",
+               {"structure A": os.path.basename(structure_a), "structure B": os.path.basename(structure_b), "fit on": sel}, [structure_a, structure_b], 3)
+    da = run.step("detect_system", "what is in A", topology=structure_a)
+    db = run.step("detect_system", "what is in B", topology=structure_b)
+    aligned = os.path.join(out_dir, "A_on_B.pdb")
+    al = run.step("align_structures", "superpose A onto B", mobile=structure_a, reference=structure_b, mobile_selection=sel, out_pdb=aligned)
+    for tag, d in (("A", da), ("B", db)):
+        if d.get("ok", True) is not False and d.get("summary"):
+            run.finding("note", f"{tag}: {d['summary']}")
+    if da.get("n_atoms") is not None and db.get("n_atoms") is not None and da.get("n_atoms") != db.get("n_atoms"):
+        run.finding("note", f"the structures have different numbers of atoms ({da['n_atoms']} and {db['n_atoms']}): only the selection '{sel}' is compared.")
+    if al.get("ok"):
+        after, before, n = al["rmsd_after"], al["rmsd_before"], al["n_atoms_fitted"]
+        level = "ok" if after < 1.0 else "note" if after < 3.0 else "warning"
+        word = "very similar" if after < 1.0 else "similar in overall shape" if after < 3.0 else "clearly different"
+        run.finding(level, f"after superposition on {n} atoms ('{sel}') the RMSD is {after:.2f} A (it was {before:.2f} A before): the structures are {word} at this level.")
+        run.finding("note", "A single RMSD over the whole structure hides local differences: a flexible loop or a moved domain can be large while the core agrees.")
+    return run.finish(_verdict(run, "Two structures superposed and compared"), out_dir, f"vmd-agent workflow compare_structures {structure_a} {structure_b}",
+                      facts={"mobile": structure_a, "reference": structure_b, "aligned_pdb": aligned if al.get("ok") else None})
+
+
+def check_claims(topology: str, out_dir: str, options: dict) -> dict:
+    claims = _claims_from(options)
+    trajectory = options.get("trajectory")
+    run = _Run("check_claims", "Are these statements true?", "Which of these statements about the system does the data support?",
+               {"topology": os.path.basename(topology), "trajectory": os.path.basename(str(trajectory)) if trajectory else "-", "statements": len(claims)},
+               [topology] + ([str(trajectory)] if trajectory else []), 1)
+    if not claims:
+        run.finding("problem", "no statements were given. Pass them with --option claims=\"It has 4 disulfide bridges; It has two chains\" or --option claims_file=statements.txt.")
+        return run.finish("Nothing to check.", out_dir, f"vmd-agent workflow check_claims {topology}")
+    vc = run.step("verify_claims", f"check {len(claims)} statement(s) against the data", topology=topology, claims=claims,
+                  **({"trajectory": security.check_path(str(trajectory))} if trajectory else {}))
+    counts = {"supported": 0, "contradicted": 0, "unverifiable": 0, "unparsed": 0}
+    for r in vc.get("results") or []:
+        verdict, text = r.get("verdict"), (r.get("claim") or {}).get("text", "")
+        counts[verdict] = counts.get(verdict, 0) + 1
+        why = r.get("explanation", "")
+        if verdict == "supported":
+            run.finding("ok", f"supported: \"{text}\". {why}")
+        elif verdict == "contradicted":
+            run.finding("problem", f"contradicted: \"{text}\". {why}")
+        elif verdict == "unverifiable":
+            run.finding("warning", f"cannot be checked with this data: \"{text}\". {why}")
+        else:
+            run.finding("note", f"not checkable as written: \"{text}\". {r.get('explanation') or r.get('note') or ''} What can be checked: the number of chains, residues or disulfide bridges; whether "
+                                "water, ions, a ligand, lipids or nucleic acid are present; the system type; helix, sheet or coil content; whether the RMSD is stable; whether the radius of "
+                                "gyration grew or shrank; whether a contact persists. Keep the sentence to one such statement.")
+    done = counts["supported"] + counts["contradicted"]
+    return run.finish(f"{counts['supported']} of {len(claims)} statement(s) supported, {counts['contradicted']} contradicted, {counts['unverifiable']} could not be checked, "
+                      f"{counts['unparsed']} not checkable as written." if done or claims else "Nothing to check.", out_dir, f"vmd-agent workflow check_claims {topology}")
+
+
 class Workflow:
     def __init__(self, fn: Callable, roles: List[str], summary: str, needs_vmd: bool, example: str):
         self.fn, self.roles, self.summary, self.needs_vmd, self.example = fn, roles, summary, needs_vmd, example
@@ -310,6 +519,17 @@ WORKFLOWS: Dict[str, Workflow] = {
                                    True, "vmd-agent workflow prepare_simulation 1ubq.pdb --option padding=10"),
     "cryoem_fit": Workflow(cryoem_fit, ["model", "map_file"], "fit a model into a cryo-EM map, with a picture and a session for VMD", False,
                            "vmd-agent workflow cryoem_fit model.pdb map.mrc --option resolution=6"),
+    "flexibility_report": Workflow(flexibility_report, ["topology", "trajectory"], "which residues are flexible or rigid, and does the secondary structure hold "
+                                   "(per-residue fluctuation, size, helix and strand over the run)", False, "vmd-agent workflow flexibility_report run.psf run.dcd"),
+    "ligand_report": Workflow(ligand_report, ["topology", "trajectory"], "does the ligand stay bound: its distance from the protein, its contacts and hydrogen bonds, "
+                              "and which residues hold it", True, 'vmd-agent workflow ligand_report run.psf run.dcd --option ligand="resname LIG"'),
+    "trajectory_qc": Workflow(trajectory_qc, ["topology", "trajectory"], "can I trust this trajectory (it matches its topology, time axis, periodic-box jumps, "
+                              "unit cell, first-frame geometry)", False, "vmd-agent workflow trajectory_qc run.psf run.dcd"),
+    "compare_structures": Workflow(compare_structures, ["structure_a", "structure_b"], "how different are two structures after superposing them (RMSD, what each "
+                                   "contains)", True, "vmd-agent workflow compare_structures apo.pdb holo.pdb"),
+    "check_claims": Workflow(check_claims, ["topology"], "which statements about the system does the data support, contradict or leave unchecked "
+                             "(give them with --option claims=... and optionally trajectory=...)", False,
+                             'vmd-agent workflow check_claims system.pdb --option claims="It has 4 disulfide bridges; It has two chains"'),
 }
 
 
@@ -335,12 +555,14 @@ def list_named() -> dict:
 def run_workflow(name: Optional[str] = None, files: Optional[List[str]] = None, out_dir: str = "workflow_report", options: Optional[dict] = None,
                  show_in_window: bool = False) -> dict:
     """With no name: list the named workflows, what each does, which files it needs and whether it needs VMD. With a name: run a whole job on the user's files, in one call. USE THIS (not a single measurement) when asked whether a run has settled
-    or equilibrated, to compare two runs, to prepare a simulation, to fit a model into a cryo-EM map, or for an overview of a structure.
-    name and the files it needs, in order: equilibration_check [topology, trajectory]; structure_overview [structure];
-    interaction_report [topology, trajectory]; compare_runs [topology, trajectory_a, trajectory_b]; prepare_simulation
-    [structure]; cryoem_fit [model, map]. It runs the checks, grades the findings (ok / note / warning / problem), gives a verdict
-    and writes report.md and report.html into out_dir. options: {"selection": "protein"}, {"partner": "resname LIG"}, {"padding": 10},
-    {"resolution": 6}. show_in_window=true also draws the outcome in the VMD window (the structure with its findings highlighted, the fitted model in
+    or equilibrated, which residues are flexible, whether a ligand stays bound, whether a trajectory can be trusted, to compare two runs or two structures, to
+    prepare a simulation, to fit a model into a cryo-EM map, to check statements, or for an overview of a structure.
+    name and the files it needs, in order: equilibration_check [topology, trajectory]; flexibility_report [topology, trajectory]; ligand_report [topology, trajectory];
+    trajectory_qc [topology, trajectory]; structure_overview [structure]; interaction_report [topology, trajectory]; compare_runs [topology, trajectory_a, trajectory_b];
+    compare_structures [structure_a, structure_b]; prepare_simulation [structure]; cryoem_fit [model, map]; check_claims [topology]. It runs the checks, grades the
+    findings (ok / note / warning / problem), gives a verdict and writes report.md and report.html into out_dir. options: {"selection": "protein"}, {"partner": "resname LIG"},
+    {"ligand": "resname LIG"}, {"claims": "It has 4 disulfide bridges; It has two chains"}, {"trajectory": "run.dcd"} (with claims), {"padding": 10}, {"resolution": 6}.
+    show_in_window=true also draws the outcome in the VMD window (the structure with its findings highlighted, the fitted model in
     its map, the built system, the two runs side by side), so you see it in VMD itself."""
     if not name:
         return list_named()

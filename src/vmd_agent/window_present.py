@@ -333,7 +333,23 @@ def present_workflow(name: str, files: List[str], result: dict, out_dir: str) ->
         before = _fingerprint(win)
         from vmd_agent import toolset
         shown: dict = {}
-        if name in ("structure_overview", "equilibration_check", "interaction_report"):
+        facts = result.get("facts") or {}
+        if name in ("flexibility_report", "ligand_report"):
+            top, trj = files[0], files[1]
+            mid = ensure(win, top, trj)
+            shown["molecule"] = mid
+            if name == "flexibility_report":
+                _highlight(win, mid, [int(r) for r in facts.get("flexible_residues") or []], "ColorID 1")
+            else:
+                if facts.get("ligand"):
+                    win.add_rep(mid, str(facts["ligand"]), "Licorice", "Name", "Opaque", None)
+                _highlight(win, mid, [int(r) for r in facts.get("touching_residues") or []], "ColorID 4")
+        elif name == "compare_structures":
+            shown.update(PRESENTERS["align_structures"](win, {"mobile": facts.get("mobile"), "reference": facts.get("reference")},
+                                                         {"aligned_pdb": facts.get("aligned_pdb")}))
+        elif name in ("trajectory_qc", "check_claims"):
+            return {"ok": True, "changed": False, "summary": f"The outcome of {name} is statements and numbers (see the report); there is nothing to draw, so the VMD window was left as it was."}
+        elif name in ("structure_overview", "equilibration_check", "interaction_report"):
             top = files[0]
             trj = files[1] if len(files) > 1 else None
             mid = ensure(win, top, trj)

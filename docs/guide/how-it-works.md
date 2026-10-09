@@ -41,7 +41,7 @@ Each tool that runs VMD saves the exact Tcl it used, so you can repeat it in you
 A **tool** does one thing. There are 57, in eleven groups, and every one is available to the chat, to MCP clients and to `vmd-agent tool NAME`. [The tool library](tools.md).
 
 A **workflow** runs several tools in a fixed order, grades what it finds (ok, note, warning, problem), gives a verdict and writes `report.md` and `report.html` with the figures, every caveat the tools raised, the methods, the
-SHA-256 of each input and the Tcl of each VMD step. The agent reaches all six through one call, `run_workflow`; from a terminal it is `vmd-agent workflow NAME FILE ...`. [Whole jobs](workflows.md).
+SHA-256 of each input and the Tcl of each VMD step. The agent reaches all eleven through one call, `run_workflow`; from a terminal it is `vmd-agent workflow NAME FILE ...`. [Whole jobs](workflows.md).
 
 ## Ways in
 

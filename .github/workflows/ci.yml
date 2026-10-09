@@ -49,7 +49,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Build the open-source image (no VMD)
-        run: docker build -f docker/Dockerfile --build-arg PYTHON_REGISTRY=public.ecr.aws/docker/library -t vmd-agent:ci .
+        run: |
+          for i in 1 2 3; do
+            docker build -f docker/Dockerfile --build-arg PYTHON_REGISTRY=public.ecr.aws/docker/library -t vmd-agent:ci . && exit 0
+            echo "build failed (attempt $i); the registry may be busy; retrying"; sleep 20
+          done
+          exit 1
       - name: Smoke test
         run: |
           mkdir -p data && cp tests/data/1ubq.pdb data/

@@ -180,7 +180,11 @@ def test_a_real_model_streams_its_answer_in_pieces(tmp_path, monkeypatch):
     ("Has my run settled? Use run.psf and run.dcd.", "equilibration_check"), ("Is the simulation equilibrated?", "equilibration_check"),
     ("Compare these two runs of the same system", "compare_runs"), ("Please set up a simulation of 1ubq.pdb", "prepare_simulation"),
     ("Fit my model into this cryo-EM map", "cryoem_fit"), ("Give me an overview of 1ubq.pdb", "structure_overview"),
-    ("Which salt bridges persist?", None), ("What is the radius of gyration?", None), ("hello", None)])
+    ("Which residues are the most flexible?", "flexibility_report"), ("Which parts of the protein move the most?", "flexibility_report"),
+    ("Does the ligand stay in the pocket?", "ligand_report"), ("Is the inhibitor still bound at the end?", "ligand_report"),
+    ("Can I trust this trajectory?", "trajectory_qc"), ("Do a quality check of my simulation", "trajectory_qc"),
+    ("How different are these two structures?", "compare_structures"), ("Compare apo.pdb and holo.pdb structures", "compare_structures"),
+    ("Which salt bridges persist?", None), ("What is the radius of gyration?", None), ("What is the RMSF of residue 5?", None), ("hello", None)])
 def test_questions_a_workflow_answers_are_pointed_at_it(text, workflow):
     assert agent.route(text) == workflow
 
@@ -348,3 +352,11 @@ def test_an_impossible_request_is_answered_without_asking_the_model():
     finally:
         srv.shutdown()
     assert answer.startswith("I cannot see or control the mouse") and requests == []
+
+
+def test_an_answer_that_says_a_tool_was_run_must_name_one_that_really_ran():
+    ran = [{"name": "run_workflow", "arguments": {"name": "ligand_report"}, "result": {"ok": True, "workflow": "ligand_report", "steps": [{"tool": "detect_system"}, {"tool": "analyze_trajectory"}]}}]
+    assert agent.unsupported_claims("The trajectory was already inspected (`trajectory_qc`) and looked fine.", ran, [])
+    assert not agent.unsupported_claims("The `ligand_report` workflow ran detect_system and analyze_trajectory.", ran, [])
+    assert not agent.unsupported_claims("Run `trajectory_qc` separately to check the periodic box.", ran, [])            # advice, not a claim of having done it
+    assert not agent.unsupported_claims("`trajectory_qc` was not run here.", ran, [])

@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1
+# (No `# syntax=` line: it makes the build fetch a frontend image from Docker Hub first, which fails whenever the Hub is slow, and nothing here needs it.)
 #
 # vmd-agent container images.   VMD IS NOT INCLUDED (UIUC license), see
 # README.md (Docker section) and ../docs/NOTICE.md.

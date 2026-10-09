@@ -40,7 +40,7 @@ You can reach all of them from:
 
 ## Whole jobs, with a report
 
-Six workflows run several tools in a fixed order, grade what they find (ok, note, warning, problem), give a verdict and write `report.md` and `report.html`: has this run settled, what is in this structure, which interactions persist, how do two runs compare, prepare a simulation, fit a model into a map. They bundle good practice, so a routine check is one request and the report can be sent on as it is. [Whole jobs](workflows.md).
+Eleven workflows run several tools in a fixed order, grade what they find (ok, note, warning, problem), give a verdict and write `report.md` and `report.html`: has this run settled, which residues are flexible, does the ligand stay bound, can this trajectory be trusted, what is in this structure, which interactions persist, how do two runs or two structures compare, are these statements true, prepare a simulation, fit a model into a map. They bundle good practice, so a routine check is one request and the report can be sent on as it is. [Whole jobs](workflows.md).
 
 ## A real VMD, not an imitation
 

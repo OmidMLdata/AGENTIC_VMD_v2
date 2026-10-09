@@ -66,7 +66,8 @@ window_query. You cannot see the window: describe it from what these tools retur
 run_workflow (with no name it lists the workflows): it runs the steps, grades the findings and writes a report. Quote its verdict and findings and \
 give the report path.
 11. Say only what the tool results show. Never say that something was drawn, shown, loaded, saved, written or opened unless a tool result says \
-so, and if a result says nothing was drawn or changed, say that.
+so, and if a result says nothing was drawn or changed, say that. Do not explain mechanisms or causes that no tool measured (for example the type of binding), and do \
+not say that a tool or workflow was run unless you called it.
 12. Some things you cannot do: pick atoms with the mouse, open VMD's own Tk windows (Timeline, Hydrogen Bonds, the plugin windows), run NAMD or a \
 cluster job (you can only write the input and the script), reach files outside the data directory, or use the internet other than to fetch or \
 search the PDB. If asked for one of these, say plainly that you cannot, offer the nearest thing a tool can do, and do not call an unrelated tool \
@@ -119,6 +120,11 @@ def unsupported_numbers(answer: str, tool_texts) -> List[str]:
 
 
 # What an answer claims about the VMD window or about files it says it wrote, checked against what the tools actually did this turn.
+def workflows_named() -> list:
+    from vmd_agent import workflows
+    return list(workflows.WORKFLOWS)
+
+
 _WINDOW_CLAIM = re.compile(r"\b(display(?:ed|s)?|shown|show(?:s|n)?|drawn|draws?|visible|rendered|opened|loaded|highlighted|rotated|coloured|colored|zoomed|appears?)\b"
                            r"[^.\n]{0,60}\b(?:in|on|into|inside)\b[^.\n]{0,24}\b(?:VMD|the window|your window|the display)\b", re.I)
 _WROTE_PATH = re.compile(r"\b(?:saved|written|wrote|created|exported|stored|generated)\b[^\n]{0,80}?((?:/|~/|\./)?[\w.\-]+(?:/[\w.\-]+)*\.\w{2,5})\b", re.I)
@@ -141,6 +147,25 @@ def window_changed(calls) -> bool:
     return False
 
 
+_RAN = re.compile(r"\b(?:ran|executed|used|inspected|checked|performed|applied|called|did)\b|\b(?:was|were|been|already)\s+\w*(?:ed|run)\b", re.I)
+
+
+def called_names(calls) -> set:
+    """Every tool or workflow that really ran this turn: the calls themselves, the workflow named in a run_workflow call, and the tools a workflow's steps ran."""
+    names = set()
+    for c in calls:
+        names.add(str(c.get("name")))
+        args = c.get("arguments") or {}
+        if isinstance(args, dict) and args.get("name"):
+            names.add(str(args["name"]))
+        r = c.get("result")
+        if isinstance(r, dict):
+            names.update(str(s.get("tool")) for s in r.get("steps") or [] if isinstance(s, dict))
+            if r.get("workflow"):
+                names.add(str(r["workflow"]))
+    return names
+
+
 def unsupported_claims(answer: str, calls, evidence_texts) -> List[str]:
     """Statements in an answer about the VMD window, or about files it says were written, that no tool result backs. The number guard cannot see these.
     ``calls`` are this turn's tool calls (name and result); ``evidence_texts`` the tool results and the question as text."""
@@ -148,6 +173,13 @@ def unsupported_claims(answer: str, calls, evidence_texts) -> List[str]:
     bad: List[str] = []
     if not window_changed(calls) and any(_WINDOW_CLAIM.search(s) and not _NEGATED.search(s) for s in re.split(r"(?<=[.!?])\s+|\n+", body)):
         bad.append("that something is shown in the VMD window (no tool changed the window)")
+    ran = called_names(calls)
+    known = set(toolset.TOOLS) | set(workflows_named())
+    for s in re.split(r"(?<=[.!?])\s+|\n+", body):
+        if _RAN.search(s) and not _NEGATED.search(s):
+            for name in sorted(known - ran):
+                if re.search(r"(?<![\w])" + re.escape(name) + r"(?![\w])", s) and f"that {name} was run" not in bad:
+                    bad.append(f"that {name} was run (it was not)")
     joined = "\n".join(evidence_texts)
     for m in _WROTE_PATH.finditer(body):
         path = m.group(1)
@@ -160,6 +192,10 @@ def unsupported_claims(answer: str, calls, evidence_texts) -> List[str]:
 _ROUTES = [
     ("equilibration_check", re.compile(r"\b(settled|equilibrat\w*|converg\w*|stabili[sz]ed|steady state)\b", re.I)),
     ("compare_runs", re.compile(r"\bcompar\w*\b.*\b(runs?|trajector\w+|simulations?)\b", re.I)),
+    ("flexibility_report", re.compile(r"\b(flexib\w*|rigid|which (?:residues|parts|regions)\b[^.?]{0,25}\b(?:move|fluctuate|wiggle)\w*|mobile (?:regions?|residues?)|most mobile)\b", re.I)),
+    ("ligand_report", re.compile(r"\b(ligand|inhibitor|drug|compound)\b.*\b(stay\w*|stays|bound|binding|pocket|leav\w*|stable|stability|held)\b|\bis the ligand\b", re.I)),
+    ("trajectory_qc", re.compile(r"\b(trust|sanity[- ]check|quality[- ]check|qc)\b.*\b(trajector\w+|runs?|simulations?)\b|\b(trajectory|run) (?:qc|quality)\b|\bperiodic[- ](?:box )?(?:jumps?|problems?)\b", re.I)),
+    ("compare_structures", re.compile(r"\b(?:compar\w*|how (?:different|similar))\b.*\b(structures?|models?)\b|\bsuperpos\w+\b", re.I)),
     ("prepare_simulation", re.compile(r"\b(prepare|set ?up|get ready)\b.*\b(simulation|md|namd)\b|\bready (to|for) simulat\w*", re.I)),
     ("cryoem_fit", re.compile(r"\bcryo-?em\b|\bfit\b.*\b(into|to)\b.*\bmap\b|\bdensity map\b", re.I)),
     ("structure_overview", re.compile(r"\b(overview|sanity check|structure quality|check (this|the|my) structure)\b", re.I)),

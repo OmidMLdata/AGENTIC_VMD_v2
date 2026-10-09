@@ -106,14 +106,14 @@ vmd-agent workflow equilibration_check run.psf run.dcd                   # a who
 
 ## What it can do
 
-It has **57 tools** in eleven groups, and six whole-job workflows that run several tools in order and write a report.
+It has **57 tools** in eleven groups, and eleven whole-job workflows that run several tools in order and write a report.
 
 * **Understand a structure:** what it contains, bonds, secondary structure, chain gaps and other problems, pictures from several angles.
 * **Measure a simulation:** RMSD, RMSF, radius of gyration, contacts, hydrogen bonds and more, with tests for whether a run has converged.
 * **Check statements:** a sentence about your system comes back supported, contradicted or "can't tell", with the evidence.
 * **Drive VMD:** load, draw, colour, rotate and measure in the real window, from chat or from forms.
 * **Build and convert:** solvated systems, mutations, membranes, trajectory conversion, cryo-EM map fitting, NAMD and SLURM files.
-* **Whole jobs with a report:** has the run settled, what is in the structure, which interactions persist, how do two runs compare.
+* **Whole jobs with a report:** has the run settled, which residues are flexible, does the ligand stay bound, can I trust this trajectory, how do two runs or two structures compare, are these statements true.
 
 The full lists are in [The tool library](docs/guide/tools.md) and [Whole jobs](docs/guide/workflows.md). [Why use vmd-agent](docs/guide/why.md) explains what it adds over using VMD on its own.
 

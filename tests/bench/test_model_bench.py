@@ -205,7 +205,7 @@ def test_the_whole_job_route_counts_as_a_fit_when_it_reports_a_good_correlation(
 def test_the_catalogue_option_runs_the_models_the_server_has_and_skips_the_rest(tmp_path, capsys):
     from vmd_agent import cli, models
     have = models.CATALOGUE[1].tag
-    srv, url, requests = _server([_call("run_workflow"), {"content": "The workflows are structure_overview, equilibration_check, interaction_report, compare_runs, prepare_simulation and cryoem_fit."}],
+    srv, url, requests = _server([_call("run_workflow"), {"content": "The workflows are structure_overview, equilibration_check, flexibility_report, ligand_report, trajectory_qc, interaction_report, compare_runs, compare_structures, prepare_simulation, cryoem_fit and check_claims."}],
                                  models=(have,))
     try:
         code = cli.main(["bench", "models", "--catalogue", "--base-url", url, "--only", "which_workflows", "--data-dir", str(tmp_path / "d"), "--out-dir", str(tmp_path / "o")])

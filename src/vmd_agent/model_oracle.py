@@ -157,7 +157,7 @@ ORACLE: Dict[str, Oracle] = {
     "settled": _o([("run_workflow", {"name": "equilibration_check", "files": [TOP, TRJ]})], lambda t, r: "The run has settled: " + str((r[0] or {}).get("verdict", "")) + " The full report is written to report.md and report.html.",
                   "Yes, settled: no drift, with the verdict and the report location."),
     "overview": _o([("run_workflow", {"name": "structure_overview", "files": [TOP]})], lambda t, r: "Structure overview: " + str((r[0] or {}).get("verdict", "")), "A verdict with findings; a protein-ligand complex."),
-    "which_workflows": _o([("run_workflow", {})], "The workflows are structure_overview, equilibration_check, interaction_report, compare_runs, prepare_simulation and cryoem_fit.", "The six workflows by name."),
+    "which_workflows": _o([("run_workflow", {})], "The workflows are structure_overview, equilibration_check, flexibility_report, ligand_report, trajectory_qc, interaction_report, compare_runs, compare_structures, prepare_simulation, cryoem_fit and check_claims.", "The eleven workflows by name."),
     "prepare": _o([("run_workflow", {"name": "prepare_simulation", "files": [TOP]})], lambda t, r: "Prepared the simulation: " + str((r[0] or {}).get("verdict", "")) + " A NAMD input was written; it has not been run.", "A checked input, a solvated neutral system and a NAMD input."),
     # ---- hand-off
     "slurm": _o([("write_slurm_script", {"command": "eq.namd", "out_path": "job.sbatch", "gpus": 1, "hours": 2.0, "kind": "namd"})], "Wrote job.sbatch: NAMD on eq.namd for 2 hours on 1 GPU (--time=02:00:00, --gres=gpu:1).", "job.sbatch with the time, the GPU and eq.namd."),

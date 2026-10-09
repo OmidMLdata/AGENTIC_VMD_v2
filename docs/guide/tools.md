@@ -6,7 +6,7 @@ the model, the [MCP server](mcp.md) gives them to an AI app, `vmd-agent tool NAM
 The count and the groups are checked by a test, so this page cannot drift from the code.
 
 **Tools and workflows are different things.** A tool does one thing. A [workflow](workflows.md) is a layer above the tools: it runs several of them in a fixed order, grades what they find and writes a
-report. There are six, and the agent reaches them through one call, `run_workflow` (with no name it lists them). They are not counted among the 55.
+report. There are eleven, and the agent reaches them through one call, `run_workflow` (with no name it lists them). They are not counted among the 57.
 
 The last column says whether a tool needs VMD installed. Tools that do not need it always work; a tool that needs it says so plainly when VMD is missing. Tools that run VMD save the exact Tcl they ran
 (`reproduce_script` in the result), so you can repeat the step in your own VMD.
