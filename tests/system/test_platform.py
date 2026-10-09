@@ -314,3 +314,21 @@ def test_the_doctor_says_the_memory_the_suggested_model_and_claude_code(capsys):
     text = launcher.doctor_text({**P.detect("no-such-docker-binary"), "repo": None, "next_steps": [], "chat_model": {"url": None, "model": None, "private": False, "reachable": None, "downloaded": False},
                                  "vmd": {"path": None, "tachyon": None, "ffmpeg": None, "self_test": None}})
     assert "Memory:" in text and "Claude Code:" in text
+
+
+def test_each_model_is_marked_for_this_computer_and_the_suggestion_follows_it():
+    from vmd_agent import models
+    cases = {  # memory, graphics-card memory -> (suggested, what the default and the largest are marked)
+        (8.0, None): ("granite4.1:3b", "too big", "too big"),
+        (16.0, None): ("granite4.1:8b", "fits", "too big"),
+        (64.0, None): ("granite4.1:8b", "fits", "fits"),
+        (8.0, 24.0): ("granite4.1:8b", "fits", "fits"),
+    }
+    for (ram, vram), (pick, default_fit, largest_fit) in cases.items():
+        rows = {a["tag"]: a for a in models.advise(ram, vram)}
+        assert [t for t, a in rows.items() if a["recommended"]] == [pick], (ram, vram)
+        assert rows[models.DEFAULT_MODEL]["fit"] == default_fit and rows["qwen3.8:27b"]["fit"] == largest_fit, (ram, vram)
+    assert models.fit(models.by_tag()["granite4.1:3b"], 6.0) == "tight" and models.fit(models.by_tag()["granite4.1:3b"], None) == "unknown"
+    assert [a["installed"] for a in models.advise(16.0, None, ["granite4.1:8b"])][:2] == [False, True]
+    assert "suggested" in models.table(16.0, None) and "[downloaded]" in models.table(16.0, None, ["granite4.1:8b"])
+    assert "Apple Silicon" in models.describe_device(24.0, None, None, apple_silicon=True) and "RTX" in models.describe_device(16.0, "NVIDIA RTX 4090", 24.0)

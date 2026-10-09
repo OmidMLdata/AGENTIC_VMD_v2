@@ -150,7 +150,13 @@
     <label class="opt"><input type="radio" name="msrc" value="local"> A free model on this computer (the private Ollama that setup installs)</label>
     <label class="opt"><input type="radio" name="msrc" value="other"> Another server: an online service you have access to, or your own Ollama, LM Studio, vLLM</label>
   </fieldset>
-  <div id="model-local-box"><label for="model-local">Models downloaded on this computer</label><select id="model-local"></select></div>
+  <div id="model-local-box"><label for="model-local">Models downloaded on this computer</label><select id="model-local"></select>
+    <details id="model-get"><summary>Download a model</summary>
+      <p class="note" id="model-device"></p>
+      <label for="model-pick">Suggested for this computer</label><select id="model-pick"></select>
+      <label class="opt"><input type="checkbox" id="model-consent"> <span id="model-consent-text"></span></label>
+      <div class="dlgbtns"><button class="btn" id="model-get-btn" type="button">Download and use</button></div>
+      <p class="note" id="model-progress" role="status"></p></details></div>
   <div id="model-other"><label for="model-found">Servers found on this computer</label><select id="model-found"></select>
     <label for="model-url">Address (usually ends in /v1)</label><input id="model-url" type="text" spellcheck="false" autocomplete="off">
     <label for="model-key">API key (leave empty if it needs none)</label><input id="model-key" type="password" autocomplete="off">

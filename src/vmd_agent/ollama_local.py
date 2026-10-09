@@ -280,9 +280,26 @@ def start(wait: float = 20.0) -> bool:
     return False
 
 
-def pull(model: str) -> bool:
-    """Download a model into the private models folder."""
+def pull(model: str, on_line: Optional[Callable[[str], None]] = None) -> bool:
+    """Download a model into the private models folder. With ``on_line`` the progress text is passed to it as it arrives (about twice a second);
+    without, it goes to the terminal as before."""
     binary = find_binary()
     if not binary:
         return False
-    return subprocess.run([binary, "pull", model], env=server_env()).returncode == 0
+    if on_line is None:
+        return subprocess.run([binary, "pull", model], env=server_env()).returncode == 0
+    proc = subprocess.Popen([binary, "pull", model], env=server_env(), stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    last, buf = 0.0, b""
+    assert proc.stdout is not None
+    while True:
+        chunk = proc.stdout.read1(512) if hasattr(proc.stdout, "read1") else proc.stdout.read(512)
+        if not chunk:
+            break
+        buf += chunk
+        parts = buf.replace(b"\r", b"\n").split(b"\n")
+        buf = parts.pop()
+        text = next((p.decode("utf-8", "replace").strip() for p in reversed(parts) if p.strip()), "")
+        if text and time.time() - last > 0.5:
+            last = time.time()
+            on_line(text[:160])
+    return proc.wait() == 0

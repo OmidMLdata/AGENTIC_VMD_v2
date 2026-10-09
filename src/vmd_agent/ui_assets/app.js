@@ -76,13 +76,40 @@ function fillModel(info) {
   $("#model-state").textContent = info.state === "ready" ? `Using ${info.model} at ${info.base_url}.` : `Not working: ${info.problem}.`;
   const list = $("#model-list"); list.textContent = ""; (info.available || []).forEach(m => list.append(new Option(m, m)));
   const loc = $("#model-local"); loc.textContent = "";
-  (info.local_models || []).forEach(m => loc.append(new Option(m, m))); if (!(info.local_models || []).length) loc.append(new Option(info.private_available ? "no model downloaded yet: run vmd-agent setup" : "no private model server yet: run vmd-agent setup", ""));
+  (info.local_models || []).forEach(m => loc.append(new Option(m, m))); if (!(info.local_models || []).length) loc.append(new Option(info.private_available ? "no model downloaded yet: use Download a model below" : "no private model server yet: use Download a model below", ""));
   if ((info.local_models || []).includes(info.model)) loc.value = info.model;
   const fs = $("#model-found"); fs.textContent = ""; fs.append(new Option((info.found || []).length ? "choose one…" : "none found", ""));
   (info.found || []).forEach(f => fs.append(new Option(`${f.base_url}  (${f.models.length} models)`, f.base_url)));
   fs.onchange = () => { const f = (info.found || []).find(x => x.base_url === fs.value); if (f) { $("#model-url").value = f.base_url; if (f.models.length) $("#model-name").value = f.models[0]; list.textContent = ""; f.models.forEach(m => list.append(new Option(m, m))); } };
   $("#model-start").hidden = !info.private_available;
+  fillSuggestions(info);
 }
+const FIT = { fits: "fits this computer", tight: "tight on this computer", "too big": "too big for this computer", unknown: "" };
+function fillSuggestions(info) {
+  const sel = $("#model-pick"); sel.textContent = ""; $("#model-device").textContent = info.device ? "This computer: " + info.device + "." : "";
+  (info.suggested || []).forEach(m => { const o = new Option(`${m.tag}  ·  ${m.gb} GB  ·  ${FIT[m.fit] || m.fit}${m.recommended ? "  ·  suggested" : ""}${m.installed ? "  ·  downloaded" : ""}`, m.tag); sel.append(o); if (m.recommended && !m.installed) sel.value = m.tag; });
+  const text = () => { const m = (info.suggested || []).find(x => x.tag === sel.value); const first = info.private_available ? "" : ` and the private Ollama (about ${info.ollama_download_gb || "a few hundred MB"} GB, kept inside the vmd-agent folder)`;
+    $("#model-consent-text").textContent = m ? `Yes, download ${m.tag} (${m.gb} GB)${first} from the internet.` : "Yes, download it."; };
+  sel.onchange = text; text(); $("#model-get").open = !(info.local_models || []).length;
+}
+$("#model-get-btn").onclick = async () => {
+  const tag = $("#model-pick").value, box = $("#model-progress");
+  if (!tag) return;
+  if (!$("#model-consent").checked) { box.textContent = "Tick the box first: it says how much will be downloaded."; return; }
+  $("#model-get-btn").disabled = true; box.textContent = "Starting…";
+  try {
+    const r = await api("/api/model/install", { model: tag, consent: true });
+    if (!r.ok) { box.textContent = (await r.json()).error; return; }
+    const reader = r.body.getReader(), dec = new TextDecoder(); let buf = "";
+    for (;;) {
+      const { value, done } = await reader.read(); if (done) break;
+      buf += dec.decode(value, { stream: true }); const parts = buf.split("\n\n"); buf = parts.pop();
+      for (const p of parts) { const ev = JSON.parse(p.replace(/^data: /, ""));
+        if (ev.type === "progress") box.textContent = ev.text; else if (ev.type === "error") box.textContent = "✗ " + ev.text;
+        else if (ev.type === "done") { fillModel(ev.info); box.textContent = `Done. Using ${ev.info.model}.`; $("#log").textContent = ""; $("#welcome").classList.remove("gone"); loadStatus(); } }
+    }
+  } catch (e) { box.textContent = "✗ " + e.message; } finally { $("#model-get-btn").disabled = false; }
+};
 function modelSource() { return $('input[name="msrc"]:checked').value; }
 function showModelSource() { const local = modelSource() === "local"; $("#model-other").hidden = local; $("#model-local-box").hidden = !local; }
 async function openModel() {
@@ -97,7 +124,7 @@ $("#model-check").onclick = async () => { fillModel(await getJSON("/api/model"))
 $("#model-start").onclick = async () => { $("#model-msg").textContent = "Starting…"; const r = await (await api("/api/model/start", {})).json(); $("#model-msg").textContent = r.error || ""; fillModel(r); loadStatus(); };
 $("#model-use").onclick = async () => {
   const local = modelSource() === "local", body = { model: local ? $("#model-local").value : $("#model-name").value.trim(), remember: true, local };
-  if (local && !body.model) { $("#model-msg").textContent = "No model is downloaded yet: run vmd-agent setup."; return; }
+  if (local && !body.model) { $("#model-msg").textContent = "No model is downloaded yet: open Download a model below."; $("#model-get").open = true; return; }
   if (!local) { body.base_url = $("#model-url").value.trim(); if ($("#model-key").value) body.api_key = $("#model-key").value; }
   const r = await api("/api/model/use", body), j = await r.json();
   if (!r.ok) { $("#model-msg").textContent = j.error; return; }

@@ -429,6 +429,9 @@ def build_parser():
     sp.add_argument("--size", action="store_true", help="say how much of a model's context the descriptions of these tools take up in every request")
     sp = sub.add_parser("models", help="the suggested open-source models for the chat, with the date they were checked")
     sp.add_argument("--check", action="store_true", help="ask the Ollama library now whether each still exists")
+    sp.add_argument("--install", nargs="?", const="", metavar="MODEL", help="download a model now (any time, also if you said no in setup); "
+                    "without a name it asks, with this computer's suggestion first; sets up the private Ollama first if there is none")
+    sp.add_argument("--yes", action="store_true", help="with --install: do not ask before downloading")
     sp = sub.add_parser("doctor", help="report this computer's OS, Docker, GPU, VMD and what to do next")
     sp.add_argument("--json", action="store_true")
     sp = sub.add_parser("mcp-config", help="print the MCP client configuration for this computer "
@@ -718,8 +721,19 @@ def main(argv=None):
             from vmd_agent import toolcli
             return toolcli.run(args, _print, _print_brief)
         if args.cmd == "models":
-            from vmd_agent import models
-            print(models.table())
+            from vmd_agent import models, ollama_local, platform_info as P
+            if args.install is not None:
+                from vmd_agent import wizard
+                ok = wizard.setup_local_model(wizard.IO(), P.system(), args.install or None, args.yes)
+                if ok:
+                    print("\nReady. Start the chat with  vmd-agent ui  (or  vmd-agent chat).")
+                return 0 if ok else 1
+            ram, gpu, vram = P.memory_gb(), P.nvidia_gpu(), P.nvidia_vram_gb()
+            print("This computer: " + models.describe_device(ram, gpu, vram, apple_silicon=(P.system() == P.MACOS and P.arch() == "arm64")) + ".")
+            pick = models.recommend(ram, bool(gpu))
+            print("Suggested: " + (f"{pick.tag} ({pick.gb:.1f} GB)" if pick else "none of these fit; an online service or Claude (vmd-agent setup) is easier") + "\n")
+            print(models.table(ram, vram, ollama_local.installed_models()))
+            print("\nDownload one:  vmd-agent models --install " + (pick.tag if pick else "MODEL"))
             if args.check:
                 print("\nAsking the Ollama library now:")
                 for m in models.CATALOGUE:

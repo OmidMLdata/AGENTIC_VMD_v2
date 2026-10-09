@@ -156,6 +156,7 @@ class State:
         info = {"base_url": self.base_url, "model": self.model, "has_key": bool(self.api_key), "available": [], "state": "ready", "problem": None,
                 "private_available": private, "is_private": self.base_url == ollama_local.url(),
                 "local_models": ollama_local.installed_models() if private else [], "local_url": ollama_local.url(), "found": []}
+        info.update(self.device_advice(info["local_models"]))
         try:
             info["available"] = list_models(self.base_url, self.api_key, timeout=timeout)
         except LLMError as e:
@@ -164,6 +165,17 @@ class State:
         if info["available"] and self.model not in info["available"]:
             info.update(state="no_model", problem=f"the server has no model called '{self.model}'")
         return info
+
+    def device_advice(self, installed: list) -> dict:
+        """What this computer is and how each suggested model suits it (read from the computer; used by the model dialog)."""
+        from vmd_agent import models, ollama_local, platform_info as P
+        ram, gpu, vram = P.memory_gb(), P.nvidia_gpu(), P.nvidia_vram_gb()
+        try:
+            ollama_gb = ollama_local.APPROX_GB.get(ollama_local.asset_name(), 0.0)
+        except ValueError:
+            ollama_gb = 0.0
+        return {"device": models.describe_device(ram, gpu, vram, apple_silicon=(P.system() == P.MACOS and P.arch() == "arm64")),
+                "suggested": models.advise(ram, vram, installed), "ollama_download_gb": ollama_gb}
 
     def discover(self) -> list:
         """Other model servers that answer on this computer (the private Ollama, a system Ollama, llama.cpp, LM Studio, vLLM), with their models."""
@@ -342,6 +354,8 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return self._stream(lambda emit: self._tool(payload, emit))
             if url.path == "/api/terminal":
                 return self._terminal(payload)
+            if url.path == "/api/model/install":
+                return self._stream(lambda emit: self._model_install(payload, emit))
             if url.path == "/api/model/start":
                 return self._model_start()
             if url.path == "/api/model/use":
@@ -391,11 +405,39 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 data = fh.read()
         self._send(200, data, "image/png")
 
+    def _model_install(self, payload: dict, emit: Callable[[dict], None]) -> None:
+        """Download a model into the private Ollama (setting that up first if the computer has none), then use it. Only with ``consent``:
+        the page asks first, naming the sizes, so nothing large is fetched by accident; this is also the way back after saying no in setup."""
+        from vmd_agent import models, ollama_local, settings
+        model = str(payload.get("model") or "").strip()
+        if not payload.get("consent"):
+            return emit({"type": "error", "text": "the download needs your go-ahead: tick the box that names its size"})
+        if not re.match(r"^[A-Za-z0-9][A-Za-z0-9._/-]*(:[A-Za-z0-9._-]+)?$", model):
+            return emit({"type": "error", "text": "that is not a model name"})
+        found = models.check(model)
+        if found["exists"] is False:
+            return emit({"type": "error", "text": f"the Ollama library has no model called '{model}'"})
+        if ollama_local.find_binary() is None:
+            emit({"type": "progress", "text": "Downloading the private Ollama (the program that runs models), checked against its published checksum…"})
+            try:
+                ollama_local.install()
+            except (RuntimeError, OSError, ValueError) as e:
+                return emit({"type": "error", "text": f"could not set up Ollama: {str(e)[:200]}"})
+        if not ollama_local.running() and not ollama_local.start():
+            return emit({"type": "error", "text": "the private model server did not start"})
+        if model not in ollama_local.installed_models():
+            emit({"type": "progress", "text": f"Downloading {model}" + (f" ({found['gb']} GB)" if found.get("gb") else "") + "…"})
+            if not ollama_local.pull(model, on_line=lambda t: emit({"type": "progress", "text": t})):
+                return emit({"type": "error", "text": f"the download of {model} failed; check the connection and try again"})
+        settings.save(llm_url=ollama_local.url(), llm_model=model, llm_key=None, ollama_mode="private")
+        self.state.reconnect(ollama_local.url(), model, None)
+        emit({"type": "done", "info": self.state.model_info()})
+
     def _model_start(self) -> None:
         """Start the private model server (the Ollama copy inside the vmd-agent folder), if there is one."""
         from vmd_agent import ollama_local
         if ollama_local.find_binary() is None:
-            return self._json({**self.state.model_info(), "error": "there is no private model server on this computer yet: run `vmd-agent setup` and choose the free local model"}, 409)
+            return self._json({**self.state.model_info(), "error": "there is no private model server on this computer yet: use \"Download a model\" in this window, or run `vmd-agent models --install`"}, 409)
         started = ollama_local.start()
         info = self.state.model_info()
         if not started:

@@ -131,6 +131,8 @@ More in [the architecture notes](docs/reference/architecture.md#the-agent-and-wh
 
 ## Choosing a model
 
+`vmd-agent models` reads your computer (memory, graphics card) and says which of the suggested models fit, tight or too big, and which one it suggests first. If you said no to a download in setup, you can change your mind any time: `vmd-agent models --install`, or **Model > Download a model** in the web page. Nothing large is fetched without your yes.
+
 Models differ a lot in how well they use tools. There's a built-in benchmark that gives a model 67 plain-language requests across 15 kinds of work (inspecting files, claims, trajectories, VMD measurements,
 building, maps, rendering, driving the VMD window, video, whole jobs and requests that should be declined). Each task has a correct answer worked out from data built to have known properties, and a program grades it.
 See [every prompt and its correct answer](docs/benchmarks/model-benchmark-tasks.md). The suggested models are listed in [Models](docs/guide/models.md).

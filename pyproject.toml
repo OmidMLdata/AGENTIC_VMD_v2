@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vmd-agent"
-version = "0.31.0"
+version = "0.32.0"
 description = "Ask questions about molecular structures and simulations in plain language; VMD does the measuring and drawing. A command line, a built-in chat for open-source models, and an MCP server over the same tool library."
 readme = "README.md"
 requires-python = ">=3.9"

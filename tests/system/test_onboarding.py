@@ -416,3 +416,48 @@ def test_a_running_model_server_is_never_moved(tmp_path, monkeypatch, bare):
     io_ = Typed(["1", ""])
     wizard.step_home(io_)
     assert (inst / "ollama").is_dir() and "is running" in io_.text
+
+
+# ------------------------------------------- saying no to a download is not final
+def _local_setup_with_ollama_ready(monkeypatch, pulled):
+    from vmd_agent import llm_client, ollama_local
+    monkeypatch.setattr(wizard, "_have_ollama", lambda: True)
+    monkeypatch.setattr(wizard, "_start_model_server", lambda io, url: True)
+    monkeypatch.setattr(llm_client, "list_models", lambda *a, **k: [])
+    monkeypatch.setattr(models, "check", lambda tag: {"tag": tag, "exists": True, "gb": 5.35, "error": ""})
+    monkeypatch.setattr(ollama_local, "find_binary", lambda root=None: "/x/ollama")
+    monkeypatch.setattr(ollama_local, "pull", lambda tag, on_line=None: pulled.append(tag) or True)
+
+
+def test_the_model_download_is_confirmed_with_its_size_and_a_no_says_how_to_do_it_later(monkeypatch):
+    pulled = []
+    _local_setup_with_ollama_ready(monkeypatch, pulled)
+    io_ = Typed(["2", "n"])                                  # the 8B, then no to the download
+    assert wizard.setup_local_model(io_, "linux") is False
+    assert pulled == [] and settings.get("llm_model") == "granite4.1:8b"                     # the choice is kept
+    assert "5.35 GB" in io_.text and "vmd-agent models --install granite4.1:8b" in io_.text and "web page" in io_.text
+
+
+def test_a_model_declined_in_setup_can_be_downloaded_later_with_models_install(monkeypatch, capsys):
+    pulled = []
+    _local_setup_with_ollama_ready(monkeypatch, pulled)
+    wizard.setup_local_model(Typed(["2", "n"]), "linux")
+    assert cli.main(["models", "--install", "granite4.1:8b", "--yes"]) == 0
+    assert pulled == ["granite4.1:8b"] and "Ready" in capsys.readouterr().out
+
+
+def test_models_names_this_computer_and_what_suits_it(capsys):
+    assert cli.main(["models"]) == 0
+    out = capsys.readouterr().out
+    assert "This computer:" in out and "Suggested:" in out and "vmd-agent models --install" in out
+
+
+def test_setup_shows_how_each_model_suits_this_computer(monkeypatch):
+    from vmd_agent import platform_info as P
+    monkeypatch.setattr(P, "memory_gb", lambda s=None: 16.0)
+    monkeypatch.setattr(P, "nvidia_gpu", lambda: None)
+    monkeypatch.setattr(wizard, "_have_ollama", lambda: False)
+    monkeypatch.setattr(wizard, "_install_ollama", lambda *a, **k: False)
+    io_ = Typed([""])
+    wizard.setup_local_model(io_, "linux")
+    assert "[fits this computer]" in io_.text and "[too big for this computer]" in io_.text

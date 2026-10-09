@@ -237,7 +237,7 @@ def test_starting_the_private_model_server_says_so_when_there_is_none(page, monk
     from vmd_agent import ollama_local
     monkeypatch.setattr(ollama_local, "find_binary", lambda root=None: None)
     s, body, _ = page.post("/api/model/start", {})
-    assert s == 409 and "vmd-agent setup" in json.loads(body)["error"]
+    assert s == 409 and "vmd-agent models --install" in json.loads(body)["error"]
 
 
 def test_every_tool_is_described_for_a_form_and_can_be_run_from_it(page):
@@ -336,3 +336,30 @@ def test_the_page_can_be_told_not_to_open_vmd_by_itself(tmp_path):
         assert srv.state.status()["auto_open_vmd"] is False
     finally:
         srv.server_close()
+
+
+def _events(body):
+    text = body.decode() if isinstance(body, bytes) else body
+    return [json.loads(x[6:]) for x in text.split("\n\n") if x.startswith("data: ")]
+
+
+def test_the_model_dialog_knows_this_computer_and_how_each_model_suits_it(page):
+    info = json.loads(page.req("GET", "/api/model")[1])
+    assert info["device"] and [m["tag"] for m in info["suggested"]][:2] == ["granite4.1:3b", "granite4.1:8b"]
+    assert all(m["fit"] in ("fits", "tight", "too big", "unknown") for m in info["suggested"]) and sum(m["recommended"] for m in info["suggested"]) <= 1
+
+
+def test_a_model_can_be_downloaded_from_the_page_later_but_only_with_a_go_ahead(page, monkeypatch):
+    from vmd_agent import models, ollama_local, settings
+    assert any(e["type"] == "error" and "go-ahead" in e["text"] for e in _events(page.post("/api/model/install", {"model": "granite4.1:8b"})[1]))
+    assert any(e["type"] == "error" and "not a model name" in e["text"] for e in _events(page.post("/api/model/install", {"model": "x; rm -rf /", "consent": True})[1]))
+    pulled = []
+    monkeypatch.setattr(models, "check", lambda tag: {"tag": tag, "exists": True, "gb": 5.35, "error": ""})
+    monkeypatch.setattr(ollama_local, "find_binary", lambda root=None: "/x/ollama")
+    monkeypatch.setattr(ollama_local, "running", lambda timeout=2.0: True)
+    monkeypatch.setattr(ollama_local, "installed_models", lambda root=None: pulled[:])
+    monkeypatch.setattr(ollama_local, "pull", lambda tag, on_line=None: (on_line("pulling manifest 40%"), pulled.append(tag))[1] or True)
+    ev = _events(page.post("/api/model/install", {"model": "granite4.1:8b", "consent": True})[1])
+    assert [e["type"] for e in ev] == ["progress", "progress", "done"] and "5.35 GB" in ev[0]["text"] and ev[1]["text"].startswith("pulling")
+    assert pulled == ["granite4.1:8b"] and settings.get("llm_model") == "granite4.1:8b" and page.state.model == "granite4.1:8b"
+    assert page.req("POST", "/api/model/install", body=b"{}", cookie=False)[0] == 403

@@ -25,6 +25,19 @@ they returned, which is why the chat flags any number a tool did not return; **s
 unverified. Any other Ollama model, or any online OpenAI-compatible service, can be used instead. `vmd-agent tool verify_claims` checks any
 statement against the data.
 
+### Which one suits this computer, and downloading later
+
+`vmd-agent models` reads this computer (memory, any NVIDIA graphics card and its memory; on Apple Silicon the memory is shared with the graphics, so all of it counts) and marks each model
+**fits**, **tight** (it may run slowly, or fail when other programs are open) or **too big**, names the one it suggests, and shows which are already downloaded. Setup and the web page's
+Model window show the same marks. The mark is a rough guide from the "suits" column, not a measurement.
+
+Saying no in setup is never final. The choice is saved, and you can download any time:
+
+* `vmd-agent models --install` asks which model (this computer's suggestion first) and sets up the private Ollama first if there is none; `vmd-agent models --install granite4.1:8b` names it;
+* or open **Model** in the web page, then **Download a model**: pick one, tick the box that says how much will be downloaded, and it downloads with progress and switches the chat to it.
+
+Nothing large is fetched without that yes: the Ollama program and each model are confirmed separately, with their sizes.
+
 ### How the chat keeps a model honest
 
 Language models guess; these checks stop a guess from passing as a measurement.

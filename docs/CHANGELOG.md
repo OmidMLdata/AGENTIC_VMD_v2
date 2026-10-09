@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.32.0: models that suit this computer, and a way back after saying no
+
+* **Suggestions from your hardware.** `vmd-agent models`, setup and the web page's Model window read the memory (and any NVIDIA card and its memory; on Apple Silicon the shared memory counts) and mark every model
+  *fits*, *tight* or *too big*, name the suggested one, and show which are already downloaded (`models.advise`, `platform_info.nvidia_vram_gb`).
+* **Saying no is no longer final.** Setup now asks before the model download too, with its size; a no keeps the choice and prints how to download later. `vmd-agent models --install [MODEL]` (with `--yes`) downloads at any time, setting up the
+  private Ollama first if there is none; the Model window has **Download a model**, with a consent box naming the sizes, streamed progress, and a switch to the new model when it is done (`POST /api/model/install`).
+
 ## 0.31.0: the page opens VMD by itself
 
 * **`vmd-agent ui` opens a real VMD window when the page loads**, if VMD is installed and no window is open, so the display is never empty and nobody has to find a button. Turn it off in the File menu (remembered by the browser) or start the page with `--no-vmd`.

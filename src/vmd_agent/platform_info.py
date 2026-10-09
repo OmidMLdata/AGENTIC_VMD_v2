@@ -122,6 +122,17 @@ def nvidia_gpu() -> Optional[str]:
     return line.split(" (UUID")[0].strip() or None
 
 
+def nvidia_vram_gb() -> Optional[float]:
+    """Memory of the first NVIDIA graphics card in GB, or None (no card, or it cannot be read; never raises)."""
+    if not shutil.which("nvidia-smi"):
+        return None
+    rc, out = run(["nvidia-smi", "--query-gpu=memory.total", "--format=csv,noheader,nounits"])
+    try:
+        return round(int(out.strip().splitlines()[0]) / 1024, 1) if rc == 0 and out.strip() else None
+    except (ValueError, IndexError):
+        return None
+
+
 def parse_meminfo(text: str) -> Optional[float]:
     """GB of memory from the contents of Linux's /proc/meminfo (``MemTotal:  16384000 kB``)."""
     for line in text.splitlines():

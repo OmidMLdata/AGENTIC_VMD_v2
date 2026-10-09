@@ -280,11 +280,15 @@ def setup_local_model(io: IO, system_name: str, model: Optional[str] = None,
     io.say("  and granite4.1:3b were run with this toolkit (the 3B often misreads results); licences differ.")
     if not model:
         io.say("  Pick a size (bigger is smarter but slower and needs more memory):")
-        labels = [f"{m.tag}: {m.label}, download {m.gb:.1f} GB; suits {m.suits}; {m.licence}"
+        ram, gpu_name, vram = P.memory_gb(system_name), P.nvidia_gpu(), P.nvidia_vram_gb()
+        gpu = bool(gpu_name)
+        io.say("  This computer: " + models.describe_device(ram, gpu_name, vram, apple_silicon=(P.system(system_name) == P.MACOS and P.arch() == "arm64")) + ".")
+        fits = {a["tag"]: a["fit"] for a in models.advise(ram, vram)}
+        note = {"fits": "fits this computer", "tight": "tight for this computer", "too big": "too big for this computer", "unknown": ""}
+        labels = [f"{m.tag}: {m.label}, download {m.gb:.1f} GB; suits {m.suits}; {m.licence}" + (f" [{note[fits[m.tag]]}]" if note[fits[m.tag]] else "")
                   for m in models.CATALOGUE]
         labels.append("I know the model name I want")
-        ram, gpu = P.memory_gb(system_name), bool(P.nvidia_gpu())
-        suggested = models.recommend(ram, gpu)
+        suggested = models.recommend(ram, gpu and bool(vram is None or vram >= models.by_tag()[models.DEFAULT_MODEL].min_vram_gb))
         if suggested is None:
             io.say(f"  This computer has {ram} GB of memory, which is little for a model that can use tools. The smallest one below may be slow or fail;")
             io.say("  an online service (setup option 2) or Claude (option 3) is the easier route.")
@@ -302,6 +306,7 @@ def setup_local_model(io: IO, system_name: str, model: Optional[str] = None,
                   ollama_mode="private" if private else "system")
     if not _have_ollama() and not _install_ollama(io, system_name, assume_yes):
         io.say(f"  I saved your choice ({model}); it will be used once Ollama is installed.")
+        io.say(f"  Change your mind any time: run  vmd-agent models --install {model}  or use the Model button in the web page (vmd-agent ui).")
         return False
     private = ollama_local.find_binary() is not None
     url = ollama_local.url() if private else DEFAULT_URL
@@ -326,10 +331,15 @@ def setup_local_model(io: IO, system_name: str, model: Optional[str] = None,
         io.say("  I could not reach the Ollama library to confirm the name; trying anyway.")
     elif found["gb"]:
         io.say(f"  The library confirms {model} exists ({found['gb']} GB).")
-    io.say(f"  Downloading {model}. This is large and happens only once; please keep this window open.")
+    size = f" ({found['gb']} GB)" if found.get("gb") else ""
+    if not (assume_yes or io.confirm(f"  Download {model}{size} now? It happens once and needs the window kept open.", True)):
+        io.say(f"  Not downloaded. Your choice ({model}) is saved. Download it whenever you like:  vmd-agent models --install {model}")
+        io.say("  or use the Model button in the web page (vmd-agent ui).")
+        return False
+    io.say(f"  Downloading {model}. Please keep this window open.")
     ok = ollama_local.pull(model) if private else _run(["ollama", "pull", model]).returncode == 0
     if not ok:
-        io.say(f"  The download failed. Check your internet connection and the name '{model}', then run setup again.")
+        io.say(f"  The download failed. Check your internet connection and the name '{model}', then try again:  vmd-agent models --install {model}")
         return False
     io.say("  Done.")
     return True
