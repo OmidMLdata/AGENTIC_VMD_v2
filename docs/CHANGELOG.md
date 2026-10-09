@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.34.1: a first-run checklist, and a way to ask the version
+
+* **[First-run checklist](reference/first-run-checklist.md)**: a walk-through for a person on a fresh computer (install, setup, saying no to the download and doing it later, the page, first questions, things it must refuse, removing it) and what to report.
+* `vmd-agent --version`, and `vmd-agent doctor` prints the version, so a report can say which one it was.
+
 ## 0.34.0: it only says what the tools did
 
 * **The guard checks claims, not only numbers.** An answer that says something is shown or drawn in the VMD window needs a tool that changed the window; one that says a file was written needs a tool result that names it. Otherwise the answer is sent back once, then flagged.

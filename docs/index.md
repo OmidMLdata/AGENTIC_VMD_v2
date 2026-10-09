@@ -27,6 +27,7 @@ The [README](../README.md) is the way in. These pages are the detail, in the ord
 | [The model benchmark](benchmarks/model-benchmark.md) | tasks per kind of functionality, to run on each language model |
 | [The benchmark's tasks and correct answers](benchmarks/model-benchmark-tasks.md) | every prompt, the tools that answer it and what a correct answer says |
 | [Development](reference/development.md) | set up, test, reproduce, the benchmark |
+| [First-run checklist](reference/first-run-checklist.md) | a walk-through for a person on a fresh computer: install, setup, download, first questions, what to report |
 | [Architecture](reference/architecture.md) | how the code fits together |
 | [Methods](reference/methods.md) | how each measurement is computed |
 | [Security](reference/security.md) | the sandbox, Tcl, downloads, containers |

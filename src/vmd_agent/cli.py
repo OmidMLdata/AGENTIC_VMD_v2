@@ -391,6 +391,8 @@ def _grouped_help(sub) -> str:
 def build_parser():
     """The whole command-line parser (also used by the tests, to check that every command is documented)."""
     p = argparse.ArgumentParser(prog="vmd-agent", formatter_class=argparse.RawDescriptionHelpFormatter)
+    from vmd_agent import __version__
+    p.add_argument("--version", action="version", version=f"vmd-agent {__version__}")
     sub = p.add_subparsers(dest="cmd", required=True, metavar="command")
     p.format_help = lambda: _grouped_help(sub)                 # the overview is grouped, not one flat list of 38
     sp = sub.add_parser("setup", help="first-time setup: finds VMD, picks your files folder, sets up the AI")

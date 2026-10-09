@@ -253,3 +253,12 @@ def test_every_tool_is_in_the_manual_with_its_group():
         assert f"`{n}`" in readme, n
     for group, _d, _t in toolset.LIBRARY:
         assert group in readme, group
+
+
+def test_the_version_can_be_asked_for_and_doctor_prints_it(capsys):
+    import vmd_agent
+    from vmd_agent import cli
+    with pytest.raises(SystemExit):
+        cli.main(["--version"])
+    assert vmd_agent.__version__ in capsys.readouterr().out
+    assert cli.main(["doctor"]) == 0 and f"vmd-agent:   {vmd_agent.__version__}" in capsys.readouterr().out

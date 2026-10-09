@@ -377,6 +377,7 @@ def doctor_text(info: Dict[str, object]) -> str:
     lines = [f"System:      {info['system']} / {info['arch']}"
              + (" (WSL)" if info["wsl"] else "")
              + (" (inside a container)" if info["in_container"] else ""),
+             f"vmd-agent:   {__import__('vmd_agent').__version__}",
              f"Python:      {info['python']}",
              f"Memory:      {info['ram_gb'] if info.get('ram_gb') else 'could not be read'} GB"
              + (lambda m: f" (suggested model: {m.tag})" if m else " (too little for a model that can use tools: use an online model or Claude)")(
