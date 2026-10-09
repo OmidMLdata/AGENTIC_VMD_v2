@@ -69,7 +69,7 @@ vmd-agent workflow equilibration_check run.psf run.dcd                   # a who
 
 ### Driving your VMD window
 
-The agent can work the VMD window you're looking at: load a system, draw it as a cartoon or a surface, colour it, zoom to the ligand, step through frames, ask what a selection contains, take a picture. Every
+The page opens a VMD window for you when it loads (if VMD is installed; `--no-vmd` turns that off). The agent can work the VMD window you're looking at: load a system, draw it as a cartoon or a surface, colour it, zoom to the ligand, step through frames, ask what a selection contains, take a picture. Every
 picture and number comes from VMD. A small script inside VMD listens on your own machine only and accepts a short, fixed list of commands, none of which runs arbitrary Tcl. Many analysis tools also take
 `show_in_window`, which draws their result in that window afterwards (the salt bridges as licorice, a fitted model inside its map, and so on). [How it works](docs/guide/window.md).
 

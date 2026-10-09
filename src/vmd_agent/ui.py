@@ -126,12 +126,13 @@ def images_in(result, root: str, found: Optional[list] = None) -> list:
 class State:
     """Everything the page's requests share: the sandbox, the model connection, the chat, and one-job-at-a-time."""
 
-    def __init__(self, data_dir: str, base_url: str, model: str, api_key: Optional[str], tools: str = "auto"):
+    def __init__(self, data_dir: str, base_url: str, model: str, api_key: Optional[str], tools: str = "auto", auto_vmd: bool = True):
         self.root = os.path.realpath(data_dir)
         os.makedirs(self.root, exist_ok=True)
         os.environ[security.ENV_ROOTS] = self.root
         os.chdir(self.root)
         self.base_url, self.model, self.api_key, self.tools = base_url, model, api_key, tools
+        self.auto_vmd = auto_vmd                     # whether the page opens a VMD window by itself when it loads
         self.token = secrets.token_urlsafe(24)
         self.busy = threading.Lock()
         self.session = agent_mod.Agent(base_url, model, api_key, tools=tools, echo=lambda m: None)
@@ -193,7 +194,7 @@ class State:
                 "vmd": env.get("vmd_path"), "vmd_version": env.get("vmd_version"), "tachyon": bool(env.get("tachyon_path")),
                 "ffmpeg": bool(env.get("ffmpeg")), "n_tools": len(toolset.library_tools()), "tools_in_chat": len(self.session.names), "profile": self.tools,
                 "profiles": {"all": len(toolset.ALL), "auto": 0},
-                "clock": self.session.clock, "window": {"connected": vmdlink.attach(timeout=1.0) is not None}}
+                "auto_open_vmd": self.auto_vmd, "clock": self.session.clock, "window": {"connected": vmdlink.attach(timeout=1.0) is not None}}
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
@@ -559,10 +560,10 @@ class Server(socketserver.ThreadingMixIn, http.server.HTTPServer):
 
 
 def make_server(data_dir: str, port: int = 0, base_url: Optional[str] = None, model: Optional[str] = None,
-                api_key: Optional[str] = None, tools: str = "auto") -> Server:
+                api_key: Optional[str] = None, tools: str = "auto", auto_vmd: bool = True) -> Server:
     """The server, bound to this computer only (port 0 picks a free one). ``server.state.token`` is the one-time key."""
     base_url, model, api_key = agent_mod.resolve_connection(base_url, model, api_key)
-    state = State(data_dir, base_url, model, api_key, tools)
+    state = State(data_dir, base_url, model, api_key, tools, auto_vmd)
     handler = type("BoundHandler", (Handler,), {"state": state})
     srv = Server(("127.0.0.1", port), handler)
     srv.state = state                                  # type: ignore[attr-defined]
@@ -574,11 +575,11 @@ def address(srv: Server) -> str:
 
 
 def main(data_dir: Optional[str] = None, port: int = 0, open_browser: bool = True, base_url: Optional[str] = None,
-         model: Optional[str] = None, api_key: Optional[str] = None, tools: str = "auto", say: Callable = lambda m: print(m, flush=True)) -> int:
+         model: Optional[str] = None, api_key: Optional[str] = None, tools: str = "auto", auto_vmd: bool = True, say: Callable = lambda m: print(m, flush=True)) -> int:
     from vmd_agent import settings
     data_dir = data_dir or (security.allowed_roots() or [None])[0] or settings.get("data_dir") or os.getcwd()
     try:
-        srv = make_server(data_dir, port, base_url, model, api_key, tools)
+        srv = make_server(data_dir, port, base_url, model, api_key, tools, auto_vmd)
     except OSError as e:
         say(f"vmd-agent ui: cannot listen on port {port}: {e}")
         return 1

@@ -76,6 +76,7 @@ def test_status_files_and_workflows(page):
     status = json.loads(page.req("GET", "/api/status")[1])
     assert status["model"] == "m" and status["n_tools"] == 57 and status["data_dir"] == os.path.realpath(page.root)
     assert status["model_ready"] in (True, False) and "ffmpeg" in status
+    assert status["auto_open_vmd"] is True                                   # the page opens a VMD window by itself, unless started with --no-vmd
     files = json.loads(page.req("GET", "/api/files")[1])["files"]
     assert [f["path"] for f in files] == ["1ubq.pdb"] and files[0]["kind"] == "structure"
     os.makedirs(os.path.join(page.root, "out", "deep"))
@@ -327,3 +328,11 @@ def test_the_page_drives_a_vmd_and_shows_vmds_own_picture(page, vmd_window):
     assert json.loads(page.req("GET", "/api/status")[1])["window"]["connected"] is True
     events = page.events("/api/tool", {"name": "window_query", "args": {"selection": "protein"}})
     assert 0 < next(e for e in events if e["type"] == "tool_result")["result"]["natoms"] <= state["molecules"][0]["natoms"]
+
+
+def test_the_page_can_be_told_not_to_open_vmd_by_itself(tmp_path):
+    srv = ui.make_server(str(tmp_path), 0, "http://127.0.0.1:1/v1", "m", auto_vmd=False)
+    try:
+        assert srv.state.status()["auto_open_vmd"] is False
+    finally:
+        srv.server_close()

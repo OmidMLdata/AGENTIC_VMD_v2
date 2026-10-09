@@ -66,7 +66,7 @@ tools (a movie of the window is one `window_movie` away), `convert_trajectory` a
 
 ## From the page, the chat and the agent
 
-* **The web page** (`vmd-agent ui`) is a remote for the window. Its display shows VMD's snapshots; dragging the picture rotates the real VMD view, the wheel zooms it, a double click resets it. The molecule
+* **The web page** (`vmd-agent ui`) opens a VMD window by itself when it loads, if VMD is installed and no window is open (switch that off in the File menu, or start the page with `--no-vmd`); it is a remote for the window. Its display shows VMD's snapshots; dragging the picture rotates the real VMD view, the wheel zooms it, a double click resets it. The molecule
   list, the Representations window, the animation bar, the menus and the console all send the commands above and then read VMD's state back. Changes made in VMD's own window show up in the page within a few
   seconds. Nothing on the page is drawn by the page.
 * **The page's forms and the Whole jobs tab** have the check box *show in my VMD window*; the display updates when a job finishes.

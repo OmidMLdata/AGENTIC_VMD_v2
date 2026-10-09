@@ -464,6 +464,7 @@ def build_parser():
     sp.add_argument("--model", help="model name (default: your saved setting)")
     sp.add_argument("--api-key", help="API key if the server needs one")
     sp.add_argument("--tools", choices=["all", "auto"], default="auto", help="which tools the chat gets (auto, the default: only those that fit each question; all: every tool)")
+    sp.add_argument("--no-vmd", action="store_true", help="do not open a VMD window by itself when the page opens (open it from the page when you want it)")
     sp = sub.add_parser("mcp-check", help="check an MCP server install the way a "
                         "real client uses it (needs the mcp SDK, Python >= 3.10)")
     sp.add_argument("--roots", nargs="+", help="allowed root directories to give the server")
@@ -664,7 +665,7 @@ def main(argv=None):
                                               "skip": 4}.get(args.use))
         if args.cmd == "ui":
             from vmd_agent import ui
-            return ui.main(args.data_dir, args.port, not args.no_browser, args.base_url, args.model, args.api_key, args.tools)
+            return ui.main(args.data_dir, args.port, not args.no_browser, args.base_url, args.model, args.api_key, args.tools, not args.no_vmd)
         if args.cmd == "menu":
             from vmd_agent import wizard
             return wizard.menu()

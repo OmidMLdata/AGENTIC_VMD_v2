@@ -691,6 +691,7 @@ const fileChoices = kind => S.everything.filter(f => f.kind === kind).map(f => (
 const MAC = /Mac/.test(navigator.platform), keyText = k => k.replace("Ctrl", MAC ? "⌘" : "Ctrl");
 act("file.add", "File", "Add files…", pickFiles);
 act("file.save", "File", "Save picture (PNG)…", async () => { if (!V.connected) return toast("Open a VMD window first.", "err"); const j = await win("window_snapshot", { out_png: "vmd_window.png", quality: "tachyon" }); if (j) { clog("ok", "✓ " + j.summary); addFigure(V.rel(j.image)); media(V.rel(j.image), "image"); loadFiles(); } }, { key: "Ctrl S" });
+act("file.autoopen", "File", "Open a VMD window automatically when this page opens (on/off)", () => { const on = !store.get("autoopen", true); store.set("autoopen", on); toast("Automatic VMD window: " + (on ? "on" : "off"), ""); });
 act("file.refresh", "File", "Refresh the file list", () => { loadFiles(); loadStatus(); V.refresh(true); });
 act("vmd.open", "File", "Open the VMD window", () => openVMD(), { enabled: () => !V.connected });
 act("mol.new", "Molecule", "New molecule…", async () => { const p = await choose("New molecule: choose a structure", fileChoices("structure")); if (p) loadMolecule(p); });
@@ -721,7 +722,7 @@ act("ext.console", "Extensions", "Go to the console", () => { $("#console").clas
 act("help.shortcuts", "Help", "Keyboard shortcuts", () => { fillShortcuts(); $("#shortcuts").showModal(); }, { key: "?" });
 act("help.console", "Help", "Console commands", () => { $("#console").classList.remove("min"); help(); });
 act("help.about", "Help", "About vmd-agent", () => $("#about").showModal());
-const MENUS = [["File", ["vmd.open", "file.add", "file.save", "file.refresh"]], ["Molecule", ["mol.new", "mol.addfile", "-", "mol.toggle", "mol.inspect", "-", "mol.delete"]], ["Graphics", ["reps.open", "rep.add", "rep.delete"]],
+const MENUS = [["File", ["vmd.open", "file.autoopen", "file.add", "file.save", "file.refresh"]], ["Molecule", ["mol.new", "mol.addfile", "-", "mol.toggle", "mol.inspect", "-", "mol.delete"]], ["Graphics", ["reps.open", "rep.add", "rep.delete"]],
                ["Display", ["proj.persp", "proj.ortho", "-", "display.depth", "display.axes", "display.shadows", "-", "bg.black", "bg.gray", "bg.white", "-", "view.reset"]], ["Mouse", ["mouse.rotate", "mouse.translate", "mouse.scale"]],
                ["Animation", ["anim.play", "anim.prev", "anim.next"]], ["Extensions", ["ext.palette", "ext.model", "-", "ext.chat", "ext.tools", "ext.jobs", "ext.console"]], ["Help", ["help.shortcuts", "help.console", "help.about"]]];
 function closeMenus(except) { $$(".menu.open").forEach(m => { if (m === except) return; m.classList.remove("open"); const d = $(".dropdown", m); if (d) d.remove(); $("button", m).setAttribute("aria-expanded", "false"); }); }
@@ -818,7 +819,13 @@ splitter("#split-mol", { prop: "--molrows", key: "molrows", min: 90, max: () => 
 $("#mol-load").onclick = () => A["mol.new"].run(); $("#mol-delete").onclick = () => A["mol.delete"].run();
 renderMolecules(); refreshAnim(); updateCaption();
 clog("job", "vmd-agent ready. Type help for the console commands, or press Ctrl+K to search every action.");
-loadFiles(); loadWorkflows(); loadStatus().then(() => V.refresh(true));
+// Open the real VMD window by itself when the page loads and VMD is installed (once; turn it off in the File menu or with --no-vmd)
+async function autoOpenVMD() {
+  if (!S.status.auto_open_vmd || !store.get("autoopen", true) || !V.installed || V.connected) return;
+  clog("job", "VMD is installed and no window is open: opening one (File menu: turn this off)");
+  await openVMD();
+}
+loadFiles(); loadWorkflows(); loadStatus().then(() => V.refresh(true)).then(autoOpenVMD);
 setInterval(() => { if (!S.busy) { loadFiles(); if (!S.status.model_ready) loadStatus(); } }, 15000);
 // the VMD window can also be changed in its own window, or by a command typed elsewhere: look again every few seconds (and take a new picture if "live" is on)
 setInterval(async () => { if (document.hidden || V.snapping) return; await V.refresh($("#live").checked && V.connected); }, 3000);

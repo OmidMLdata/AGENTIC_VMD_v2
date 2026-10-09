@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.31.0: the page opens VMD by itself
+
+* **`vmd-agent ui` opens a real VMD window when the page loads**, if VMD is installed and no window is open, so the display is never empty and nobody has to find a button. Turn it off in the File menu (remembered by the browser) or start the page with `--no-vmd`.
+
 ## 0.30.3: why use it
 
 * A new page, [Why use vmd-agent](guide/why.md), and a short section in the README: checked answers, statistics beyond VMD, repeatable steps, safe access for a model, one toolbox, a real VMD, whole jobs.
