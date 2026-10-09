@@ -10,8 +10,8 @@ Downloads are large (Ollama's Linux and Windows archives are over 1 GB because t
 GPU libraries), so callers must ask the user first; nothing here asks, and nothing here runs
 unless called.
 
-Never run end to end: no Ollama binary was downloaded where this was written. The release
-file names, the checksum check and the paths are tested; the download itself is not.
+Run on macOS (Apple Silicon): the install, the server start, the model download and a chat through it. Not run on Linux or
+Windows: there the release file names, the checksum check and the paths are tested, the download itself is not.
 """
 from __future__ import annotations
 

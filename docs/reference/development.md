@@ -1,5 +1,16 @@
 # Development
 
+## What is in this repository
+
+```
+src/vmd_agent/     the package: the agent, the tool library, VMD wrappers (vmdkit/), analysis, drawing, the web page (ui_assets/), the benchmarks
+install/           the one-line installers (install.sh for Mac and Linux, install.ps1 for Windows)
+docker/            Dockerfile, compose files and helpers for the container routes
+docs/              the manual: guide/ (using it), benchmarks/ (choosing a model), reference/ (architecture, methods, security, research), CHANGELOG and NOTICE
+tests/             the test suite, laid out like the package
+.github/           CI
+```
+
 ## How the tools fit together
 
 1. `probe_environment` → pick a renderer (`vmd` or `matplotlib`).

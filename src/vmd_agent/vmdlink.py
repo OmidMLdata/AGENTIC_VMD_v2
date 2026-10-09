@@ -209,7 +209,7 @@ def open_window(vmd_path: Optional[str] = None, headless: bool = False, wait: fl
         stop()
     vmd = find_vmd(vmd_path)
     if not vmd:
-        raise LinkError("VMD was not found. Install VMD (https://www.ks.uiuc.edu/Research/vmd/) and run `vmd-agent setup`, or set VMD_BIN.")
+        raise LinkError("VMD was not found. Install VMD (https://www.ks.uiuc.edu/Research/vmd/) and run `vmd-agent setup` (or `vmd-agent setup --vmd /path/to/VMD` if it is somewhere unusual), or set VMD_BIN.")
     if not headless and os.name == "posix" and os.uname().sysname == "Linux" and not (os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY")):
         raise LinkError("this computer has no display to open a VMD window on")
     port, token = _free_port(), secrets.token_urlsafe(24)

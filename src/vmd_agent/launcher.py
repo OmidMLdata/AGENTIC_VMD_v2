@@ -13,8 +13,8 @@ Windows' VMD cannot run in Docker, and Docker on a Mac cannot use its GPU), and 
 otherwise when it is ready. Every decision is returned as data, and ``--print-plan``
 shows it without running anything.
 
-Never run end to end: the Docker path needs Docker and the native path a model server,
-neither of which was available where this was written.
+The native path has run on macOS (Apple Silicon) against the private Ollama. Never run end to end on Docker: that path needs Docker,
+which was not available where this was written.
 """
 from __future__ import annotations
 
@@ -392,9 +392,9 @@ def doctor_text(info: Dict[str, object]) -> str:
              "Chat model:  " + (
                  f"{info['chat_model']['model']} at {info['chat_model']['url']}: "
                  + (("not running right now; it starts by itself when you chat" if info['chat_model']['private'] else
-                     "not reachable (run `vmd-agent setup`)") if info['chat_model']['reachable'] is False else
+                     "not reachable (run `vmd-agent setup`, or `vmd-agent ui` and open Model)") if info['chat_model']['reachable'] is False else
                     "reachable, downloaded" if info['chat_model']['downloaded'] else
-                    "reachable, NOT downloaded yet (run `vmd-agent setup`)")
+                    "reachable, NOT downloaded yet (run `vmd-agent models --install`)")
                  if info['chat_model']['url'] else "none chosen yet (run `vmd-agent setup`)"),
              f"VMD:         {v['path'] or 'not found'}"
              + (f" (Tachyon: {v['tachyon'] or 'not found'})" if v["path"] else ""),

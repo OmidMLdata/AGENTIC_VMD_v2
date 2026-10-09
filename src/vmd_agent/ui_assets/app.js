@@ -239,7 +239,7 @@ async function openVMD() {
 }
 async function ensureWindow() {
   if (V.connected) return true;
-  if (!V.installed) { toast("VMD was not found on this computer: install VMD, then run vmd-agent setup.", "err"); return false; }
+  if (!V.installed) { toast("VMD was not found on this computer: install VMD, then run vmd-agent setup (vmd-agent setup --vmd PATH if it is in an unusual place).", "err"); return false; }
   await openVMD(); return V.connected;
 }
 
@@ -285,7 +285,7 @@ function media(rel, kind) {
 function updateCaption() {
   const nd = $("#nodata"), m = V.topMol, msg = $("#nodata-msg"), btn = $("#open-vmd");
   btn.hidden = true;
-  if (!V.installed) { nd.hidden = false; msg.textContent = "VMD was not found on this computer. Install VMD (free from UIUC), then run vmd-agent setup. The tools still draw built-in pictures without it."; }
+  if (!V.installed) { nd.hidden = false; msg.textContent = "VMD was not found on this computer. Install VMD (free from UIUC), then run vmd-agent setup (add --vmd PATH if it is in an unusual place). The tools still draw built-in pictures without it."; }
   else if (!V.connected) { nd.hidden = false; msg.textContent = "No VMD window is open. This display shows snapshots of a real VMD window, which you control from here and from the chat."; btn.hidden = false; btn.disabled = false; $("#view").hidden = true; }
   else if (!V.mols.length) { nd.hidden = false; msg.textContent = "VMD is open and empty. Double-click a structure in Files, or type  mol new FILE  in the console."; }
   else nd.hidden = true;

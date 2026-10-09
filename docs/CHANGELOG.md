@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.33.0: a friendlier first run
+
+* **README rewritten around installing and starting**: what you need, four install steps with the answers to give, how to start it, what to do when something goes wrong. The detail moved to pages: [How it works](guide/how-it-works.md), the model benchmark commands to [Models](guide/models.md), the repository layout to [Development](reference/development.md), and a cleaner [Install and set up](guide/install.md).
+* **Setup no longer opens the VMD website by itself.** The question defaulted to yes and came back on every run. It now defaults to no, is asked once, and says how to point setup at VMD later (`vmd-agent setup --vmd PATH`). The same for Ollama's page.
+* **Setup never makes a hidden data folder in your home directory**, and after the installer its default is the installer's folder (a project's `.vmd-agent` is one answer away).
+* **Messages point the same way:** a missing model says `vmd-agent models --install` or the Model window, a missing VMD says `setup --vmd PATH`, and `vmd-agent ui` tells a first-time user to run setup.
+* **`vmd-agent start` is labelled the Docker route** and listed under its own heading, not under Set up. Docstrings no longer say the Ollama install was never run.
+
 ## 0.32.0: models that suit this computer, and a way back after saying no
 
 * **Suggestions from your hardware.** `vmd-agent models`, setup and the web page's Model window read the memory (and any NVIDIA card and its memory; on Apple Silicon the shared memory counts) and mark every model

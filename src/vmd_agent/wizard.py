@@ -7,8 +7,8 @@ nothing without asking, and says exactly what it is about to run.
 
 All input and output go through a small ``IO`` object so the conversation can be tested.
 
-Never run end to end against Ollama, Docker, Claude Desktop or Claude Code: none was
-available where this was written. The decisions and the file writes are tested.
+Run end to end on macOS (Apple Silicon) with the private Ollama: install, start, model download and chat.
+Not run: Linux, Windows, Docker, or registering with Claude Desktop or Claude Code. The decisions and the file writes are tested.
 """
 from __future__ import annotations
 
@@ -118,12 +118,14 @@ def step_vmd(io: IO, vmd_hint: Optional[str] = None, assume_yes: bool = False) -
             _check_vmd_works(io, found)
             return found
         io.say(f"  I could not find a VMD program in '{where}'. Skipping; you can run setup again later.")
-    if io.confirm("  Open VMD's download page in your browser? (You download and install it yourself; "
-                  "then run `vmd-agent setup` again and I will find it.)", True):
+    if not settings.get("vmd_page_offered") and io.confirm("  Open VMD's download page in your browser? (You download and install it yourself; "
+                                                           "then run `vmd-agent setup` again and I will find it.)", False):
         try:
             webbrowser.open(VMD_SITE)
         except Exception:
             pass
+    settings.save(vmd_page_offered=True)                       # asked once; never again, and never opened without a yes
+    io.say("  Later: install VMD, then run `vmd-agent setup` (or `vmd-agent setup --vmd /path/to/VMD` if it is somewhere unusual).")
     return None
 
 
@@ -167,13 +169,17 @@ def step_home(io: IO, where: Optional[str] = None, assume_yes: bool = False) -> 
     existing = settings.local_home()
     here = os.path.join(os.getcwd(), settings.LOCAL)
     if not existing:
+        if where is None and os.path.realpath(os.getcwd()) == os.path.realpath(os.path.expanduser("~")):
+            where = "user"                                   # a hidden folder in your home directory helps nobody: keep it with the install
+            io.say(f"\nvmd-agent keeps its own data in {settings.home_dir()}. (To keep it inside a project instead, open a terminal in that folder and run  vmd-agent setup --home here .)")
         if where is None:
             if assume_yes:
                 where = "user"
             else:
                 io.say("\nWhere should vmd-agent keep its own data (your settings, the link to your VMD window, and the free model if you use one)?")
-                pick = io.choose("  Choose one", [f"In this folder: {here} (recommended: delete or move the folder and everything goes with it; the model needs a few GB here)",
-                                                  f"In one place for your whole account: {settings.previous_home()}"], default=1)
+                installer = bool(os.environ.get(settings.ENV_INSTALL))
+                pick = io.choose("  Choose one", [f"In this folder: {here} (delete or move the folder and everything goes with it; the model needs a few GB here)",
+                                                  f"In one place for your whole account: {settings.previous_home()}"], default=2 if installer else 1)
                 where = "here" if pick == 1 else "user"
         if where != "here":
             io.say(f"  vmd-agent keeps its own data in {settings.home_dir()}.")
@@ -235,7 +241,7 @@ def _install_ollama(io: IO, system_name: str, assume_yes: bool) -> bool:
     io.say("  You can install Ollama yourself instead:")
     io.say(f"    1. Go to {OLLAMA_SITE} and download the installer for your computer.")
     io.say("    2. Run it, then come back and run `vmd-agent setup` again.")
-    if not assume_yes and io.confirm("  Open that page in your browser now?", True):
+    if not assume_yes and io.confirm("  Open that page in your browser now?", False):
         try:
             webbrowser.open(OLLAMA_SITE)
         except Exception:
@@ -372,7 +378,7 @@ def setup_ai_app(io: IO, data_dir: str, assume_yes: bool = False,
     from vmd_agent import mcp_check
     cfg = mcp_check.build_mcp_config(roots=[data_dir], system_name=system_name)
     io.say("\n  Claude Code or Claude Desktop will do the thinking, and vmd-agent will be one of their tools (through a standard called MCP).")
-    io.say("  The chat and the web page of vmd-agent itself still need a model of their own; you can add one later (vmd-agent setup, or Extensions, Model in the web page).")
+    io.say("  The chat and the web page of vmd-agent itself still need a model of their own; you can add one later (vmd-agent models --install, or Model in the web page).")
     path = cfg["claude_desktop_config"]
     done = False
     if path and (assume_yes or io.confirm(f"  Add it to Claude Desktop's settings now? ({path})")):
@@ -455,7 +461,7 @@ def setup(io: Optional[IO] = None, assume_yes: bool = False, check_only: bool = 
     io.say(f"  Your choices are saved ({settings.path()}).")
     io.say("\nAll set. From now on just type:   vmd-agent        (or  vmd-agent ui  for the web page)")
     if pick in (1, 2) and not ready:
-        io.say("(The chat needs the model above to be ready first; the other features work already.)")
+        io.say("(The chat needs the model above to be ready first. To get it later: vmd-agent models --install, or Model in the web page. Everything else works already.)")
     if not assume_yes and io.confirm("\nOpen the web page now? (your files, the chat and whole jobs, in your browser; Ctrl+C in this window stops it)", True):
         from vmd_agent import cli
         cli.main(["ui"])

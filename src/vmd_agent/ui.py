@@ -626,6 +626,8 @@ def main(data_dir: Optional[str] = None, port: int = 0, open_browser: bool = Tru
         say(f"vmd-agent ui: cannot listen on port {port}: {e}")
         return 1
     url = address(srv)
+    if not settings.get("setup_done"):
+        say("First time here? Run  vmd-agent setup  once (it finds VMD, picks your files folder and sets up a model); the page works without it, with fewer things ready.\n")
     say(f"vmd-agent ui is running on this computer only.\n  files folder: {srv.state.root}\n  model: {srv.state.model} @ {srv.state.base_url}\n"   # type: ignore[attr-defined]
         f"\nOpen this address (it has a one-time key):\n  {url}\n\nPress Ctrl+C to stop.")
     if open_browser:

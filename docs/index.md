@@ -6,6 +6,7 @@ The [README](../README.md) is the way in. These pages are the detail, in the ord
 
 | Page | What is in it |
 |---|---|
+| [How it works](guide/how-it-works.md) | the loop from question to answer, routing, the checks, headless VMD against the VMD window |
 | [Why use it](guide/why.md) | what it adds over using VMD and your own scripts: checked answers, statistics, repeatable steps, safe access, whole jobs |
 | [Install and set up](guide/install.md) | the installer, the setup questions, who answers, where everything lives, other ways to install, troubleshooting |
 | [Ways to work](guide/using.md) | the web page, the menu, the chat, the commands; the wall-clock time of every execution |

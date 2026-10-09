@@ -461,3 +461,35 @@ def test_setup_shows_how_each_model_suits_this_computer(monkeypatch):
     io_ = Typed([""])
     wizard.setup_local_model(io_, "linux")
     assert "[fits this computer]" in io_.text and "[too big for this computer]" in io_.text
+
+
+def test_setup_never_makes_a_hidden_data_folder_in_your_home_directory(tmp_path, monkeypatch, bare):
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv(settings.ENV_INSTALL, str(tmp_path / "inst"))
+    monkeypatch.chdir(home)
+    io_ = Typed()
+    assert wizard.step_home(io_) == settings.home_dir() and not (home / ".vmd-agent").exists()
+    assert "--home here" in io_.text                                   # and it says how to keep the data in a project instead
+
+
+def test_after_the_installer_the_default_is_the_installers_folder(tmp_path, monkeypatch, bare):
+    work = tmp_path / "work"
+    work.mkdir()
+    monkeypatch.setenv(settings.ENV_INSTALL, str(tmp_path / "inst"))
+    monkeypatch.chdir(work)
+    wizard.step_home(Typed([""]))                                      # just pressing Enter
+    assert not (work / ".vmd-agent").exists()
+
+
+def test_the_vmd_download_page_is_never_opened_without_a_yes_and_is_offered_only_once(monkeypatch):
+    opened = []
+    monkeypatch.setattr(wizard.webbrowser, "open", lambda u: opened.append(u))
+    from vmd_agent import environment
+    monkeypatch.setattr(environment, "find_vmd", lambda hint=None: None)
+    wizard.step_vmd(Typed(["", ""]))                                  # not found; Enter for the folder; Enter for the page question
+    assert opened == [] and settings.get("vmd_page_offered") is True
+    io_ = Typed(["", "y"])
+    wizard.step_vmd(io_)                                              # a second run does not ask about the page at all
+    assert opened == [] and "Open VMD's download page" not in io_.text

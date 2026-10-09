@@ -38,6 +38,21 @@ Saying no in setup is never final. The choice is saved, and you can download any
 
 Nothing large is fetched without that yes: the Ollama program and each model are confirmed separately, with their sizes.
 
+### Comparing models
+
+A built-in benchmark gives a model 67 plain-language requests across 15 kinds of work (inspecting files, claims, trajectories, VMD measurements, building, maps, rendering, driving the VMD window, video, whole jobs and
+requests that should be declined). Each task has a correct answer worked out from data built to have known properties, and a program grades it ([every prompt and its correct answer](../benchmarks/model-benchmark-tasks.md)).
+
+```bash
+vmd-agent bench models --list --reference          # every prompt and what a correct answer says
+vmd-agent bench models --model granite4.1:8b       # one model on your local server
+vmd-agent bench models --catalogue --pull          # every suggested model, one after another (downloads each into the private Ollama)
+vmd-agent bench models --summarize                 # the comparison: success by model and by kind of work, seconds, tokens
+vmd-agent bench tools                              # every tool on generated data with known answers
+```
+
+More: [the model benchmark](../benchmarks/model-benchmark.md) and [the tool test set](../benchmarks/tool-test-set.md).
+
 ### How the chat keeps a model honest
 
 Language models guess; these checks stop a guess from passing as a measurement.

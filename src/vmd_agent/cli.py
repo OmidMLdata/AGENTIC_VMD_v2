@@ -359,12 +359,13 @@ def _bench(args):
 
 #: the commands, grouped the way a person would look for them (every command must appear exactly once: a test checks)
 GROUPS = [
-    ("1. Set up", ["setup", "doctor", "models", "start"]),
+    ("1. Set up", ["setup", "doctor", "models"]),
     ("2. Ask in plain language", ["ui", "chat", "menu"]),
     ("3. The tool library (every tool, one way to run it)", ["tools", "tool"]),
     ("4. Whole jobs that run several tools and write a report", ["workflow"]),
     ("5. Use Claude Code or Claude Desktop as the assistant instead", ["mcp-config", "mcp-check"]),
     ("6. Benchmarks and cross-checks", ["bench"]),
+    ("7. Docker (advanced)", ["start"]),
 ]
 
 INTRO = """vmd-agent: ask questions about molecular structures and simulations in plain language, and get answers
@@ -406,8 +407,8 @@ def build_parser():
     sp.add_argument("--model", help="the local model to use (default: you are asked)")
     sub.add_parser("menu", help="the friendly menu (also what plain `vmd-agent` opens)")
 
-    sp = sub.add_parser("start", help="start the chat the right way for this computer "
-                        "(detects Linux/macOS/Windows, Docker, GPU, VMD)")
+    sp = sub.add_parser("start", help="Docker route (advanced): start the chat in containers, or natively, "
+                        "after detecting this computer (Linux/macOS/Windows, Docker, GPU, VMD)")
     sp.add_argument("prompt", nargs="*", help="ask once and exit")
     sp.add_argument("--mode", choices=["auto", "docker", "native"], default="auto")
     sp.add_argument("--model", help="model name (default granite4.1:8b)")

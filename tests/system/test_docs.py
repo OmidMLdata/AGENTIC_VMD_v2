@@ -39,12 +39,12 @@ def test_the_tool_counts_in_the_docs_match_the_code():
     page = open(os.path.join(ROOT, "docs", "guide", "tools.md"), encoding="utf-8").read()
     readme = open(os.path.join(ROOT, "README.md"), encoding="utf-8").read()
     names = toolset.library_tools()
-    missing = [n for n in names if f"`{n}`" not in page or f"`{n}`" not in readme]
-    assert not missing, f"tools the page or the README does not list: {missing}"
+    missing = [n for n in names if f"`{n}`" not in page]
+    assert not missing, f"tools the tool page does not list: {missing}"
     total = len(names)
     assert f"one list of {total} tools" in page and f"**{total} tools** in eleven groups" in readme and len(toolset.LIBRARY) == 11
     for group, _what, tools in toolset.LIBRARY:
-        assert f"### {group}" in page and f"**{group}** ({len(tools)})" in readme, group
+        assert f"### {group}" in page, group
     for f in FILES:
         if f.endswith("CHANGELOG.md"):
             continue                                   # the history keeps the old counts
