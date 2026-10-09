@@ -13,12 +13,14 @@
 #
 # Build context is the repository root.
 ARG PYTHON_VERSION=3.11
+# Where the base image comes from: Docker Hub by default; CI uses a mirror of the same official image, because Docker Hub rate-limits shared runners.
+ARG PYTHON_REGISTRY=docker.io/library
 
 # ------------------------------------------------------------------ base ----
 # Everything except VMD. The matplotlib renderer works here, so the toolkit is
 # fully usable (inspection, detection, analysis, claims, keyframes, benchmark,
 # figures) with only open-source software.
-FROM python:${PYTHON_VERSION}-slim AS base
+FROM ${PYTHON_REGISTRY}/python:${PYTHON_VERSION}-slim AS base
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \

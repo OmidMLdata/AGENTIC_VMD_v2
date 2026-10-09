@@ -3,7 +3,7 @@
 The conversation is driven by a list of typed answers (what a person would type); every
 tool the menu then runs is the real one. Nothing here pretends to be Ollama, Claude,
 uv or GitHub: steps that need them are not exercised, and the installers are checked
-statically only. The installers and the Ollama/Claude steps have NEVER been run."""
+statically only here; CI runs both installers on Linux, macOS and Windows runners, and the Claude registration steps have never been run."""
 import io
 import json
 import os
@@ -262,7 +262,7 @@ def test_install_script_parses():
 @pytest.mark.parametrize("name", ["install.sh", "install.ps1"])
 def test_the_installers_are_honest_and_conservative(name):
     s = open(os.path.join(ROOT, "install", name)).read()
-    assert "NEVER RUN" in s                              # says what is unverified
+    assert "STATUS:" in s and "NOT run by hand" in s       # says what is unverified
     assert "astral.sh/uv" in s                           # uv's official installer only
     import re
     assert not re.search(r"^\s*sudo\b", s, re.M)          # never runs sudo itself

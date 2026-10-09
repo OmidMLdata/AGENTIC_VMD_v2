@@ -13,9 +13,9 @@
 #   2. downloads vmd-agent from GitHub as a zip (no Git needed) and installs it with that private uv.
 #   3. writes a launcher <folder>/bin/vmd-agent and starts the guided setup.
 #
-# STATUS: NEVER RUN. uv, GitHub access and a clean machine were not available where this was written.
-# Its syntax is checked by the tests; the uv variables it sets were checked against uv's own installer
-# script and docs. If a step fails, the message says which, and the README lists the manual alternative.
+# STATUS: run from the public address on macOS (Apple Silicon), and by CI from each commit on Ubuntu, macOS and Windows runners (install,
+# `setup --yes`, `doctor`, a tool). NOT run by hand on Linux or Windows, and not with a keyboard attached on any of them (the setup questions).
+# If a step fails, the message says which, and the install page lists the manual alternative.
 set -eu
 
 SOURCE="${VMD_AGENT_SOURCE:-https://github.com/OmidMLdata/AGENTIC_VMD_v2/archive/refs/heads/main.zip}"

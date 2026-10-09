@@ -7,7 +7,7 @@
 # model server with its models. No administrator rights, nothing system-wide, no PATH edits.
 # To remove everything: delete that folder.
 #
-# STATUS: NEVER RUN. No Windows machine, uv or GitHub access was available where this was written.
+# STATUS: run by CI from each commit on a Windows runner (install, `setup --yes`, `doctor`, a tool). NOT run by hand, and not with a keyboard attached (the setup questions).
 $ErrorActionPreference = "Stop"
 $Source = if ($env:VMD_AGENT_SOURCE) { $env:VMD_AGENT_SOURCE } else { "https://github.com/OmidMLdata/AGENTIC_VMD_v2/archive/refs/heads/main.zip" }
 $Python = if ($env:VMD_AGENT_PYTHON) { $env:VMD_AGENT_PYTHON } else { "3.12" }
