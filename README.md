@@ -1,360 +1,176 @@
 # vmd-agent
 
-A toolkit **and a benchmark** for LLM-driven molecular visualization and trajectory analysis (VMD-style workflows):
-an MCP server, CLI and Python library that let an agent inspect, measure, render and verify, plus a benchmark that
-measures how well agents automate these workflows and whether they **fail loudly or silently**.
+You ask a question about a molecular system in ordinary words, and vmd-agent answers it by running real measurements. What's in this file? Has my run settled? Is this statement true? It uses
+[VMD](https://www.ks.uiuc.edu/Research/vmd/) for the measuring and the drawing. A language model sits in the middle: it decides which tools to run, reads what they return, and writes the answer. Any number
+in that answer has to have come from a tool, and if one didn't, it gets sent back or flagged.
 
-> **VMD is optional and not bundled** (UIUC licence). Everything works without it using an open-source
-> renderer. See [NOTICE.md](NOTICE.md) and [docs/TECHNICAL.md](docs/TECHNICAL.md#docker).
+By default the model is a free, open-source one running on your own computer, so nothing leaves your machine. If you'd rather have Claude Code or Claude Desktop do the thinking, you can pick that in setup;
+vmd-agent then just hands them its tools.
 
-## Status
+You need a Mac, Windows or Linux computer and an internet connection. VMD itself is free from UIUC and worth having, because pictures and many of the tools use it. You don't need Python, Git, Docker or an account.
 
-| | |
+## Why use it
+
+* **Answers you can check.** Every number in an answer comes from a tool. A statement about your system, such as "76 residues and the radius of gyration stays below 13 Å", comes back supported, contradicted or "can't tell", with the evidence.
+* **Statistics on top of VMD.** Convergence tests with effective sample sizes, careful wording ("no drift detected" is not "converged"), and key frames chosen where something changes. Where it matters, VMD and the toolkit each measure and the report says whether they agree.
+* **Everything can be repeated.** Each VMD step saves its exact Tcl, and a whole-job report records input checksums, methods and caveats.
+* **A safe way to let a model near VMD.** A fixed set of validated commands, a files-folder sandbox and a loopback-only link, with no raw Tcl or shell handed over.
+* **One place for the whole toolbox,** from fetching and converting to building systems, fitting cryo-EM maps and writing NAMD and SLURM files, reachable from a web page, a chat, scripts and MCP clients.
+* **A real VMD.** It drives the window you can see, and every picture is VMD's own.
+
+More: [Why use vmd-agent](docs/guide/why.md).
+
+## Install
+
+Open a terminal (on a Mac, press `Cmd` + `Space` and type `Terminal`; on Windows, search the Start menu for `PowerShell`), paste one line, and answer a few questions.
+
+Mac or Linux:
+
+```bash
+curl -LsSf https://raw.githubusercontent.com/OmidMLdata/AGENTIC_VMD_v2/main/install/install.sh | sh
+```
+
+Windows (PowerShell):
+
+```powershell
+powershell -ExecutionPolicy Bypass -c "irm https://raw.githubusercontent.com/OmidMLdata/AGENTIC_VMD_v2/main/install/install.ps1 | iex"
+```
+
+The installer puts the program in one folder (`~/vmd-agent`) and needs no administrator rights. Setup then finds VMD and starts it once to make sure it runs, asks for a files folder (the agent can only
+see that folder), and asks who should answer your questions: a free model on your computer (recommended), an online service, Claude Code or Desktop, or nobody. Nothing big is downloaded without asking first.
+The details are in [Install and set up](docs/guide/install.md).
+
+If you'd rather keep everything, including the model, inside your project folder, `vmd-agent setup --home here` creates a `.vmd-agent` folder there and offers to move an existing model into it.
+Git ignores that folder.
+
+`vmd-agent doctor` shows what it found on your computer (system, memory, graphics card, VMD, Ollama) and what to do next.
+
+## Using it
+
+There are four ways in, and they all use the same tools.
+
+* **The web page** (`vmd-agent ui`) is a remote control for a real VMD window. It's laid out like VMD, with a molecule list, a representations editor, animation controls and a console, and the picture in the
+  middle is VMD's own. Alongside it you get the chat, a form for every tool, a tab for whole jobs, and a terminal for developers.
+* **The menu** (`vmd-agent`) is a numbered list in plain words: look at a structure, analyse a simulation, check a statement.
+* **The chat** (`vmd-agent chat`) is the same conversation in the terminal.
+* **The command line** (`vmd-agent tool NAME ...`) runs any single tool without a model, which is handy for scripts.
+
+Put your structure and trajectory files in your files folder and ask for them by name: *"What is in protein.pdb?"*, *"Has my run settled? Use run.psf and run.dcd."*, *"Which salt bridges persist?"*,
+*"Build a solvated, neutral system from 1ubq.pdb."*
+
+```bash
+vmd-agent tools                                                          # the library, in groups
+vmd-agent tool fetch_structure 1UBQ --out pdbs                           # download a structure
+vmd-agent tool analyze_trajectory run.psf run.dcd --analyses rmsd rgyr   # measure a simulation
+vmd-agent tool verify_claims my.pdb "It has 4 disulfide bridges"         # check a statement against the data
+vmd-agent tool measure_with_vmd run.pdb run.dcd --kind rgyr              # one of VMD's own measurements
+vmd-agent workflow equilibration_check run.psf run.dcd                   # a whole job, with a report
+```
+
+### Driving your VMD window
+
+The agent can work the VMD window you're looking at: load a system, draw it as a cartoon or a surface, colour it, zoom to the ligand, step through frames, ask what a selection contains, take a picture. Every
+picture and number comes from VMD. A small script inside VMD listens on your own machine only and accepts a short, fixed list of commands, none of which runs arbitrary Tcl. Many analysis tools also take
+`show_in_window`, which draws their result in that window afterwards (the salt bridges as licorice, a fitted model inside its map, and so on). [How it works](docs/guide/window.md).
+
+## The tools
+
+There are **57 tools** in eleven groups. A tool does one thing, and each one is available to the chat, to MCP clients and to `vmd-agent tool NAME`. [Every tool, what it does, and whether it needs VMD](docs/guide/tools.md).
+
+| Group | Tools |
 |---|---|
-| **Toolkit** | loads PDB/mmCIF/PSF/DCD/XTC, classifies systems, measures structure and dynamics, renders figures, detects damaged data, verifies statements; sandboxed MCP server. Its measurements are checked against independent implementations by procedures you can run yourself (see **How to run**). |
-| **Automation benchmark** | *can an LLM agent carry out analysis and visualization workflows correctly, and say so when it cannot?* Six task families with answers known by construction; arms compare tool access (plain Python, plain VMD, this toolkit, ablations); scored on success and **silent errors**. |
-| **Results** | **None are included.** This repository ships no measured results, no benchmark scores and no model evaluations. Everything is produced by running the commands below on your own data. |
+| **Look at this computer and your files** (4) | `probe_environment` · `inspect_files` · `detect_system` · `structure_stats` |
+| **Get a structure** (2) | `search_pdb` · `fetch_structure` |
+| **Draw** (10) | `visualize_and_interpret` · `render_image` · `render_movie` · `annotate_image` · `view_image` · `generate_visualization_recipe` · `list_representations` · `color_key` · `export_session` · `run_tcl` |
+| **Control your VMD window** (13) | `window_open` · `window_load` · `window_molecules` · `window_representation` · `window_display` · `window_view` · `window_animate` · `window_query` · `window_snapshot` · `window_scene` · `window_visualize` · `window_movie` · `window_save` |
+| **Measure a simulation** (4) | `analyze_trajectory` · `measure_with_vmd` · `select_keyframes` · `periodic_box` |
+| **Interactions and structure quality** (5) | `find_interactions` · `secondary_structure` · `backbone_torsions` · `check_structure` · `align_structures` |
+| **Convert and write files** (2) | `convert_trajectory` · `write_structure` |
+| **Density maps (cryo-EM and more)** (4) | `make_map` · `inspect_map` · `combine_maps` · `fit_to_map` |
+| **Build and prepare a simulation** (7) | `build_system` · `mutate_residue` · `merge_structures` · `build_membrane` · `build_nanotube` · `prepare_namd` · `write_slurm_script` |
+| **Video** (2) | `probe_video` · `interpret_video` |
+| **Evidence and records** (4) | `verify_claims` · `record_visual_interpretation` · `assemble_report` · `verify_provenance` |
 
-Not verified by the author: real VMD (none was available, so tests that need it are marked `requires_vmd` and are
-**skipped, not passed**, where VMD is absent), the Docker images, any live model, any real MCP client. The benchmark
-should not be run by the same model that wrote it. `vmd-agent` is **one entrant** in the benchmark, not the presumed
-winner. The study design is in [docs/PAPER.md](docs/PAPER.md) and the draft analysis plan in
-[docs/PREREGISTRATION.md](docs/PREREGISTRATION.md).
+In plain terms, they cover:
 
-## How to run
+* **Understanding a structure:** what it contains (chains, ligands, water, ions, lipids, nucleic acids), bonds, disulfides, hydrogen bonds, secondary structure, chirality and chain gaps, and pictures from several angles with a legend.
+  Structures can come from your files, the PDB, AlphaFold or a URL.
+* **Measuring a simulation:** RMSD, RMSF, radius of gyration, contacts, hydrogen bonds, distances, surface area and density, with tests for whether a run has converged, and keyframes picked from where something
+  actually happens. You can also check a written statement against the data and get back supported, contradicted or "can't tell", with the evidence.
+* **Running VMD itself:** its `measure` commands, trajectory conversion, density maps, solvated CHARMM36 systems, mutations, membranes, nanotubes, rendered scenes and movies, and NAMD and SLURM files. Each tool that
+  runs VMD saves the exact Tcl it used, so you can repeat it in your own VMD. [More on VMD](docs/guide/vmd.md).
+* **Videos and records:** read a video's real metadata, pull stills and map them back to simulation frames, re-check recorded hashes, and put a report together from a session.
 
-### 1. Install
+## Whole jobs
 
-```bash
-git clone https://github.com/OmidMLdata/AGENTIC_VMD_v2.git && cd AGENTIC_VMD_v2
-python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"            # core + tests. Python >= 3.9
-pip install -e ".[server]"         # + the MCP server (Python >= 3.10; mcp 1.x and 2.x both work)
-pip install -e ".[bench]"          # + the Anthropic SDK, to run a model on the benchmark
-pip install mdtraj                 # optional: independent DSSP for `validate-dssp`
-pip install -e ".[all]"            # everything above (Python >= 3.10)
-```
+A workflow isn't a tool. It runs several tools in a fixed order, grades what it finds (ok, note, warning, problem), gives a verdict, and writes `report.md` and `report.html` with the figures, every caveat the tools
+raised, the SHA-256 of your input files and the Tcl of each VMD step. The agent reaches all six through one call, `run_workflow`; from a terminal it's `vmd-agent workflow NAME FILE ...`.
+[Workflows](docs/guide/workflows.md).
 
-VMD is **optional** and never bundled. For VMD rendering and the plain-VMD benchmark arm, install it yourself from
-UIUC, then `export VMD_BIN=/path/to/vmd` (a launcher or its install directory). `vmd-agent probe` shows what was found.
-
-### 2. Run the tests
-
-```bash
-pytest -rs
-```
-
-Tests that need something the machine lacks are skipped with the reason shown (`requires_vmd`, `requires_ffmpeg`,
-`requires_mcp`, `requires_network`, `requires_api`). **A skip means "not verified here", not "passed".** Run only the
-real-VMD tests with `pytest -m requires_vmd -rs`. Live model tests spend a few cents and need
-`VMD_AGENT_LIVE_TESTS=1` and `ANTHROPIC_API_KEY`.
-
-### 3. Use the toolkit
-
-```bash
-vmd-agent probe                                              # what this machine can do
-vmd-agent visualize tests/data/1ubq.pdb --renderer matplotlib --views front iso
-vmd-agent claims tests/data/1lyz.pdb "It has 4 disulfide bridges" "It has a membrane"
-vmd-agent analyze system.psf traj.dcd --do rmsd rmsf rgyr contacts convergence --dt-ps 400
-vmd-agent keyframes system.psf traj.dcd -k 9 --render
-```
-
-MCP server: see [MCP server](#mcp-server) below; `vmd-agent mcp-check` verifies an install.
-
-### 4. Reproduce the validation checks
-
-Each command computes its numbers locally from your files and prints them. Nothing is stored in the repository.
-
-```bash
-# analysis vs independent NumPy, on any topology + trajectory
-vmd-agent validate system.pdb traj.dcd --sel2 "resname LIG" --cutoff 6
-
-# built-in DSSP vs the PDB's own annotations (and vs MDTraj if installed); downloads the entries
-vmd-agent validate-dssp 1CRN 1MBN 2LZM 1UBQ --cache pdb_cache
-
-# event-aware vs uniform keyframes on YOUR real trajectory, with injected events, plus a no-event control
-vmd-agent bench events top.pdb traj.dcd --trials 100 --frames 300 -k 9 --seed 0
-vmd-agent bench sampling --n-frames 1000 -k 9 --trials 200          # idealised AR(1) version
-
-# novel-structure generator checked against its own design (prints agreement per property)
-vmd-agent bench synth 100 --out synth --seed 1
-```
-
-The generator is **not reproducible across machines from the seed alone** (floating-point differences between NumPy
-builds change discrete choices). Keep the generated files; `design.json` records a SHA-256 for each.
-
-### 5. Run the automation benchmark
-
-```bash
-# a. tasks with answers known by construction (use your own trajectories; one is not enough for statistics)
-vmd-agent bench agent-suite --out suite --seed 100 \
-    --base top1.pdb traj1.dcd --base top2.pdb traj2.dcd --structures real/*.pdb --synthetic-dir synth
-
-# b. prove the setup before spending anything: VMD, selection scoring, sandbox, key
-vmd-agent bench agent-preflight --suite suite --arms vmd_agent python_mdanalysis vmd_plain \
-    --allow-exec --model anthropic:<model-id>              # add --live-api for one tiny real call
-
-# c. scripted baselines: no model, no network. They check the scorers; they are not model results
-vmd-agent bench agent-run --suite suite --baselines oracle sloppy reference --out-dir out_baselines
-
-# d. estimate cost (calls no model; no prices are built in)
-vmd-agent bench agent-plan --suite suite --labels 6 --repeats 3 --price-in <USD/M tokens> --price-out <USD/M tokens>
-
-# e. a real model (needs ANTHROPIC_API_KEY). python/Tcl arms run model-written code: use a container or VM
-vmd-agent bench agent-run --suite suite --model anthropic:<model-id> \
-    --arms vmd_agent vmd_agent_no_verify python_mdanalysis vmd_plain --allow-exec --repeats 3 --out-dir out
-```
-
-Outputs in `--out-dir`: `records.jsonl` (every run), `summary.md` and `summary.json`, `manifest.json` (versions, VMD,
-renderer, container flag, suite hash; no secrets). Every run uses a fresh copy of its task workspace, and the runner
-refuses a suite whose files changed.
-
-**In Docker with your own VMD** (VMD is never baked into an image you could publish):
-
-```bash
-export ANTHROPIC_API_KEY=...                     # a dedicated key with a spending limit
-export DATA_DIR=$PWD/data                        # your trajectories; the suite and outputs go here too
-MODE=withvmd docker/bench.sh preflight --arms vmd_agent python_mdanalysis vmd_plain --allow-exec --model anthropic:<id>
-MODE=withvmd docker/bench.sh suite --out /data/suite --seed 100 --base /data/top.pdb /data/traj.dcd --structures /data/real/*.pdb
-MODE=withvmd docker/bench.sh run --suite /data/suite --out-dir /data/out --repeats 3 --allow-exec --model anthropic:<id> --arms vmd_agent python_mdanalysis
-```
-
-`MODE=withvmd` builds VMD from a **Linux** tarball you place in `docker/vmd-dist/`; `MODE=hostvmd VMD_HOME=...` mounts a
-Linux install. A Mac's VMD.app cannot run in a Linux container (run natively instead). Details:
-[docs/TECHNICAL.md](docs/TECHNICAL.md#running-the-benchmark-with-your-vmd-and-your-key).
-
-### 6. Run the grounding component study
-
-```bash
-vmd-agent bench run real/*.pdb --synthetic-dir synth --dry-run --repeats 3 --price-in <USD/M> --price-out <USD/M>
-vmd-agent bench run real/*.pdb --synthetic-dir synth --model anthropic:<model-id> --out-dir out_grounding --repeats 3
-vmd-agent bench run real/*.pdb --model stats-reader --renderer matplotlib --out-dir out_offline   # offline control, no key
-```
-
-### 7. Before a confirmatory run
-
-Fill the `TODO` fields in [docs/PREREGISTRATION.md](docs/PREREGISTRATION.md), freeze the toolkit version, generate the
-suite from data not used in development, **deposit the generated suite directory**, tag and file the plan, and only then
-run the model. The model that wrote the benchmark must not run it or analyse its results.
-
-## Repository layout
-
-```
-.
-├── src/vmd_agent/
-│   ├── cli.py · server.py · auto.py       entry points; one-call pipelines
-│   ├── environment.py · security.py       host probing; path sandbox, Tcl screen, URL policy
-│   ├── inputs/      molio (native mmCIF) · fetch · inspection
-│   ├── structure/   detect · stats · dssp
-│   ├── dynamics/    analysis · timeseries · keyframes
-│   ├── visual/      recipes · representations · colorkey · annotate · render · renderers/(vmd, mpl)
-│   ├── evidence/    claims · validation · provenance · media · report
-│   └── bench/       automation benchmark: agent/{suite · tools · agents · scoring · runner}
-│                    grounding study: truth · questions · conditions · models · scorer · runner
-│                    shared: synth · events · sampling · rating_study
-├── tests/           mirrors src/: inputs/ structure/ dynamics/ visual/ evidence/ bench/ surfaces/ system/
-│   └── data/        4 real PDBs, a real 20 ns ubiquitin MD (50 frames), a synthetic sample system
-├── docs/            PAPER · TECHNICAL (architecture, methods, security, Docker) · PREREGISTRATION (draft) · history/
-├── docker/          Dockerfile · docker-compose.yml · entrypoint · install_vmd.sh · vmd-dist/ (your VMD tarball)
-├── .github/workflows/ci.yml
-└── pyproject.toml · LICENSE · NOTICE.md · CHANGELOG.md
-```
-
-The subpackages follow the pipeline: **inputs → structure → dynamics → visual → evidence**, with
-`bench/` on top. Details in [docs/TECHNICAL.md](docs/TECHNICAL.md#architecture).
-
-## What it does
-
-| Capability | VMD needed? | Notes |
+| Workflow | Files | What it does |
 |---|---|---|
-| Inspect files, flag missing companions (DCD without PSF…) | no | |
-| Load PDB / PSF / GRO / XTC / DCD / … **and mmCIF** | no | mmCIF read natively (MDAnalysis cannot) |
-| Detect components + system type, integrity checks | no | |
-| Bonds, disulfides, **angle-based H-bonds**, salt bridges, **DSSP** | no | each result states *how* it was obtained |
-| Tailored VMD/Tcl recipes, 12-representation catalogue, focus modes | no | |
-| Render views | **optional** | VMD+Tachyon or **matplotlib** (open source) |
-| Render movies | VMD + ffmpeg | one VMD session, fixed camera |
-| Trajectory analysis (RMSD, RMSF, Rg, H-bonds, contacts, distance, SASA, density, convergence) | no | autocorrelation-aware statistics, honest time axes, PBC diagnostics |
-| Event-aware keyframe selection | no | change points instead of uniform stills |
-| Claim verification | no | supported / contradicted / unverifiable / unparsed |
-| Video probing, decode check, QC, still→source-frame mapping | ffmpeg | evidence, never "I watched it" |
-| Provenance records (versions, hashes, exact Tcl) | no | `vmd-agent provenance <dir>` re-verifies |
-| Automation benchmark: task suite with known answers, tool arms, scorers, runner, cost planner | no | [docs/PAPER.md](docs/PAPER.md#5-the-automation-benchmark) |
-| Grounding component study: truth, conditions, scorer, novel structures | no | [docs/PAPER.md](docs/PAPER.md#appendix-e-grounding-study-specification) |
-| Validation: vs NumPy; DSSP vs PDB annotations and MDTraj | no | `vmd-agent validate`, `validate-dssp` |
+| `structure_overview` | structure | what's in it and whether it's in good shape: composition, torsions, chirality, gaps, pictures |
+| `equilibration_check` | topology, trajectory | has the run settled: RMSD and size convergence, periodic box, two engines compared |
+| `interaction_report` | topology, trajectory | hydrogen bonds and salt bridges (and contacts with a partner group), as how often each is present |
+| `compare_runs` | topology, two trajectories | RMSD, size and fluctuation of two runs side by side |
+| `prepare_simulation` | structure | check the input, build a solvated neutral CHARMM36 system, write NAMD and SLURM files |
+| `cryoem_fit` | model, map | fit a model into a cryo-EM map, with a picture and a session for VMD |
 
-## The agent loop
+## How the agent works
 
-1. `probe_environment` → pick a renderer (`vmd` or `matplotlib`).
-2. `inspect_files` → `detect_system` → `structure_stats`.
-3. `visualize_and_interpret` / `fetch_and_visualize` → a **grounded package**: images, a legend tying every colour to a
-   detected component, colour keys, statistics, a what-to-look-for checklist, renderer caveats, provenance.
-4. `view_image` each image, then write the interpretation.
-5. `analyze_trajectory` (+ `select_keyframes`, `interpret_video`) for dynamics.
-6. **`verify_claims`** on your own write-up. Unparsed sentences were not checked.
-7. `record_visual_interpretation` → `assemble_report`.
+One module runs the model, the tools and the checks, and every front end sits on top of it, so the chat, the web page and the benchmark behave alike.
 
-## MCP server
+* **Routing.** By default (`--tools auto`) the model is offered only the tools that fit your question, plus a way to ask for more. A small model's context is limited, and all 57 descriptions take most of it.
+  `--tools all` offers everything. [Which tools a model sees](docs/guide/tools.md#does-the-model-see-all-of-them-at-once).
+* **Argument repair.** If the model writes a number as text, `RMSD` instead of `rmsd`, or a file name without its folder, that's fixed when there's only one sensible reading, and the result says so.
+* **The guard.** A data question answered without a tool is sent back once. An answer containing a number no tool returned is sent back once, then flagged. Requests that can't be answered are declined, not guessed.
+* **Timing.** Every model call and every tool call shows how long it took.
+* **MCP.** The same tools work as an MCP server for Claude Code, Claude Desktop or any other client. [MCP clients](docs/guide/mcp.md).
 
-The MCP server exposes the 27 tools below to an MCP client (Claude Code, Claude Desktop, or any other) over stdio. This
-section is everything needed to run it on a **Linux machine that has VMD installed**.
+More in [the architecture notes](docs/reference/architecture.md#the-agent-and-what-surrounds-the-model).
 
-### 1. What the Linux machine needs
+## Choosing a model
 
-| Need | Detail | Required? |
-|---|---|---|
-| **Python >= 3.10** | `python3 --version`. The MCP SDK needs it; the rest of the toolkit also runs on 3.9. | yes |
-| **The toolkit with the server extra** | `python3 -m venv ~/vmd-agent-venv && ~/vmd-agent-venv/bin/pip install -e ".[server]"` (add `.[sasa]` for SASA analysis). Both MCP SDK generations (1.x and 2.x) are supported. | yes |
-| **A data directory** | everything the agent reads or writes must be inside it (see the sandbox below) | yes |
-| **VMD** | for VMD renders. Without it the server still works and draws with the built-in matplotlib renderer. | optional |
-| `tcsh` and VMD's shared libraries | VMD's `vmd` launcher is a tcsh script, and the binary links OpenGL/X11 libraries even when run headless. `docker/Dockerfile` lists the Debian packages used for this (`tcsh libgl1 libglu1-mesa libx11-6 libxi6 libxinerama1 libxft2 libfontconfig1 libxext6 libxrender1`). That list is **untested against a real VMD**. | only with VMD |
-| **Tachyon** | ships inside a VMD install (`tachyon_LINUXAMD64` or similar). The VMD renderer needs it to make images. | only with VMD |
-| `ffmpeg` | only for the movie and video tools (`render_movie`, `probe_video`, `validate_video`, `interpret_video`, `extract_video_frames`) | optional |
-| Outbound HTTPS | only for `fetch_structure`, `fetch_and_visualize` and `search_pdb` (RCSB, UniProt, AlphaFold) | optional |
-
-No display is needed: VMD is always run headless (`-dispdev text`).
-
-### 2. Check the install before connecting a client
-
-Run these **as the same user the server will run as**:
+Models differ a lot in how well they use tools. There's a built-in benchmark that gives a model 67 plain-language requests across 15 kinds of work (inspecting files, claims, trajectories, VMD measurements,
+building, maps, rendering, driving the VMD window, video, whole jobs and requests that should be declined). Each task has a correct answer worked out from data built to have known properties, and a program grades it.
+See [every prompt and its correct answer](docs/benchmarks/model-benchmark-tasks.md). The suggested models are listed in [Models](docs/guide/models.md).
 
 ```bash
-~/vmd-agent-venv/bin/vmd-agent probe          # does this machine have VMD, Tachyon, ffmpeg, the libraries?
-~/vmd-agent-venv/bin/vmd-agent mcp-check --roots /srv/md-data --vmd /opt/vmd/bin/vmd --render
+vmd-agent bench models --list --reference          # every prompt and what a correct answer says
+vmd-agent bench models --model granite4.1:8b       # one model on your local server
+vmd-agent bench models --catalogue --pull          # every suggested model, one after another (downloaded into the private Ollama)
+vmd-agent bench models --summarize                 # the comparison: success by model and by kind of work, seconds, tokens
+vmd-agent bench tools                              # every tool on generated data with known answers
 ```
 
-`mcp-check` starts the server and talks to it with the real MCP client over stdio, which is what your client will do. It
-gives the server **only** the environment you pass it (MCP clients typically do not forward your shell's exports or
-`PATH`, and the SDK's own client does not), so a variable that works in your terminal but is missing from the client's
-configuration shows up here. It reports:
-`connect` (the server starts and speaks MCP), `tools` (27 registered), `analysis_libraries`, `vmd` and `tachyon` (found?
-which version?), `ffmpeg`, the sandbox (a path outside the roots is refused; relative paths resolve inside the first root),
-whether the raw Tcl tool is disabled, and with `--render` a real VMD + Tachyon render of a tiny structure. `FAIL` means a
-client cannot work; `WARN` means reduced capability or a risk (no VMD, no sandbox). Exit code 2 on any `FAIL`.
+More: [the model benchmark](docs/benchmarks/model-benchmark.md) and [the tool test set](docs/benchmarks/tool-test-set.md).
 
-### 3. Connect a client
+## Safety
 
-The server command is the console script `vmd-agent-server` in the virtualenv (use its **absolute path**; a client does
-not activate your virtualenv). Do not assume your shell's environment reaches the server; **list the variables you
-need in the client's configuration**:
+The agent can only read and write inside your files folder, and it can't touch its own settings folder at all. Tcl is never taken from a caller: each VMD command builds its script from validated values and
+runs it headless, with a cleaned environment and a time limit. The free-form Tcl tool is off unless you switch it on. Downloads are limited to the sources you name, and the private model server is checked against its
+published checksum before it runs. [Security](docs/reference/security.md).
 
-* `VMD_AGENT_ALLOWED_ROOTS`: the directory (or several, separated by `:`) the agent may read and write. **Set it.**
-* `VMD_BIN`: your VMD launcher or install directory. Without it the server looks on `PATH` and a few common locations;
-  do not rely on that.
+## What's in this repository
 
-**a. Claude Code on the same Linux machine**
-
-```bash
-claude mcp add vmd-agent \
-  -e VMD_BIN=/opt/vmd/bin/vmd -e VMD_AGENT_ALLOWED_ROOTS=/srv/md-data \
-  -- /home/you/vmd-agent-venv/bin/vmd-agent-server
 ```
-
-(Check `claude mcp add --help` for your version's exact flags; then `claude mcp list` should show it connected.)
-
-**b. A client on another machine (for example Claude Desktop on your laptop), over SSH**
-
-The server runs on the Linux machine; the client starts it through `ssh`. Use key-based, non-interactive SSH, and make
-sure the remote shell prints **nothing** on login (no banners, no output from `.bashrc`): anything written to stdout other
-than MCP messages corrupts the connection. (The SSH route and the `claude mcp add` flags have **not been tested by the
-author**; `mcp-check --command ssh --args -T you@linux-host "<remote command>"` tests the same path.)
-
-```json
-{ "mcpServers": { "vmd-agent": {
-    "command": "ssh",
-    "args": ["-T", "you@linux-host",
-             "env VMD_BIN=/opt/vmd/bin/vmd VMD_AGENT_ALLOWED_ROOTS=/srv/md-data /home/you/vmd-agent-venv/bin/vmd-agent-server"] } } }
+src/vmd_agent/     the package: the agent, the tools, the VMD wrappers (vmdkit/), analysis, drawing, the web page, the benchmarks
+install/           the one-line installers (install.sh for Mac and Linux, install.ps1 for Windows)
+docker/            Dockerfile, compose files and helpers for the container routes
+docs/              the manual: guide/ (using it), benchmarks/ (choosing a model), reference/ (architecture, methods, security, research), CHANGELOG and NOTICE
+tests/             the test suite, laid out like the package
+.github/           CI
 ```
-
-**c. Any client on the same machine (JSON config)**
-
-```json
-{ "mcpServers": { "vmd-agent": {
-    "command": "/home/you/vmd-agent-venv/bin/vmd-agent-server",
-    "env": { "VMD_BIN": "/opt/vmd/bin/vmd", "VMD_AGENT_ALLOWED_ROOTS": "/srv/md-data" } } } }
-```
-
-**d. In Docker with your VMD mounted** (Linux host, VMD build matching the image architecture; the image has no VMD of
-its own). Build the `vmd-libs` image first (see [docs/TECHNICAL.md](docs/TECHNICAL.md#docker)); **never built or run by the
-author**:
-
-```json
-{ "mcpServers": { "vmd-agent": { "command": "docker",
-    "args": ["run", "-i", "--rm", "--read-only", "--tmpfs", "/tmp", "--tmpfs", "/home/vmdagent", "--cap-drop", "ALL",
-             "-v", "/srv/md-data:/data", "-v", "/opt/vmd:/opt/vmd:ro", "-e", "VMD_BIN=/opt/vmd/bin/vmd",
-             "vmd-agent:hostvmd"] } } }
-```
-
-Inside the container the data directory is `/data` and the sandbox is already set to it. Without VMD, use the plain
-`vmd-agent` image and drop the VMD lines.
-
-### 4. How the server behaves
-
-* **The sandbox.** With `VMD_AGENT_ALLOWED_ROOTS` set, every path a tool receives (inputs *and* output directories) must
-  resolve inside one of the roots, with symlinks, `..` and prefix tricks resolved. **A relative path is taken relative
-  to the first root**, not to the server's working directory, so a tool's default output directory (`vmd_agent_output`)
-  lands inside it. **With it unset the sandbox is off** and the server prints a warning to stderr.
-* **`run_vmd_tcl` is disabled** (it returns a refusal) unless the server environment has `VMD_AGENT_ENABLE_TCL=1`. The
-  Tcl screen is an accident guard, not a security boundary: enable it only for a client and agent you trust.
-* **Downloads** refuse non-http(s) URLs and loopback/private/link-local hosts (also after redirects). Optional:
-  `VMD_AGENT_ALLOW_PRIVATE_URLS=1` for an internal mirror, `VMD_AGENT_MAX_DOWNLOAD_MB` for the size cap.
-* **Renderers.** `renderer="auto"` uses VMD when it and Tachyon are found, otherwise matplotlib; every result says which
-  drew the pictures. `view_image` returns images, so the client must support image content.
-* **Logs** go to stderr only; stdout is the protocol stream. If you wrap the server in your own script, print nothing to
-  stdout.
-
-### 5. Troubleshooting
-
-| Symptom | Likely cause and fix |
-|---|---|
-| client says the server exited / will not connect | run the exact command by hand and read stderr; usual causes: Python < 3.10, `mcp` not installed in *that* environment, or a relative or wrong path to `vmd-agent-server`. `mcp-check --command <your command>` tests the same command. |
-| tool results say `vmd_found: false` | `VMD_BIN` is not in the **client's** `env` block. Your shell's `PATH` and exports may not be forwarded. |
-| `path ... is outside the allowed roots` | the path (or an output directory) is not under `VMD_AGENT_ALLOWED_ROOTS`; use a path inside it, or add the directory to the roots. |
-| renders fall back to "matplotlib" though VMD is installed | Tachyon was not found next to VMD, or VMD does not run headless here (missing `tcsh` or libraries). `vmd-agent probe` shows `tachyon_path`; try `vmd -dispdev text -eof` by hand. |
-| `VMD did not produce a Tachyon scene` | VMD started but failed: run `mcp-check --render`, then run VMD by hand with a small script. Use `renderer="matplotlib"` meanwhile. |
-| the connection works over SSH for a while, then breaks | something on the remote side wrote to stdout (login banner, `.bashrc` output). Make the remote shell silent. |
-| movies or video tools fail | `ffmpeg` is not on the server's `PATH` (the client may not forward yours; set `PATH` in its `env` block). |
-
-27 tools: `probe_environment` · `inspect_files` · `detect_system` · `generate_visualization_recipe` · `structure_stats` ·
-`color_key` · `annotate_image` · `list_representations` · `describe_representation` · `render_image` · `render_movie` ·
-`run_vmd_tcl` · `search_pdb` · `fetch_structure` · `fetch_and_visualize` · `visualize_and_interpret` ·
-`analyze_trajectory` · `select_keyframes` · `verify_claims` · `verify_provenance` · `extract_video_frames` ·
-`probe_video` · `validate_video` · `interpret_video` · `view_image` · `record_visual_interpretation` · `assemble_report`.
-
-## CLI
-
-```bash
-vmd-agent probe | renderers
-vmd-agent inspect|detect|stats system.psf [--traj traj.dcd]
-vmd-agent show 1UBQ [--renderer matplotlib]                 # fetch + render + interpret
-vmd-agent visualize system.psf --traj traj.dcd --renderer auto
-vmd-agent analyze system.psf traj.dcd --do rmsd rmsf rgyr contacts convergence [--unwrap] [--dt-ps 400]
-vmd-agent keyframes system.psf traj.dcd -k 9 --sel2 "resname LIG" [--render]
-vmd-agent claims system.pdb "The ligand is buried" "It has 4 disulfide bridges"
-vmd-agent validate system.psf traj.dcd --sel2 "resname LIG"
-vmd-agent validate-dssp 1CRN 1MBN 2LZM --cache pdb_cache
-vmd-agent provenance ./vmd_agent_output
-vmd-agent bench agent-suite|agent-preflight|agent-run|agent-plan ...   # automation benchmark
-vmd-agent bench truth|run|synth|events|sampling|rating-sheet|rating-summary ...   # grounding study
-vmd-agent report ./session --out report.md
-```
-
-## Renderers
-
-| Backend | Needs | Strength | Limits |
-|---|---|---|---|
-| `vmd` | your VMD install (+ Tachyon) | publication quality, all focus modes | not bundled; licence |
-| `matplotlib` | nothing extra | always available; VMD palette so legends stay true | backbone **trace** (not ribbons), no occlusion or shading, no surface/pocket modes |
-
-`renderer="auto"` uses VMD when present, otherwise matplotlib. Every package says which renderer drew the
-images and lists its caveats; the legend is generated from what that renderer actually drew.
 
 ## Documentation
 
-[PAPER](docs/PAPER.md) (the whole study as a research paper; appendices hold the research-question map, the grounding-study
-specification and the verification record) ·
-[PREREGISTRATION](docs/PREREGISTRATION.md) (draft analysis plan) ·
-[TECHNICAL](docs/TECHNICAL.md) ([architecture](docs/TECHNICAL.md#architecture), [methods](docs/TECHNICAL.md#methods), [security](docs/TECHNICAL.md#security), [Docker](docs/TECHNICAL.md#docker)) ·
-[CHANGELOG](CHANGELOG.md) · [changes from the original project](docs/history/CHANGES_FROM_ORIGINAL.md)
+[All the pages](docs/index.md): [Why use it](docs/guide/why.md) · [Install and set up](docs/guide/install.md) · [Ways to work](docs/guide/using.md) · [The command line](docs/guide/commands.md) · [Models](docs/guide/models.md) ·
+[Whole jobs](docs/guide/workflows.md) · [VMD](docs/guide/vmd.md) · [Your VMD window](docs/guide/window.md) · [The tool library](docs/guide/tools.md) · [MCP clients](docs/guide/mcp.md) · [Docker](docs/guide/docker.md) ·
+[The model benchmark](docs/benchmarks/model-benchmark.md) · [Development](docs/reference/development.md) · [Architecture](docs/reference/architecture.md) · [Methods](docs/reference/methods.md) ·
+[Security](docs/reference/security.md) · [Research paper](docs/reference/RESEARCH.md) · [Changelog](docs/CHANGELOG.md)
 
-MIT licence ([LICENSE](LICENSE)). Third-party notes, including **VMD and MDAnalysis (GPL)**: [NOTICE.md](NOTICE.md).
+## Contributing
+
+`pip install -e ".[dev]"`, then `ruff check src tests`, `vulture` and `pytest -rs`. See [Development](docs/reference/development.md).
+
+MIT licence ([LICENSE](LICENSE)). Third-party notes, including **VMD and MDAnalysis (GPL)**: [NOTICE](docs/NOTICE.md).

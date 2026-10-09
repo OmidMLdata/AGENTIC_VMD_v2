@@ -14,7 +14,7 @@ Changes from the first version
   trajectory each time, and reset the camera per frame so the movie jittered.
 * ``render_frames`` renders an arbitrary list of frames the same way and backs
   the event-aware keyframe feature.
-* ``run_vmd_tcl`` screens scripts through :mod:`vmd_agent.security`.
+* ``run_tcl`` screens scripts through :mod:`vmd_agent.security`.
 """
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from typing import Optional, Sequence
 
-from vmd_agent.environment import find_vmd, find_tachyon, vmd_runtime_env
+from vmd_agent.environment import find_ffmpeg, find_vmd, find_tachyon, vmd_runtime_env
 from vmd_agent.inputs.inspection import _HAS_COORDS
 from vmd_agent.visual.recipes import generate_visualization_recipe, _mtype
 from vmd_agent import security
@@ -293,7 +293,7 @@ def count_frames(topology: str, trajectory: Optional[str]) -> int:
 
 
 # ------------------------------------------------------------------ raw Tcl
-def run_vmd_tcl(script: str, vmd_path: Optional[str] = None,
+def run_tcl(script: str, vmd_path: Optional[str] = None,
                 timeout: int = 900, allow_unsafe: Optional[bool] = None,
                 cwd: Optional[str] = None, env: Optional[dict] = None) -> dict:
     """Execute a Tcl script in headless VMD and capture output.
@@ -513,7 +513,7 @@ def render_movie(topology: str, trajectory: str,
                  keep_frames: bool = False, **recipe_kw) -> dict:
     """Render a trajectory to an MP4: one VMD session, one fixed camera."""
     _validate_inputs(topology, trajectory, background)
-    ffmpeg = shutil.which("ffmpeg")
+    ffmpeg = find_ffmpeg()
     if not find_vmd(vmd_path):
         return {"ok": False, "error": "VMD not found; cannot render movie."}
     n = count_frames(topology, trajectory)

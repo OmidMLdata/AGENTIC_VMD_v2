@@ -8,7 +8,7 @@ run it on their own trajectory to confirm the analysis agrees with first
 principles before trusting a figure.
 
 It does **not** compare against GROMACS, cpptraj or VMD themselves; see
-``docs/PAPER.md`` (Appendix F, "Not verified") for how to do that comparison by hand.
+``docs/reference/RESEARCH.md`` (Appendix F, "Not verified") for how to do that comparison by hand.
 """
 from __future__ import annotations
 

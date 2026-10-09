@@ -116,7 +116,7 @@ def detect_system(topology: str, trajectory: Optional[str] = None,
     """
     try:
         return _detect_system(topology, trajectory, clash_check)
-    except Exception as e:                            # noqa: BLE001
+    except Exception as e:
         return {"error": f"{type(e).__name__}: {e}",
                 "hint": "Provide a topology with atom and residue names "
                         "(PDB, mmCIF, PSF, GRO, PRMTOP), not a bare trajectory."}

@@ -67,9 +67,9 @@ def test_model_written_python_runs_in_the_workspace(built):
 def test_plain_vmd_arm_needs_exec_and_screens_scripts_before_any_launch(built):
     t = _task(built, "rmsd_last")
     off = tools.Environment(t, "vmd_plain")
-    assert "run_vmd_tcl" not in {s["name"] for s in off.tool_specs()}
+    assert "run_tcl" not in {s["name"] for s in off.tool_specs()}
     on = tools.Environment(t, "vmd_plain", allow_exec=True)
-    r = on.call("run_vmd_tcl", {"script": "exec rm -rf /tmp/x\n"})
+    r = on.call("run_tcl", {"script": "exec rm -rf /tmp/x\n"})
     assert r.get("blocked") and "exec" in r["error"]
 
 
@@ -79,7 +79,7 @@ def test_real_vmd_cannot_see_the_api_key_and_runs_in_the_workspace(
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-secret")
     t = _task(built, "rmsd_last")
     env = tools.Environment(t, "vmd_plain", allow_exec=True, vmd_path=real_vmd)
-    r = env.call("run_vmd_tcl", {"script": (
+    r = env.call("run_tcl", {"script": (
         'puts "CWD=[pwd]"\n'
         'puts "KEY=[info exists env(ANTHROPIC_API_KEY)]"\n')})
     assert r["ok"], r
@@ -277,3 +277,26 @@ def test_cli_preflight_exit_codes(capsys):
     with pytest.raises(SystemExit) as e:
         cli.main(["bench", "agent-preflight", "--arms", "python_mdanalysis"])
     assert e.value.code == 2
+
+
+def test_preflight_for_an_open_model_names_an_unreachable_server_clearly():
+    import socket
+    sock = socket.socket()
+    sock.bind(("127.0.0.1", 0))
+    port = sock.getsockname()[1]
+    sock.close()
+    r = pf.preflight(["vmd_agent"], model="some-model", provider="openai",
+                     base_url=f"http://127.0.0.1:{port}/v1")
+    assert not r["ready"] and "llm_server" in r["blocking"]
+    by = {c["name"]: c for c in r["checks"]}
+    assert "cannot reach the model server" in by["llm_server"]["detail"]
+    assert "api_key" not in by                  # a local model needs no key
+
+
+def test_every_tool_call_in_the_benchmark_is_timed(built):
+    t = _task(built, "rmsd_last")
+    env = tools.Environment(t, "python_mdanalysis", allow_exec=True)
+    env.call("run_python", {"code": "import time; time.sleep(0.2)"})
+    env.call("list_files", {})
+    assert env.log[0]["seconds"] >= 0.2 and env.log[1]["seconds"] < env.log[0]["seconds"]
+    assert env.stats()["tool_s"] >= 0.2

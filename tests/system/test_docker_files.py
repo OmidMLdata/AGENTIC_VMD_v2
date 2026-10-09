@@ -18,8 +18,7 @@ def _read(*p):
 
 
 @pytest.mark.skipif(SH is None, reason="no sh")
-@pytest.mark.parametrize("script", ["entrypoint.sh", "install_vmd.sh",
-                                    "bench.sh"])
+@pytest.mark.parametrize("script", ["entrypoint.sh", "install_vmd.sh"])
 def test_shell_scripts_parse(script):
     assert subprocess.run([SH, "-n", os.path.join(DOCKER, script)]
                           ).returncode == 0
@@ -62,38 +61,103 @@ def test_compose_services_secrets_and_hardening():
     assert "sk-ant" not in _read("docker-compose.yml")
 
 
-@pytest.mark.skipif(SH is None or shutil.which("file") is None,
-                    reason="needs sh and file")
-def test_bench_script_refuses_a_macos_vmd_for_a_linux_container(tmp_path):
+def test_bench_docker_refuses_a_macos_vmd_for_a_linux_container(tmp_path, capsys):
+    from vmd_agent import launcher
     home = tmp_path / "vmd"
     (home / "bin").mkdir(parents=True)
     exe = home / "bin" / "vmd"
-    exe.write_bytes(b"\xcf\xfa\xed\xfe\x07\x00\x00\x01\x03\x00\x00\x00"
-                    b"\x02\x00\x00\x00" + b"\x00" * 16)
-    exe.chmod(0o755)
-    r = subprocess.run([SH, os.path.join(DOCKER, "bench.sh"), "check-vmd"],
-                       env={**os.environ, "MODE": "hostvmd",
-                            "VMD_HOME": str(home)},
-                       capture_output=True, text=True)
-    assert r.returncode == 1 and "macOS binary" in r.stderr
+    exe.write_bytes(b"\xcf\xfa\xed\xfe\x07\x00\x00\x01\x03\x00\x00\x00\x02\x00\x00\x00" + b"\x00" * 16)   # Mach-O magic
+    said = []
+    assert launcher.check_vmd_home(str(home), said.append) == 1 and "macOS binary" in said[0]
     exe.write_text("#!/bin/sh\necho hi\n")
-    ok = subprocess.run([SH, os.path.join(DOCKER, "bench.sh"), "check-vmd"],
-                        env={**os.environ, "MODE": "hostvmd",
-                             "VMD_HOME": str(home)},
-                        capture_output=True, text=True)
-    assert ok.returncode == 0 and "found" in ok.stdout
-    missing = subprocess.run([SH, os.path.join(DOCKER, "bench.sh"),
-                              "check-vmd"],
-                             env={**os.environ, "MODE": "hostvmd",
-                                  "VMD_HOME": str(tmp_path / "none")},
-                             capture_output=True, text=True)
-    assert missing.returncode == 1
+    said.clear()
+    assert launcher.check_vmd_home(str(home), said.append) == 0 and "found" in said[0]
+    assert launcher.check_vmd_home(str(tmp_path / "none"), said.append) == 1
+    assert launcher.check_vmd_home(None, said.append) == 2
 
 
-@pytest.mark.skipif(SH is None, reason="no sh")
-def test_bench_script_rejects_unknown_mode_and_command():
-    for env, args in (({"MODE": "nope"}, ["run"]), ({}, ["frobnicate"])):
-        r = subprocess.run([SH, os.path.join(DOCKER, "bench.sh"), *args],
-                           env={**os.environ, **env}, capture_output=True,
-                           text=True)
-        assert r.returncode == 2
+def test_bench_docker_rejects_unknown_mode_and_action():
+    from vmd_agent import launcher
+    assert launcher.docker_bench("run", mode="nope", say=lambda m: None) == 2
+    assert launcher.docker_bench("frobnicate", say=lambda m: None) == 2
+
+
+def test_bench_docker_builds_the_compose_command(monkeypatch, tmp_path):
+    from vmd_agent import launcher
+    seen = []
+    monkeypatch.setenv("DATA_DIR", str(tmp_path / "d"))
+    monkeypatch.setattr(launcher, "_run", lambda cmd, *a, **k: seen.append(cmd) or type("R", (), {"returncode": 0})())
+    assert launcher.docker_bench("preflight", ["--arms", "vmd_agent"], mode="withvmd") == 0
+    cmd = seen[0]
+    assert cmd[:2] == ["docker", "compose"] and cmd[cmd.index("--profile") + 1] == "bench-withvmd"
+    assert cmd[-4:] == ["bench", "agent-preflight", "--arms", "vmd_agent"]
+    assert (tmp_path / "d").is_dir()
+    launcher.docker_bench("shell")
+    assert seen[1][-1] == "sh"
+
+
+# ------------------------------------------------ the all-in-one chat stack
+ROOT_DIR = os.path.abspath(ROOT)
+
+
+def test_start_without_docker_says_what_to_install_and_does_nothing_else(capsys):
+    from vmd_agent import launcher
+    said = []
+    assert launcher.start(mode="docker", docker="no-such-docker-binary", say=said.append) == 2
+    assert "Docker is not installed" in " ".join(said) and "docs.docker.com" in " ".join(said)
+
+
+def test_start_down_runs_compose_down(monkeypatch):
+    from vmd_agent import launcher
+    seen = []
+    monkeypatch.setattr(launcher, "_run", lambda cmd, *a, **k: seen.append(cmd) or type("R", (), {"returncode": 0})())
+    assert launcher.stop_docker() == 0
+    assert seen[0][-1] == "down" and seen[0][1] == "compose"
+
+
+def test_chat_compose_wires_the_model_server_to_the_chat_and_confines_it():
+    yaml = pytest.importorskip("yaml")
+    with open(os.path.join(DOCKER, "chat.compose.yml")) as fh:
+        c = yaml.safe_load(fh)
+    s = c["services"]
+    assert s["ollama"]["image"].startswith("ollama/ollama")
+    assert "ollama:/root/.ollama" in s["ollama"]["volumes"]        # models persist
+    assert s["ollama"]["healthcheck"]["test"][-1] == "list"
+    chat = s["vmd-agent"]
+    assert chat["depends_on"]["ollama"]["condition"] == "service_healthy"
+    env = chat["environment"]
+    assert env["VMD_AGENT_LLM_URL"] == "http://ollama:11434/v1"
+    assert env["VMD_AGENT_ALLOWED_ROOTS"] == "/data"               # sandbox on
+    assert chat["command"] == ["chat"] and chat["tty"] and chat["stdin_open"]
+    assert chat["read_only"] and chat["cap_drop"] == ["ALL"]
+    assert any(v.endswith(":/data") for v in chat["volumes"])
+    assert "${VMD_TARGET" in chat["build"]["target"]               # VMD optional
+    assert "ollama" in c["volumes"]
+    raw = open(os.path.join(DOCKER, "chat.compose.yml")).read()
+    assert "sk-" not in raw and "API_KEY" not in raw               # no keys needed
+
+
+def test_gpu_override_only_touches_the_model_server():
+    yaml = pytest.importorskip("yaml")
+    with open(os.path.join(DOCKER, "chat.gpu.yml")) as fh:
+        g = yaml.safe_load(fh)
+    assert list(g["services"]) == ["ollama"]
+    dev = g["services"]["ollama"]["deploy"]["resources"]["reservations"]["devices"][0]
+    assert dev["driver"] == "nvidia" and "gpu" in dev["capabilities"]
+
+
+def test_start_never_downloads_vmd_and_is_honest_about_its_status():
+    s = open(os.path.join(ROOT_DIR, "src", "vmd_agent", "launcher.py")).read()
+    assert "Never run end to end" in s           # honest about its status
+    assert "curl" not in s and "wget" not in s   # VMD's licence: the user downloads it
+    assert "docker/vmd-dist" in s
+
+
+def test_bench_docker_finds_the_mode_flag_wherever_it_is(monkeypatch):
+    from vmd_agent import cli, launcher
+    seen = []
+    monkeypatch.setattr(launcher, "docker_bench", lambda action, rest, mode, **k: seen.append((action, rest, mode)) or 0)
+    assert cli.main(["bench", "docker", "preflight", "--arms", "a", "--mode", "withvmd"]) == 0
+    assert cli.main(["bench", "docker", "run", "--mode=hostvmd", "--repeats", "3"]) == 0
+    assert cli.main(["bench", "docker", "plan"]) == 0
+    assert seen == [("preflight", ["--arms", "a"], "withvmd"), ("run", ["--repeats", "3"], "hostvmd"), ("plan", [], "plain")]

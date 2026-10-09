@@ -8,7 +8,7 @@ experiment: what does the toolkit add over a model that writes its own code?
 ``vmd_agent_no_verify``   same, without ``verify_claims`` (ablation)
 ``vmd_agent_no_keyframes``  same, without ``select_keyframes`` (ablation)
 ``python_mdanalysis``  ``run_python``: the model writes MDAnalysis/NumPy itself
-``vmd_plain``          ``run_vmd_tcl``: the model writes Tcl for a real VMD
+``vmd_plain``          ``run_tcl``: the model writes Tcl for a real VMD
 ====================  =========================================================
 
 Every arm also gets ``list_files``, ``read_text_file`` and ``submit_answer``.
@@ -16,8 +16,8 @@ Every arm also gets ``list_files``, ``read_text_file`` and ``submit_answer``.
 Safety. File arguments are confined to the task's workspace. ``run_python``
 runs model-written code in a subprocess with a timeout; that is **not a
 sandbox**. Enable it (``allow_exec=True``) only inside a container or VM.
-``run_vmd_tcl`` goes through the toolkit's Tcl screen, which is an accident
-guard, not a boundary (see ``docs/TECHNICAL.md#security``), and needs a real VMD.
+``run_tcl`` goes through the toolkit's Tcl screen, which is an accident
+guard, not a boundary (see ``README.md#security``), and needs a real VMD.
 """
 from __future__ import annotations
 
@@ -29,7 +29,9 @@ import tempfile
 import time
 from typing import Callable, Dict, List, Optional
 
-import numpy as np
+from vmd_agent import security
+from vmd_agent.llm_client import compact, render_result  # noqa: F401
+
 
 COMMON = ("list_files", "read_text_file", "submit_answer")
 ARMS: Dict[str, tuple] = {
@@ -44,10 +46,9 @@ ARMS: Dict[str, tuple] = {
         "probe_environment", "inspect_files", "detect_system",
         "structure_stats", "analyze_trajectory", "verify_claims"),
     "python_mdanalysis": COMMON + ("run_python",),
-    "vmd_plain": COMMON + ("run_vmd_tcl",),
+    "vmd_plain": COMMON + ("run_tcl",),
 }
-NEEDS_EXEC = {"run_python", "run_vmd_tcl"}
-OUTPUT_CAP = 6000
+NEEDS_EXEC = {"run_python", "run_tcl"}
 PYTHON_TIMEOUT_S = 120
 VMD_TIMEOUT_S = 300
 
@@ -58,7 +59,12 @@ _ENV_ALLOW = ("PATH", "HOME", "USER", "LANG", "TZ", "TMPDIR", "TERM",
               "PYTHONPATH", "PYTHONHOME", "VIRTUAL_ENV", "MPLCONFIGDIR",
               "MPLBACKEND", "DISPLAY", "TCL_LIBRARY", "TK_LIBRARY",
               "LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH", "DYLD_FALLBACK_LIBRARY_PATH",
-              "VMD_AGENT_ALLOWED_ROOTS")
+              "VMD_AGENT_ALLOWED_ROOTS",
+              # Windows: programs fail to start or find system DLLs without these
+              "SYSTEMROOT", "SYSTEMDRIVE", "WINDIR", "COMSPEC", "PATHEXT", "TEMP",
+              "TMP", "USERPROFILE", "APPDATA", "LOCALAPPDATA", "PROGRAMDATA",
+              "PROGRAMFILES", "PROGRAMFILES(X86)", "COMMONPROGRAMFILES",
+              "NUMBER_OF_PROCESSORS", "PROCESSOR_ARCHITECTURE")
 _ENV_ALLOW_PREFIX = ("LC_", "VMD")
 
 
@@ -77,45 +83,8 @@ class StepLimit(Exception):
     pass
 
 
-# ------------------------------------------------------------ serialising
-def _default(o):
-    if isinstance(o, (np.integer,)):
-        return int(o)
-    if isinstance(o, (np.floating,)):
-        return float(o)
-    if isinstance(o, np.ndarray):
-        return o.tolist()
-    if isinstance(o, (set, tuple)):
-        return list(o)
-    return str(o)
-
-
-def compact(obj, max_list: int = 24, max_str: int = 600):
-    """Shrink a result for a model: long numeric lists become a summary,
-    long strings are cut. The tool's real return value is not changed."""
-    if isinstance(obj, dict):
-        return {k: compact(v, max_list, max_str) for k, v in obj.items()}
-    if isinstance(obj, (list, tuple)):
-        if len(obj) > max_list:
-            nums = [x for x in obj if isinstance(x, (int, float))
-                    and not isinstance(x, bool)]
-            if len(nums) == len(obj):
-                a = np.asarray(nums, dtype=float)
-                fin = a[np.isfinite(a)]
-                return {"_list": len(obj), "first": obj[:3], "last": obj[-3:],
-                        "min": float(fin.min()) if len(fin) else None,
-                        "max": float(fin.max()) if len(fin) else None}
-            return [compact(x, max_list, max_str) for x in obj[:max_list]] + \
-                   [f"... {len(obj) - max_list} more"]
-        return [compact(x, max_list, max_str) for x in obj]
-    if isinstance(obj, str) and len(obj) > max_str:
-        return obj[:max_str] + f"... [{len(obj) - max_str} more chars]"
-    return obj
-
-
-def render_result(obj, cap: int = OUTPUT_CAP) -> str:
-    text = json.dumps(compact(obj), default=_default)
-    return text if len(text) <= cap else text[:cap] + "...[truncated]"
+# compact() and render_result() live in vmd_agent.llm_client (shared with the chat
+# command) and are re-exported here.
 
 
 # ------------------------------------------------------------ environment
@@ -138,6 +107,7 @@ class Environment:
         self.blocked = 0
         self.tool_errors = 0
         self.t0 = time.time()
+        self.tool_s = 0.0
 
     # ---- specs
     def tool_specs(self) -> List[dict]:
@@ -150,7 +120,7 @@ class Environment:
             raise ValueError("a path string is required")
         full = p if os.path.isabs(p) else os.path.join(self.workdir, p)
         real = os.path.realpath(full)
-        if real != self.workdir and not real.startswith(self.workdir + os.sep):
+        if not security.is_within(real, self.workdir):
             raise PermissionError(
                 f"'{p}' is outside the task workspace ({self.workdir})")
         return real
@@ -161,6 +131,7 @@ class Environment:
     # ---- dispatch
     def call(self, name: str, args: Optional[dict] = None) -> dict:
         args = args if isinstance(args, dict) else {}
+        started = time.time()
         if name not in self.names:
             res = {"error": f"unknown tool '{name}'"
                             if name not in _SPECS else
@@ -175,17 +146,20 @@ class Environment:
                 res = {"error": str(e), "blocked": True}
             except TypeError as e:
                 res = {"error": f"bad arguments for {name}: {e}"}
-            except Exception as e:                    # noqa: BLE001
+            except Exception as e:
                 res = {"error": f"{type(e).__name__}: {e}"}
         failed = isinstance(res, dict) and bool(res.get("error"))
         if failed and not res.get("blocked"):
             self.tool_errors += 1
+        seconds = time.time() - started
+        self.tool_s += seconds
         self.log.append({"tool": name, "args": compact(args),
-                         "error": failed})
+                         "error": failed, "seconds": round(seconds, 3)})
         return res
 
     def stats(self) -> dict:
         return {"tool_calls": len(self.log), "tool_errors": self.tool_errors,
+                "tool_s": round(self.tool_s, 2),
                 "blocked": self.blocked,
                 "wall_s": round(time.time() - self.t0, 2)}
 
@@ -306,7 +280,7 @@ def _run_vmd_tcl(env, script: str) -> dict:
     if not env.allow_exec:
         raise PermissionError("code execution is disabled (allow_exec=False)")
     from vmd_agent.visual import render
-    r = render.run_vmd_tcl(script, env.vmd_path, timeout=VMD_TIMEOUT_S,
+    r = render.run_tcl(script, env.vmd_path, timeout=VMD_TIMEOUT_S,
                            cwd=env.workdir, env=sanitized_env())
     return {k: r.get(k) for k in ("ok", "error", "blocked", "returncode",
                                   "stdout", "stderr") if k in r}
@@ -319,7 +293,7 @@ _IMPL: Dict[str, Callable] = {
     "structure_stats": _structure_stats,
     "analyze_trajectory": _analyze_trajectory,
     "select_keyframes": _select_keyframes, "verify_claims": _verify_claims,
-    "run_python": _run_python, "run_vmd_tcl": _run_vmd_tcl,
+    "run_python": _run_python, "run_tcl": _run_vmd_tcl,
 }
 
 _STR = {"type": "string"}
@@ -377,7 +351,7 @@ _SPECS: Dict[str, tuple] = {
     "run_python": ("Run a Python 3 script (NumPy, SciPy, MDAnalysis, "
                    "matplotlib are installed) in the workspace; returns "
                    "stdout and stderr.", _obj({"code": _STR}, ["code"])),
-    "run_vmd_tcl": (
+    "run_tcl": (
         "Run a Tcl script in headless VMD (text mode, no display) and return "
         "its stdout/stderr. Only what you `puts` is returned. Relative paths "
         "resolve in the workspace. Load with `mol new FILE type pdb waitfor "

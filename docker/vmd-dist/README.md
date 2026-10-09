@@ -11,4 +11,4 @@ To build the optional `with-vmd` image **for your own use**:
    `docker build -f docker/Dockerfile --target with-vmd -t vmd-agent:vmd-local .`
 
 Tarballs here are git-ignored. **Do not push an image built this way.**
-Prefer the `vmd-libs` image with your VMD mounted read-only; see `../docs/TECHNICAL.md#docker`.
+Prefer the `vmd-libs` image with your VMD mounted read-only; see the Docker section of `../README.md`.

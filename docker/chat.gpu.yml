@@ -1,0 +1,10 @@
+# Added by `vmd-agent start` when an NVIDIA GPU and the NVIDIA container toolkit are found.
+services:
+  ollama:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

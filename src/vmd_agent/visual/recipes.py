@@ -44,9 +44,8 @@ from vmd_agent.visual.representations import (
 )
 
 # Parameters come from the representation catalogue so there is a single
-# source of truth; a few legacy aliases are kept for backwards compatibility.
+# source of truth.
 _REP_PARAMS = {name: rep["params"] for name, rep in REPRESENTATIONS.items()}
-_REP_PARAMS.setdefault("Surf", "1.400000 0.000000")
 
 
 def _auto_protein_reps(detection: dict, plddt_coloring: bool = False,
@@ -129,6 +128,56 @@ def _rep_block(sel: str, style: str, color: str, material: str,
             f"mol selection {{{sel}}}\n"
             f"mol material {material}\n"
             f"mol addrep top\n")
+
+
+def planned_reps(detection: dict, material: str = "Opaque", focus: str = "overview", representation: Optional[str] = None,
+                 color_method: Optional[str] = None, plddt_coloring: bool = False, show_water: bool = False) -> tuple:
+    """The representations a recipe draws for a detected system, as data: ``([{selection, style, color, material, params, comment}], warnings)``.
+    The Tcl recipe and the live VMD window both draw exactly these, so a picture of the window shows what a recipe would."""
+    sels = detection.get("suggested_selections", {})
+    out: list = []
+    suitability_warnings: list = []
+
+    def put(sel, style, color, mat, comment):
+        out.append({"selection": security.tcl_selection(sel), "style": security.tcl_word(style, "representation"),
+                    "color": security.tcl_word(color, "colour method"), "material": security.tcl_word(mat, "material"),
+                    "params": [float(x) for x in str(_REP_PARAMS.get(style, "")).split()], "comment": " ".join(str(comment).split())})
+
+    def add(key, sel):
+        for stylei, colori, comment in _COMPONENT_REPS[key]:
+            put(sel, stylei, colori, material, comment)
+
+    if "protein" in sels:
+        if representation:
+            # explicit user request wins, but we say so if it fits badly
+            suitability_warnings += check_suitability(representation, detection)
+            chosen = [(representation, color_method or "Structure", f"Representation explicitly requested: {representation}.")]
+        else:
+            chosen = _auto_protein_reps(detection, plddt_coloring, focus)
+            if color_method:
+                chosen = [(s, color_method, c) for s, _c, c in chosen]
+        for stylei, colori, comment in chosen:
+            mat = material
+            # a surface drawn over a cartoon must be see-through
+            if focus == "pocket" and stylei in ("Surf", "MSMS", "QuickSurf"):
+                mat = "Transparent"
+            put(sels["protein"], stylei, colori, mat, comment)
+    if "nucleic" in sels:
+        add("nucleic", sels["nucleic"])
+    if "lipid" in sels:
+        add("lipid", sels["lipid"])
+    if "ligand" in sels:
+        if focus == "pocket":
+            put(sels["ligand"], "CPK", "Name", material, "Ligand as van-der-Waals spheres + bonds, to show how it fills the pocket.")
+        else:
+            add("ligand", sels["ligand"])
+    if "ions" in sels:
+        add("ions", sels["ions"])
+    if "material_inorganic" in detection.get("components", {}) and detection["components"]["material_inorganic"].get("present"):
+        add("material", "not (protein or nucleic or water)")
+    if show_water and "water" in sels:
+        add("water", sels["water"])
+    return out, suitability_warnings
 
 
 def generate_visualization_recipe(detection: dict,
@@ -214,43 +263,10 @@ def generate_visualization_recipe(detection: dict,
         for stylei, colori, comment in _COMPONENT_REPS[key]:
             lines.append(_rep_block(sel, stylei, colori, material, comment))
 
-    suitability_warnings = []
-    if "protein" in sels:
-        if representation:
-            # explicit user request wins, but we say so if it fits badly
-            suitability_warnings += check_suitability(representation, detection)
-            chosen = [(representation, color_method or "Structure",
-                       f"Representation explicitly requested: {representation}.")]
-        else:
-            chosen = _auto_protein_reps(detection, plddt_coloring, focus)
-            if color_method:
-                chosen = [(s, color_method, c) for s, _c, c in chosen]
-        for stylei, colori, comment in chosen:
-            mat = material
-            # a surface drawn over a cartoon must be see-through
-            if focus == "pocket" and stylei in ("Surf", "MSMS", "QuickSurf"):
-                mat = "Transparent"
-            lines.append(_rep_block(sels["protein"], stylei, colori,
-                                    mat, comment))
-    if "nucleic" in sels:
-        add("nucleic", sels["nucleic"])
-    if "lipid" in sels:
-        add("lipid", sels["lipid"])
-    if "ligand" in sels:
-        if focus == "pocket":
-            lines.append(_rep_block(
-                sels["ligand"], "CPK", "Name", material,
-                "Ligand as van-der-Waals spheres + bonds, to show how it "
-                "fills the pocket."))
-        else:
-            add("ligand", sels["ligand"])
-    if "ions" in sels:
-        add("ions", sels["ions"])
-    if "material_inorganic" in detection.get("components", {}) and \
-            detection["components"]["material_inorganic"].get("present"):
-        add("material", "not (protein or nucleic or water)")
-    if show_water and "water" in sels:
-        add("water", sels["water"])
+    planned, suitability_warnings = planned_reps(detection, material, focus=focus, representation=representation, color_method=color_method,
+                                                  plddt_coloring=plddt_coloring, show_water=show_water)
+    for r in planned:
+        lines.append(_rep_block(r["selection"], r["style"], r["color"], r["material"], r["comment"]))
 
     # ---- global scene / camera / render settings ----
     bg = "white" if background == "white" else "black"

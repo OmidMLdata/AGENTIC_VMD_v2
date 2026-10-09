@@ -1,8 +1,8 @@
 # From the repo root:
-#   docker compose -f docker/docker-compose.yml run --rm vmd-agent probe
-#   docker compose -f docker/docker-compose.yml --profile hostvmd run --rm hostvmd probe
+#   docker compose -f docker/docker-compose.yml run --rm vmd-agent tool probe_environment
+#   docker compose -f docker/docker-compose.yml --profile hostvmd run --rm hostvmd tool probe_environment
 #
-# Benchmark runs (real VMD, real model): use docker/bench.sh, which wraps these
+# Benchmark runs (real VMD, real model): use `vmd-agent bench docker`, which wraps these
 # services and checks your VMD first.
 #
 # Mount your project data at ./data (or set DATA_DIR). All paths the tools use

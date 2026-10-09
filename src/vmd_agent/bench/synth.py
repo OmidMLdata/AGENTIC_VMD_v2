@@ -233,7 +233,7 @@ def build_fold(kind: str, rng) -> Tuple[np.ndarray, List[str], dict]:
                 segs.append((H, "H"))
     elif kind == "coil":
         info["n_helices"] = info["n_strands"] = 0
-        for i in range(int(rng.integers(3, 6))):
+        for _ in range(int(rng.integers(3, 6))):
             n = int(rng.integers(4, 8))
             P = _oriented(backbone_coords(n, rng.uniform(-150, -60),
                                           rng.uniform(-60, 160)), [0, 0, 1.0])

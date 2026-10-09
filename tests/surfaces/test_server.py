@@ -47,21 +47,10 @@ def tool_names(server):
     return {t.name for t in asyncio.run(server.mcp.list_tools())}
 
 
-EXPECTED = {
-    "probe_environment", "inspect_files", "detect_system",
-    "generate_visualization_recipe", "structure_stats", "color_key",
-    "annotate_image", "list_representations", "describe_representation",
-    "search_pdb", "fetch_structure", "fetch_and_visualize",
-    "visualize_and_interpret", "render_image", "render_movie", "run_vmd_tcl",
-    "analyze_trajectory", "select_keyframes", "verify_claims",
-    "extract_video_frames", "probe_video", "validate_video", "interpret_video",
-    "view_image", "record_visual_interpretation", "assemble_report",
-    "verify_provenance",
-}
-
-
 def test_all_tools_are_registered_with_the_sdk(server):
-    assert tool_names(server) == EXPECTED and len(EXPECTED) == 27
+    from vmd_agent import toolset
+    assert tool_names(server) == set(toolset.TOOLS) and len(toolset.TOOLS) == 58
+    assert set(toolset.library_tools()) <= tool_names(server) and "run_workflow" in tool_names(server)
 
 
 def test_tools_have_agent_facing_descriptions_and_schemas(server):
@@ -101,21 +90,21 @@ def test_run_vmd_tcl_is_disabled_by_default(server, monkeypatch):
     monkeypatch.setattr(render, "_run_vmd_text", counting)
     for script in ("puts hi", "exec ls",
                    "set c ex\nappend c ec\n$c touch /tmp/x"):
-        r = call(server, "run_vmd_tcl", script=script)
+        r = call(server, "run_tcl", script=script)
         assert r["blocked"] and not r["ok"] and "disabled" in r["error"]
     assert started == []                                    # VMD never launched
 
 
 def test_enabled_tcl_tool_still_screens_obvious_commands(server, monkeypatch):
     monkeypatch.setenv("VMD_AGENT_ENABLE_TCL", "1")
-    assert call(server, "run_vmd_tcl", script="exec ls")["blocked"]
+    assert call(server, "run_tcl", script="exec ls")["blocked"]
 
 
 @pytest.mark.requires_vmd
 def test_enabled_tcl_tool_runs_a_safe_script_in_real_vmd(server, real_vmd,
                                                          monkeypatch):
     monkeypatch.setenv("VMD_AGENT_ENABLE_TCL", "1")
-    r = call(server, "run_vmd_tcl", script="puts mcp_says_hi", vmd_path=real_vmd)
+    r = call(server, "run_tcl", script="puts mcp_says_hi", vmd_path=real_vmd)
     assert r["ok"] and "mcp_says_hi" in r["stdout"]
 
 

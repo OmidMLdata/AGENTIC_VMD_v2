@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>vmd-agent</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23000'/%3E%3Cpath d='M3 4l4 8 2-5 2 5 2-8' stroke='%23fff' fill='none'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/assets/style.css">
+</head>
+<body>
+<a class="skip" href="#display">Skip to the display</a>
+
+<svg class="sprite" width="0" height="0" aria-hidden="true">
+  <defs>
+    <symbol id="i-play" viewBox="0 0 16 16"><path d="M4 2.5v11l9-5.5z" fill="currentColor"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 16 16"><path d="M4 2.5h3v11H4zM9 2.5h3v11H9z" fill="currentColor"/></symbol>
+    <symbol id="i-rplay" viewBox="0 0 16 16"><path d="M12 2.5v11L3 8z" fill="currentColor"/></symbol>
+    <symbol id="i-first" viewBox="0 0 16 16"><path d="M3 2.5h2v11H3zM13 2.5v11L6 8z" fill="currentColor"/></symbol>
+    <symbol id="i-last" viewBox="0 0 16 16"><path d="M11 2.5h2v11h-2zM3 2.5v11l7-5.5z" fill="currentColor"/></symbol>
+    <symbol id="i-prev" viewBox="0 0 16 16"><path d="M11 2.5v11L4 8z" fill="currentColor"/></symbol>
+    <symbol id="i-next" viewBox="0 0 16 16"><path d="M5 2.5v11l7-5.5z" fill="currentColor"/></symbol>
+    <symbol id="i-eye" viewBox="0 0 16 16"><path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8z" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="8" cy="8" r="2" fill="currentColor"/></symbol>
+    <symbol id="i-eye-off" viewBox="0 0 16 16"><path d="M1 8s2.5-4.5 7-4.5S15 8 15 8s-2.5 4.5-7 4.5S1 8 1 8z" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".4"/><path d="M2 14L14 2" stroke="currentColor" stroke-width="1.4"/></symbol>
+    <symbol id="i-close" viewBox="0 0 16 16"><path d="M3 3l10 10M13 3L3 13" stroke="currentColor" stroke-width="1.5" fill="none"/></symbol>
+  </defs>
+</svg>
+
+<header id="menubar">
+  <nav id="menus" role="menubar" aria-label="Menus"></nav>
+</header>
+
+<main id="work">
+  <aside id="left" aria-label="Molecules and files">
+    <section class="pane" id="molpane" aria-labelledby="molh">
+      <header><h2 id="molh">Molecules</h2><span class="grow"></span>
+        <button class="tool" id="mol-load" title="New molecule from your files">New…</button>
+        <button class="tool" id="mol-delete" title="Delete the top molecule">Delete</button>
+      </header>
+      <div class="scroll"><table id="mols" aria-label="Loaded molecules"><thead><tr><th title="Molecule number">ID</th><th title="Top: the molecule that commands and the animation act on">T</th><th title="Drawn: show or hide this molecule">D</th><th>Name</th><th class="num">Atoms</th><th class="num">Frames</th></tr></thead><tbody></tbody></table>
+        <p class="empty" id="mols-empty">No molecules loaded. Double-click a structure below, or use Molecule, New molecule.</p></div>
+    </section>
+    <div class="splitter h" id="split-mol" role="separator" aria-orientation="horizontal" tabindex="0" aria-label="Resize the molecule list"></div>
+    <section class="pane" id="filepane" aria-labelledby="fileh">
+      <header><h2 id="fileh">Files</h2><span class="grow"></span><span id="folder" title=""></span></header>
+      <div id="drop" tabindex="0" role="button" aria-label="Add files: drop them here or press Enter to choose">Drop files here, or click to add<input id="pick" type="file" multiple hidden></div>
+      <div class="scroll" id="files" role="tree"></div>
+      <div id="info" hidden></div>
+    </section>
+  </aside>
+  <div class="splitter v" id="split-left" role="separator" aria-orientation="vertical" tabindex="0" aria-label="Resize the left column"></div>
+
+  <section class="pane" id="displaypane" aria-labelledby="disph">
+    <header><h2 id="disph">Display</h2><span class="grow"></span>
+      <div class="seg" role="radiogroup" aria-label="Mouse mode" id="mousemodes">
+        <button role="radio" data-mode="rotate" title="Rotate (R): drag to turn the molecule">Rotate</button>
+        <button role="radio" data-mode="translate" title="Move (T): drag to move it; Shift-drag works in any mode">Move</button>
+        <button role="radio" data-mode="scale" title="Zoom (S): drag up or down; the wheel always zooms">Zoom</button>
+      </div>
+      <button class="tool" id="snap-now" title="Take a new snapshot of the VMD window">Refresh</button>
+      <label class="inl livebox"><input type="checkbox" id="live" checked> live</label>
+      <button class="tool" id="reps-btn" title="Graphics, Representations (Ctrl+R)">Graphics…</button>
+    </header>
+    <div id="display">
+      <img id="view" alt="A snapshot of the VMD window. Drag to rotate, scroll to zoom, double-click to reset the view." draggable="false" hidden>
+      <div id="media"></div>
+      <div id="nodata"><div><b id="nodata-msg"></b><button class="btn" id="open-vmd" type="button" hidden>Open VMD window</button></div></div>
+      <div id="caption"></div>
+      <div id="repwin" class="floating" hidden role="dialog" aria-label="Graphical Representations">
+        <div class="floathead"><strong>Graphical Representations</strong><span class="grow"></span><button class="tool icon" id="repwin-close" aria-label="Close"><svg class="ic"><use href="#i-close"/></svg></button></div>
+        <div class="floatbody">
+          <div class="rowline"><label for="rep-mol">Selected molecule</label><select id="rep-mol"></select></div>
+          <div id="replist" role="listbox" aria-label="Representations of this molecule"></div>
+          <div class="rowline"><button class="btn small" id="rep-add">Create Rep</button><button class="btn small" id="rep-del">Delete Rep</button></div>
+          <div id="repform">
+            <fieldset><legend>Selected Atoms</legend>
+              <input id="rep-sel" spellcheck="false" autocomplete="off" placeholder="protein, name CA, resname LIG, within 5 of ...">
+              <div class="err" id="rep-err" role="alert"></div>
+              <div class="chips" id="rep-presets"></div></fieldset>
+            <div class="two"><fieldset><legend>Drawing Method</legend><select id="rep-style"></select></fieldset>
+              <fieldset><legend>Coloring Method</legend><select id="rep-color"></select></fieldset></div>
+            <fieldset><legend>Material</legend><select id="rep-material"></select></fieldset>
+            <div id="rep-id-row" hidden><fieldset><legend>ColorID</legend><select id="rep-colorid"></select></fieldset></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="anim" aria-label="Animation controls">
+      <button class="tool icon" data-a="first" title="First frame" aria-label="First frame"><svg class="ic"><use href="#i-first"/></svg></button>
+      <button class="tool icon" data-a="prev" title="Step back" aria-label="Step back"><svg class="ic"><use href="#i-prev"/></svg></button>
+      <button class="tool icon" data-a="reverse" id="anim-reverse" title="Play in reverse" aria-label="Play in reverse"><svg class="ic"><use href="#i-rplay"/></svg></button>
+      <button class="tool icon" data-a="play" id="anim-play" title="Play (Space)" aria-label="Play"><svg class="ic"><use href="#i-play"/></svg></button>
+      <button class="tool icon" data-a="next" title="Step forward" aria-label="Step forward"><svg class="ic"><use href="#i-next"/></svg></button>
+      <button class="tool icon" data-a="last" title="Last frame" aria-label="Last frame"><svg class="ic"><use href="#i-last"/></svg></button>
+      <input type="range" id="slider" min="0" max="0" value="0" aria-label="Frame">
+      <label class="inl" for="frame-n">frame</label><input type="number" id="frame-n" min="0" value="0"><span id="flabel">of 1</span>
+      <label class="inl" for="style">style</label><select id="style"><option value="loop">Loop</option><option value="once">Once</option><option value="rock">Rock</option></select>
+      <label class="inl" for="speed">speed</label><input type="range" id="speed" min="1" max="30" value="8"><span id="speed-n">8/s</span>
+    </div>
+    <div id="gallery" aria-label="Pictures made by the tools"></div>
+  </section>
+  <div class="splitter v" id="split-right" role="separator" aria-orientation="vertical" tabindex="0" aria-label="Resize the assistant column"></div>
+
+  <aside class="pane" id="right" aria-label="Assistant">
+    <div class="tabs" role="tablist">
+      <button class="tab on" role="tab" aria-selected="true" aria-controls="chat" data-p="chat" id="tab-chat">Chat</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="tools" data-p="tools" id="tab-tools">Tools</button>
+      <button class="tab" role="tab" aria-selected="false" aria-controls="jobs" data-p="jobs" id="tab-jobs">Whole jobs</button>
+    </div>
+    <div id="chat" role="tabpanel" aria-labelledby="tab-chat" class="on">
+      <div id="banner"></div>
+      <div class="scroll" id="scroll"><div id="log" aria-live="polite"></div>
+        <div id="welcome"><p>Ask in plain language. Each tool the agent runs is listed with the seconds it took; click a line to see its arguments and result.</p></div></div>
+      <form id="composer" autocomplete="off">
+        <textarea id="q" rows="1" placeholder="what is in protein.pdb?" aria-label="Your question"></textarea>
+        <button type="button" class="btn" id="new" title="Start a new conversation">New</button>
+        <button type="submit" class="btn" id="send">Send</button>
+      </form>
+    </div>
+    <div id="tools" role="tabpanel" aria-labelledby="tab-tools"><div class="scroll" id="tl"></div></div>
+    <div id="jobs" role="tabpanel" aria-labelledby="tab-jobs"><div class="scroll" id="wf"></div></div>
+  </aside>
+
+  <div class="splitter h wide" id="split-console" role="separator" aria-orientation="horizontal" tabindex="0" aria-label="Resize the console"></div>
+  <section class="pane" id="console" aria-labelledby="conh">
+    <header><h2 id="conh">Console</h2><span class="grow"></span><span id="totals"></span>
+      <button class="tool" id="clear" title="Clear the console">Clear</button>
+      <button class="tool icon" id="console-fold" title="Fold or unfold the console" aria-label="Fold the console">▾</button></header>
+    <div id="consolelog" role="log" aria-live="off" tabindex="0"></div>
+    <form id="conform" autocomplete="off"><span class="prompt" aria-hidden="true">vmd &gt;</span><input id="conin" spellcheck="false" aria-label="Console command" placeholder="help"></form>
+  </section>
+</main>
+
+<footer id="status">
+  <span id="statusleft"></span>
+  <span class="grow"></span>
+  <span id="mousestat" title="Mouse mode"></span>
+  <span><label for="profile">chat tools</label><select id="profile"></select></span>
+  <button id="theme" title="Colour theme: automatic, light or dark">theme</button>
+  <span id="ver"></span>
+</footer>
+
+<dialog id="palette" aria-label="Search actions"><input id="pal-in" type="search" placeholder="search actions" aria-label="Search actions" autocomplete="off"><ul id="pal-list" role="listbox"></ul></dialog>
+<dialog id="shortcuts" aria-label="Keyboard shortcuts"><div class="dlg"><h3>Keyboard shortcuts</h3><table id="sc-table"></table><form method="dialog"><button class="btn">Close</button></form></div></dialog>
+<dialog id="about" aria-label="About"><div class="dlg"><h3>vmd-agent</h3><p id="about-text"></p><form method="dialog"><button class="btn">Close</button></form></div></dialog>
+<dialog id="modeldlg" aria-label="Model"><div class="dlg">
+  <h3>Model</h3>
+  <p id="model-state"></p>
+  <fieldset><legend>Where the model runs</legend>
+    <label class="opt"><input type="radio" name="msrc" value="local"> A free model on this computer (the private Ollama that setup installs)</label>
+    <label class="opt"><input type="radio" name="msrc" value="other"> Another server: an online service you have access to, or your own Ollama, LM Studio, vLLM</label>
+  </fieldset>
+  <div id="model-local-box"><label for="model-local">Models downloaded on this computer</label><select id="model-local"></select></div>
+  <div id="model-other"><label for="model-found">Servers found on this computer</label><select id="model-found"></select>
+    <label for="model-url">Address (usually ends in /v1)</label><input id="model-url" type="text" spellcheck="false" autocomplete="off">
+    <label for="model-key">API key (leave empty if it needs none)</label><input id="model-key" type="password" autocomplete="off">
+    <label for="model-name">Model name</label><input id="model-name" type="text" list="model-list" spellcheck="false" autocomplete="off"><datalist id="model-list"></datalist></div>
+  <p class="note" id="model-msg" role="status"></p>
+  <p class="note">To use Claude Code or Claude Desktop as the assistant instead of a model here, run <code>vmd-agent mcp-config</code> in a terminal.</p>
+  <div class="dlgbtns"><button class="btn" id="model-start" type="button">Start local server</button><button class="btn" id="model-check" type="button">Check</button><span class="grow"></span>
+    <button class="btn" id="model-use" type="button">Use this model</button><button class="btn" id="model-close" type="button">Close</button></div>
+</div></dialog>
+<dialog id="chooser" aria-label="Choose a file"><div class="dlg"><h3 id="chooser-title">Choose a file</h3><ul id="chooser-list" role="listbox"></ul><form method="dialog"><button class="btn">Cancel</button></form></div></dialog>
+<div id="toasts" aria-live="polite"></div>
+
+<script src="/assets/commands.js"></script>
+<script src="/assets/markdown.js"></script>
+<script src="/assets/app.js"></script>
+</body>
+</html>

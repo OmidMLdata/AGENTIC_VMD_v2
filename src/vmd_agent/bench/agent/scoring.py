@@ -57,7 +57,8 @@ def _int(v) -> Optional[int]:
 def _inside(workdir: str, path: str) -> bool:
     root = os.path.realpath(workdir)
     real = os.path.realpath(path)
-    return real == root or real.startswith(root + os.sep)
+    from vmd_agent import security
+    return security.is_within(real, root)
 
 
 # -------------------------------------------------------- family scorers
@@ -124,7 +125,7 @@ def vmd_selected_indices(topology: str, selection: str,
     script = (f"mol new {{{top}}} type pdb waitfor all\n"
               f'set s [atomselect top "{sel}"]\n'
               'puts "VMDIDX=[$s get index]"\n')
-    r = render.run_vmd_tcl(script, vmd_path, timeout=120,
+    r = render.run_tcl(script, vmd_path, timeout=120,
                            allow_unsafe=True, env=sanitized_env())
     if not r.get("ok") and "VMDIDX=" not in (r.get("stdout") or ""):
         raise RuntimeError("VMD failed: " + str(r.get("error") or
@@ -311,6 +312,8 @@ def summarize_agents(records: Sequence[dict], by: str = "label",
             "mean_tool_calls": float(np.mean(
                 [r.get("tool_calls", 0) for r in rows])),
             "mean_wall_s": float(np.mean([r.get("wall_s", 0) for r in rows])),
+            "mean_model_s": float(np.mean([r.get("model_s") or 0 for r in rows])),   # wall-clock inside the model's calls
+            "mean_tool_s": float(np.mean([r.get("tool_s") or 0 for r in rows])),     # wall-clock inside the tools
             "tokens_in": int(sum(r.get("tokens_in") or 0 for r in rows)),
             "tokens_out": int(sum(r.get("tokens_out") or 0 for r in rows)),
             "by_family": fams}

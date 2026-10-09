@@ -18,11 +18,12 @@ import hashlib
 import json
 import os
 import platform
-import shutil
 import subprocess
 import sys
 import time
 from typing import Dict, Iterable, List, Optional
+
+from vmd_agent.environment import find_ffmpeg
 
 _PKGS = ("MDAnalysis", "numpy", "scipy", "matplotlib", "PIL", "pandas")
 FILE = "provenance.json"
@@ -83,7 +84,7 @@ def collect_environment(vmd_path: Optional[str] = None,
         "platform": platform.platform(),
         "packages": {m: _version(m) for m in _PKGS},
         "vmd_path": vmd,
-        "ffmpeg": _tool_version(shutil.which("ffmpeg"), ["-version"]),
+        "ffmpeg": _tool_version(find_ffmpeg(), ["-version"]),
         "in_docker": os.path.exists("/.dockerenv"),
     }
     if vmd and query_vmd:

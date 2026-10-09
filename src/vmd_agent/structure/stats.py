@@ -324,8 +324,6 @@ def structure_stats(topology: str, trajectory: Optional[str] = None,
             out["n_hydrogen_bonds"] = int(n)
             out["hbond_method"] = method
             out["hbond_criterion"] = desc
-            # legacy key kept so older callers and sessions keep working
-            out["n_hydrogen_bonds_geometric"] = int(n)
     except Exception as e:                                  # pragma: no cover
         out["hbond_error"] = f"{type(e).__name__}: {e}"
 
@@ -360,9 +358,10 @@ def structure_stats(topology: str, trajectory: Optional[str] = None,
         nuc_atoms = u.select_atoms("nucleic")
         if len(prot_atoms):
             out["n_protein_chains"] = _chain_ids(prot_atoms)
+            out["n_protein_residues"] = int(len(prot_atoms.residues))      # n_residues counts every residue: ligand, water, ions
         if len(nuc_atoms):
             out["n_nucleic_chains"] = _chain_ids(nuc_atoms)
-        # legacy key: polymer chains (protein + nucleic), or all if no polymer
+        # chains of the polymer (protein + nucleic), or all chains if there is no polymer
         out["n_chains"] = (out.get("n_protein_chains", 0)
                            + out.get("n_nucleic_chains", 0)
                            or out["n_chains_all"])

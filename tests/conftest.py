@@ -11,15 +11,22 @@ did not run, not a test that passed.
 * real MCP SDK:        Python >= 3.10 and ``pip install mcp``; ``requires_mcp``
 * real model API:      ``VMD_AGENT_LIVE_TESTS=1`` and ``ANTHROPIC_API_KEY``
                        (spends a few cents); ``requires_api``
+* real local model:    a running OpenAI-style server (e.g. Ollama) and
+                       ``VMD_AGENT_LIVE_LLM_MODEL=<name>``; ``requires_llm``
 * real network:        reachable rcsb.org; ``requires_network``
 """
+import http.server
+import json
+import threading
+import time
 import os
-import shutil
 import sys
 import warnings
 
 import numpy as np
 import pytest
+
+from vmd_agent.environment import find_ffmpeg
 
 warnings.filterwarnings("ignore")
 
@@ -145,14 +152,38 @@ def have_network() -> bool:
     return _NET["ok"]
 
 
+_LLM = {}
+
+
+def have_llm() -> bool:
+    """A real model server is reachable and a model is named for live tests:
+    VMD_AGENT_LIVE_LLM_MODEL (and VMD_AGENT_LLM_URL unless it is Ollama's default)."""
+    if "ok" not in _LLM:
+        _LLM["ok"] = False
+        model = os.environ.get("VMD_AGENT_LIVE_LLM_MODEL")
+        if model:
+            try:
+                from vmd_agent.llm_client import list_models
+                url = os.environ.get("VMD_AGENT_LLM_URL",
+                                     "http://localhost:11434/v1")
+                have = list_models(url, os.environ.get("VMD_AGENT_LLM_KEY"),
+                                   timeout=4)
+                _LLM["ok"] = (not have) or model in have
+            except Exception:
+                _LLM["ok"] = False
+    return _LLM["ok"]
+
+
 def pytest_report_header(config):
     from vmd_agent.environment import find_tachyon
     return [
         f"real VMD:     {REAL_VMD or 'NOT FOUND (requires_vmd tests will be skipped)'}",
         f"real Tachyon: {(find_tachyon(REAL_VMD) if REAL_VMD else None) or 'not found'}",
-        f"real ffmpeg:  {shutil.which('ffmpeg') or 'NOT FOUND (requires_ffmpeg tests will be skipped)'}",
+        f"real ffmpeg:  {find_ffmpeg() or 'NOT FOUND (requires_ffmpeg tests will be skipped)'}",
         f"real MCP SDK: {'yes' if _have_mcp() else 'NOT AVAILABLE (requires_mcp tests will be skipped)'}",
         f"real network: {'reachable' if have_network() else 'UNREACHABLE (requires_network tests will be skipped)'}",
+        "live local-model tests: " + ("ON" if have_llm() else
+                                      "off (set VMD_AGENT_LIVE_LLM_MODEL and run a model server)"),
         "live model API tests: " + ("ON" if os.environ.get("VMD_AGENT_LIVE_TESTS") == "1"
                                     and os.environ.get("ANTHROPIC_API_KEY") else "off"),
     ]
@@ -162,9 +193,12 @@ def pytest_collection_modifyitems(config, items):
     """Apply the gates for the markers, so a test says what it needs once."""
     skips = {
         "requires_vmd": (REAL_VMD is None, "no real VMD found (set VMD_BIN)"),
-        "requires_ffmpeg": (shutil.which("ffmpeg") is None, "no real ffmpeg"),
+        "requires_ffmpeg": (find_ffmpeg() is None, "no real ffmpeg (not on PATH and imageio-ffmpeg missing)"),
         "requires_network": (not have_network(),
                              "cannot reach files.rcsb.org / alphafold.ebi.ac.uk"),
+        "requires_llm": (not have_llm(),
+                         "no reachable model server with VMD_AGENT_LIVE_LLM_MODEL set "
+                         "(e.g. `ollama serve` and `ollama pull <model>`)"),
         "requires_mcp": (not _have_mcp(), "real MCP SDK not importable "
                          "(needs Python >= 3.10 and `pip install mcp`)"),
         "requires_api": (not (os.environ.get("VMD_AGENT_LIVE_TESTS") == "1"
@@ -194,9 +228,63 @@ def real_tachyon(real_vmd):
 
 
 @pytest.fixture(autouse=True)
+def _isolated_settings(tmp_path, monkeypatch):
+    """Never read or write the developer's real vmd-agent settings, or download into the folder where a real install keeps its private model server and models
+    (a test that reaches the install step must land in a temporary folder, not in the developer's home)."""
+    monkeypatch.setenv("VMD_AGENT_CONFIG_DIR", str(tmp_path / "_vmd_agent_config"))
+    monkeypatch.setenv("VMD_AGENT_HOME", str(tmp_path / "_vmd_agent_home"))
+
+
+@pytest.fixture(autouse=True)
 def _clean_env(monkeypatch):
     """Tests must not inherit a developer's sandbox settings (VMD_BIN is kept: the
     real VMD must stay discoverable)."""
     for k in ("VMD_AGENT_ALLOWED_ROOTS", "VMD_AGENT_ALLOW_UNSAFE_TCL",
               "VMD_AGENT_ALLOW_PRIVATE_URLS", "VMD_AGENT_ENABLE_TCL"):
         monkeypatch.delenv(k, raising=False)
+
+
+# ---- a model server for tests of the agent: real HTTP, the chat API's wire format, scripted replies (no model is judged with it)
+DELAY = 0.25
+
+
+def scripted_server(replies, models=("m",)):
+    """Answers each POST with the next of ``replies`` (a dict: content and/or tool_calls) after DELAY seconds, as plain JSON."""
+    calls = []
+
+    class H(http.server.BaseHTTPRequestHandler):
+        def do_GET(self):                                     # the list of models the server has
+            body = json.dumps({"object": "list", "data": [{"id": m, "object": "model"} for m in models]}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def do_POST(self):
+            calls.append(json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0)))))
+            time.sleep(DELAY)
+            msg = {"role": "assistant", **replies[min(len(calls), len(replies)) - 1]}
+            usage = {"prompt_tokens": 5, "completion_tokens": 2}
+            if calls[-1].get("stream"):                       # the same reply as server-sent events, as streaming clients ask for
+                delta = {k: v for k, v in msg.items() if k != "role" and v}
+                if "tool_calls" in delta:
+                    delta["tool_calls"] = [{"index": i, **c} for i, c in enumerate(delta["tool_calls"])]
+                events = [{"choices": [{"delta": delta, "finish_reason": None}]},
+                          {"choices": [{"delta": {}, "finish_reason": "stop"}], "usage": usage}]
+                body = b"".join(b"data: " + json.dumps(e).encode() + b"\n\n" for e in events) + b"data: [DONE]\n\n"
+                ctype = "text/event-stream"
+            else:
+                body = json.dumps({"choices": [{"message": msg, "finish_reason": "stop"}], "usage": usage}).encode()
+                ctype = "application/json"
+            self.send_response(200)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *a):
+            pass
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    return srv, f"http://127.0.0.1:{srv.server_address[1]}/v1", calls

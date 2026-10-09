@@ -98,6 +98,7 @@ def run_agent_benchmark(suite_dir: str, runs: Sequence[dict], out_dir: str,
                            "repeat": rep, **env.stats(),
                            "tokens_in": meta.get("tokens_in"),
                            "tokens_out": meta.get("tokens_out"),
+                           "model_s": meta.get("model_s"), "model_calls": meta.get("model_calls"),
                            "agent_error": err,
                            "wall_s": round(time.time() - t0, 2)}
                     recs.append(rec)

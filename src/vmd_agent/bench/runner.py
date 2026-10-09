@@ -287,7 +287,7 @@ def summary_markdown(summary: dict) -> str:
         L += ["", "An adjusted estimate clearly above 0 on image conditions is "
               "evidence of recognition from memory; it still assumes the "
               "novel and real structures differ in difficulty in the same way "
-              "for images as for text (see docs/PAPER.md#appendix-e-grounding-study-specification)."]
+              "for images as for text (see docs/reference/RESEARCH.md#appendix-e-grounding-study-specification)."]
     if summary.get("skipped_cells"):
         L += ["", f"{len(summary['skipped_cells'])} structure×condition cells "
               "were skipped (no renderer available)."]

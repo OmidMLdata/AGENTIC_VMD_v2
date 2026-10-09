@@ -57,7 +57,7 @@ def test_public_view_leaks_nothing(built):
 
 
 def test_no_truth_inside_any_workspace(built):
-    for dp, _dn, fs in os.walk(os.path.join(built[0], "work")):
+    for _dp, _dn, fs in os.walk(os.path.join(built[0], "work")):
         for f in fs:
             assert f in ("system.pdb", "traj.dcd"), f
 
@@ -135,11 +135,6 @@ def test_selection_truth_uses_independent_geometry(built):
 
 
 # ---------------------------------------------------------------- scoring
-def _sc(built, kind, answer, n=0, **kw):
-    t = _by_kind(built, kind, n)
-    return scoring.score_task(t, built[1]["truth"][t["id"]], answer)
-
-
 def test_measure_tolerance_and_malformed_answers(built):
     t = _by_kind(built, "rg_mean")
     v = built[1]["truth"][t["id"]]["value"]
@@ -501,3 +496,36 @@ def test_a_changed_workspace_file_stops_the_run(built, tmp_path):
         run_agent_benchmark(d, [{"label": "o", "agent": OracleAgent(
             S.load_suite(d)["truth"]), "arm": "vmd_agent"}],
             str(tmp_path / "out"), n_boot=0)
+
+
+@pytest.mark.requires_llm
+def test_an_open_model_drives_the_tool_loop_end_to_end(built, tmp_path):
+    """Live: a real local model through the OpenAI-style API. It must complete the
+    protocol (call tools, submit a well-formed answer); whether it is *right* is the
+    benchmark's question. Small local models may fail this: that is a result."""
+    from vmd_agent.bench.agent import runner
+    from vmd_agent.bench.agent.agents import OpenAICompatAgent
+    t = _by_kind(built, "rg_mean")
+    staged = runner._stage(t, str(tmp_path / "w"))
+    env = tools.Environment(staged, "vmd_agent", max_steps=12)
+    agent = OpenAICompatAgent(
+        os.environ.get("VMD_AGENT_LLM_URL", "http://localhost:11434/v1"),
+        os.environ["VMD_AGENT_LIVE_LLM_MODEL"], os.environ.get("VMD_AGENT_LLM_KEY"))
+    meta = agent.run(S.public_view(staged), env)
+    assert any(c["tool"] != "submit_answer" for c in env.log), env.log
+    assert meta["tokens_in"] > 0
+
+
+def test_agent_compare_command_reports_the_paired_difference(tmp_path, capsys):
+    """The CLI command reads the records agent-run wrote and prints paired_arms."""
+    import json
+    from vmd_agent import cli
+    rows = [{"label": lab, "task_id": f"t{i}", "cluster": f"c{i % 3}", "family": "measure",
+             "success": lab == "a" or i % 2 == 0}
+            for lab in ("a", "b") for i in range(12)]
+    p = tmp_path / "records.jsonl"
+    p.write_text("\n".join(json.dumps(r) for r in rows))
+    assert cli.main(["bench", "agent-compare", str(p), "--a", "a", "--b", "b"]) == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out["n_tasks"] == 12 and out["n_clusters"] == 3
+    assert abs(out["mean_difference"] - 0.5) < 1e-9          # a always succeeds; b on every other task

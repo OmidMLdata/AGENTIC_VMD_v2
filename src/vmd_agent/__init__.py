@@ -21,24 +21,24 @@ Design contract
 * Inspection, detection, trajectory analysis, claim verification and the
   matplotlib renderer use only open-source Python packages, so they work on
   any machine, VMD present or not. VMD is **not bundled** (UIUC license).
-* VMD rendering and ``run_vmd_tcl`` locate a user-installed VMD and fail
+* VMD rendering and ``run_tcl`` locate a user-installed VMD and fail
   gracefully with actionable messages when it is missing.
 * Every public function returns a JSON-serialisable ``dict`` so calls chain.
 * Results state how they were obtained (bond source, H-bond method, renderer,
   time axis) and what they cannot show.
 """
 
-__version__ = "0.9.4"
+__version__ = "0.30.3"
 
-from vmd_agent.inputs.inspection import inspect_files  # noqa: E402
-from vmd_agent.structure.detect import detect_system  # noqa: E402
-from vmd_agent.visual.recipes import generate_visualization_recipe  # noqa: E402
-from vmd_agent.dynamics.analysis import analyze_trajectory  # noqa: E402
-from vmd_agent.auto import (visualize_and_interpret, fetch_and_visualize,  # noqa: E402
+from vmd_agent.inputs.inspection import inspect_files
+from vmd_agent.structure.detect import detect_system
+from vmd_agent.visual.recipes import generate_visualization_recipe
+from vmd_agent.dynamics.analysis import analyze_trajectory
+from vmd_agent.auto import (visualize_and_interpret, fetch_and_visualize,
                             probe_environment, select_keyframes)
-from vmd_agent.inputs.fetch import fetch_structure, search_pdb  # noqa: E402
-from vmd_agent.evidence.claims import verify_claims  # noqa: E402
-from vmd_agent.visual.renderers import get_renderer  # noqa: E402
+from vmd_agent.inputs.fetch import fetch_structure, search_pdb
+from vmd_agent.evidence.claims import verify_claims
+from vmd_agent.visual.renderers import get_renderer
 
 __all__ = [
     "__version__",

@@ -59,3 +59,16 @@ def test_cli_exit_codes(capsys):
     assert cli.main(["mcp-check", "--roots", DATA]) == 0
     assert "READY" in capsys.readouterr().out
     assert cli.main(["mcp-check", "--roots", "/nonexistent/dir"]) == 2
+
+
+def test_the_client_config_follows_the_saved_settings_and_the_contained_folder(tmp_path, monkeypatch):
+    """Found in a clean-room install: the server (started by a client) saw none of the saved settings."""
+    from vmd_agent import mcp_check, settings
+    monkeypatch.setenv("VMD_AGENT_HOME", str(tmp_path / "home"))
+    monkeypatch.delenv("VMD_AGENT_CONFIG_DIR", raising=False)
+    settings.save(data_dir=str(tmp_path / "files"))
+    env = mcp_check.build_mcp_config(vmd=str(tmp_path / "vmd"))["config"]["mcpServers"]["vmd-agent"]["env"]
+    assert env["VMD_AGENT_HOME"] == str(tmp_path / "home")
+    assert env["VMD_AGENT_ALLOWED_ROOTS"].endswith("files")                 # the folder chosen in setup is the sandbox
+    given = mcp_check.build_mcp_config(roots=[str(tmp_path / "other")], vmd=str(tmp_path / "vmd"))
+    assert given["config"]["mcpServers"]["vmd-agent"]["env"]["VMD_AGENT_ALLOWED_ROOTS"].endswith("other")
