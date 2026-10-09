@@ -59,8 +59,12 @@ def present(tool: str, args: dict, result: dict) -> dict:
         return {"ok": False, "error": f"{tool} has nothing to draw"}
     try:
         win = vmdlink.Window(vmdlink.open_window())
+        before = _fingerprint(win)
         out = fn(win, args, result)
         out.setdefault("ok", True)
+        out["changed"] = _fingerprint(win) != before                # said by the window, not by the presenter: did anything in it actually change?
+        if not out["changed"]:
+            out["summary"] = "The VMD window already showed this, so nothing new was drawn."
         out["molecules"] = [{"id": m["id"], "name": m["name"], "top": m["top"], "frame": m["frame"], "frames": m["nframes"], "representations": m["numreps"]} for m in win.molecules()]
         return out
     except (vmdlink.LinkError, security.SecurityError, security.InvalidInput, OSError, ValueError, KeyError) as e:
@@ -70,6 +74,11 @@ def present(tool: str, args: dict, result: dict) -> dict:
 # ------------------------------------------------------------------------------------------------ helpers
 def _real(path: str) -> str:
     return os.path.realpath(security.check_path(path))
+
+
+def _fingerprint(win: vmdlink.Window) -> list:
+    """What the window holds, to tell afterwards whether anything was drawn: each molecule with its representations, visibility and frame."""
+    return [(m["id"], m["numreps"], m["top"], m.get("shown"), m["frame"], m["nframes"]) for m in win.molecules()]
 
 
 def _molecule_holding(win: vmdlink.Window, path: str) -> Optional[dict]:
@@ -321,6 +330,7 @@ def present_workflow(name: str, files: List[str], result: dict, out_dir: str) ->
     """Show the outcome of a whole job in the VMD window: what its figures show, but in VMD."""
     try:
         win = vmdlink.Window(vmdlink.open_window())
+        before = _fingerprint(win)
         from vmd_agent import toolset
         shown: dict = {}
         if name in ("structure_overview", "equilibration_check", "interaction_report"):
@@ -357,6 +367,12 @@ def present_workflow(name: str, files: List[str], result: dict, out_dir: str) ->
             mid = _load_simple(win, fitted, "Structure")
             win.top(mid)
             shown["model_molecule"] = mid
-        return {"ok": True, **shown, "summary": f"The outcome of {name} is drawn in the VMD window."}
+        changed = _fingerprint(win) != before
+        summary = (f"The outcome of {name} is drawn in the VMD window." if changed and name != "equilibration_check" else
+                   "The system and its trajectory are loaded in the VMD window. The analysis itself is numbers and figures (see the report); VMD draws the structure, not the statistics."
+                   if changed else
+                   "The VMD window already showed this system, so nothing new was drawn. The outcome of "
+                   f"{name} is numbers and figures (see the report), not something VMD draws.")
+        return {"ok": True, **shown, "changed": changed, "summary": summary}
     except (vmdlink.LinkError, security.SecurityError, security.InvalidInput, OSError, ValueError, KeyError) as e:
         return {"ok": False, "error": str(e) or type(e).__name__}

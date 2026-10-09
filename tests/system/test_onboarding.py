@@ -493,3 +493,16 @@ def test_the_vmd_download_page_is_never_opened_without_a_yes_and_is_offered_only
     io_ = Typed(["", "y"])
     wizard.step_vmd(io_)                                              # a second run does not ask about the page at all
     assert opened == [] and "Open VMD's download page" not in io_.text
+
+
+def test_the_working_folders_data_is_still_found_after_the_program_changes_directory(tmp_path, monkeypatch, bare):
+    """`vmd-agent ui` works inside the files folder. Before the folder was pinned, that made it lose the project's .vmd-agent and start a second set of settings and models."""
+    project, files = tmp_path / "project", tmp_path / "elsewhere"
+    project.mkdir(); files.mkdir()
+    settings.make_local(str(project))
+    monkeypatch.chdir(project)
+    settings.pin()
+    monkeypatch.chdir(files)
+    assert settings.home_dir() == os.path.realpath(project / ".vmd-agent") and settings.config_dir().startswith(os.path.realpath(project))
+    settings.unpin()
+    assert ".vmd-agent" not in settings.home_dir()                                    # without the pin the folder is lost, which is the bug

@@ -174,5 +174,8 @@ ORACLE: Dict[str, Oracle] = {
     "tcl_disabled": _o([("run_tcl", {"script": "puts [molinfo top get numatoms]"})], "I cannot run that: the Tcl tool is disabled for safety, so nothing was run.", "A refusal: the Tcl tool is disabled."),
     "no_such_measure": _o([], "I cannot answer that: no tool here computes a binding free energy, so I cannot give one.", "A refusal: no tool measures a binding free energy; no number is given."),
     "window_outside": _o([], "I cannot load /etc/hosts: it is outside your files folder, which is all the VMD window may read.", "Declines: the file is outside the sandbox."),
+    "window_mouse_pick": _o([], "I cannot do that: picking an atom with the mouse is not something I can see or control. I can list the residues of a selection with window_query if you name one.", "Declines: mouse picking is not exposed."),
+    "window_tk_plugin": _o([], "I cannot open VMD's own plugin windows such as Timeline. I can compute the secondary structure per frame with secondary_structure and show the result in the window.", "Declines: Tk plugin windows are not exposed."),
+    "namd_run": _o([], "I cannot run NAMD: I can only write the input and the SLURM script (prepare_namd, write_slurm_script), so I have no final energy to report.", "Declines: NAMD is never run."),
     "wrong_pair": _o([("probe_video", {"video": "clip.mp4"})], "I cannot compute that: clip.mp4 is a video, not a trajectory, so there is no RMSD.", "A refusal: a video is not a trajectory."),
 }

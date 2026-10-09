@@ -40,7 +40,7 @@ Nothing large is fetched without that yes: the Ollama program and each model are
 
 ### Comparing models
 
-A built-in benchmark gives a model 67 plain-language requests across 15 kinds of work (inspecting files, claims, trajectories, VMD measurements, building, maps, rendering, driving the VMD window, video, whole jobs and
+A built-in benchmark gives a model 70 plain-language requests across 15 kinds of work (inspecting files, claims, trajectories, VMD measurements, building, maps, rendering, driving the VMD window, video, whole jobs and
 requests that should be declined). Each task has a correct answer worked out from data built to have known properties, and a program grades it ([every prompt and its correct answer](../benchmarks/model-benchmark-tasks.md)).
 
 ```bash

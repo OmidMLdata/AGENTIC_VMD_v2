@@ -50,7 +50,7 @@ the records. Nothing is stored in the repository: you run it on your models and 
 | `hand_off` | a SLURM script | 1 |
 | `records` | re-check recorded hashes, write a report from a session | 2 |
 | `network` | search the PDB, download an entry | 2 |
-| `decline` | requests that cannot or must not be done: a missing file, a path outside the folder, Tcl that is disabled, a quantity no tool measures, data that do not match | 6 |
+| `decline` | requests that cannot or must not be done: a missing file, a path outside the folder, Tcl that is disabled, a quantity no tool measures, data that do not match, and things the toolkit cannot do (picking atoms with the mouse, VMD's own plugin windows, running NAMD) | 9 |
 
 Every prompt, the tools that answer it and **what a correct answer says** are in [the task list](model-benchmark-tasks.md); `vmd-agent bench models --list --reference` prints it, and `vmd-agent bench models --oracle` does every task perfectly with the real tools and grades that (no model), so a task that a perfect agent cannot pass shows up as a bug in the task. Tasks that need VMD, ffmpeg or the network are skipped (with the reason) when the computer lacks them, and are not counted.
 A test checks that every tool is asked for by some task or excused with a reason.

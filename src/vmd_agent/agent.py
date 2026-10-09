@@ -26,7 +26,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Callable, List, Optional
 
-from vmd_agent import argfix, models, ollama_local, progress, routing, security, toolhints, toolset
+from vmd_agent import argfix, limits, models, ollama_local, progress, routing, security, toolhints, toolset
 from vmd_agent.llm_client import (
     LLMError, assistant_message, chat_completion, list_models, parse_choice,
     render_result, to_openai_tools, tool_message)
@@ -64,7 +64,14 @@ change how they are drawn with window_representation (selection, style, color), 
 window_query. You cannot see the window: describe it from what these tools return, and take a window_snapshot only when the user wants a picture.
 10. For a whole job (has a run settled, what interacts, compare two runs, prepare a simulation, fit a model into a map) call \
 run_workflow (with no name it lists the workflows): it runs the steps, grades the findings and writes a report. Quote its verdict and findings and \
-give the report path."""
+give the report path.
+11. Say only what the tool results show. Never say that something was drawn, shown, loaded, saved, written or opened unless a tool result says \
+so, and if a result says nothing was drawn or changed, say that.
+12. Some things you cannot do: pick atoms with the mouse, open VMD's own Tk windows (Timeline, Hydrogen Bonds, the plugin windows), run NAMD or a \
+cluster job (you can only write the input and the script), reach files outside the data directory, or use the internet other than to fetch or \
+search the PDB. If asked for one of these, say plainly that you cannot, offer the nearest thing a tool can do, and do not call an unrelated tool \
+or pretend.
+13. Never print a tool call or its JSON for the user to run; call the tool yourself, or say that you cannot."""
 
 
 _DATA_WORDS = re.compile(
@@ -111,6 +118,44 @@ def unsupported_numbers(answer: str, tool_texts) -> List[str]:
     return bad
 
 
+# What an answer claims about the VMD window or about files it says it wrote, checked against what the tools actually did this turn.
+_WINDOW_CLAIM = re.compile(r"\b(display(?:ed|s)?|shown|show(?:s|n)?|drawn|draws?|visible|rendered|opened|loaded|highlighted|rotated|coloured|colored|zoomed|appears?)\b"
+                           r"[^.\n]{0,60}\b(?:in|on|into|inside)\b[^.\n]{0,24}\b(?:VMD|the window|your window|the display)\b", re.I)
+_WROTE_PATH = re.compile(r"\b(?:saved|written|wrote|created|exported|stored|generated)\b[^\n]{0,80}?((?:/|~/|\./)?[\w.\-]+(?:/[\w.\-]+)*\.\w{2,5})\b", re.I)
+
+
+_NEGATED = re.compile(r"\b(?:not|never|no|nothing|cannot|can't|couldn't|didn't|did not|does not|doesn't|without|unable|isn't|wasn't|hasn't)\b", re.I)
+
+
+def window_changed(calls) -> bool:
+    """Did a tool this turn actually change the VMD window? A window_* tool that succeeded, or a ``show_in_window`` result that says it changed something."""
+    for c in calls:
+        r = c.get("result")
+        if not isinstance(r, dict) or r.get("error") or r.get("ok") is False:
+            continue
+        if str(c.get("name", "")).startswith("window_"):
+            return True
+        w = r.get("window")
+        if isinstance(w, dict) and w.get("ok") and w.get("changed", True):
+            return True
+    return False
+
+
+def unsupported_claims(answer: str, calls, evidence_texts) -> List[str]:
+    """Statements in an answer about the VMD window, or about files it says were written, that no tool result backs. The number guard cannot see these.
+    ``calls`` are this turn's tool calls (name and result); ``evidence_texts`` the tool results and the question as text."""
+    body = re.sub(r"```.*?```", "", answer, flags=re.S)
+    bad: List[str] = []
+    if not window_changed(calls) and any(_WINDOW_CLAIM.search(s) and not _NEGATED.search(s) for s in re.split(r"(?<=[.!?])\s+|\n+", body)):
+        bad.append("that something is shown in the VMD window (no tool changed the window)")
+    joined = "\n".join(evidence_texts)
+    for m in _WROTE_PATH.finditer(body):
+        path = m.group(1)
+        if os.path.basename(path) not in joined and f"that the file {path} was written" not in bad:
+            bad.append(f"that the file {path} was written (no tool result mentions it)")
+    return bad
+
+
 #: questions that a named workflow answers better than one measurement (the model is pointed at it; it still makes the call)
 _ROUTES = [
     ("equilibration_check", re.compile(r"\b(settled|equilibrat\w*|converg\w*|stabili[sz]ed|steady state)\b", re.I)),
@@ -137,6 +182,9 @@ _CLAIMS = re.compile(r"\b(which (of (these|them)|ones?) (are|is) (true|correct)|
 def claims_hint(text: str) -> bool:
     return bool(_CLAIMS.search(text))
 
+
+GROUND_CLAIMS = ("Your answer says things no tool result shows: {claims}. Say only what the tool results show: if nothing was drawn or saved, say so, "
+                 "and if a tool could do it, call that tool first.")
 
 GROUND = ("Some numbers in your answer are in no tool result: {numbers}. Use only what the tools returned. If the question cannot be answered "
           "with the tools you have, say so plainly instead of estimating.")
@@ -359,6 +407,7 @@ class Agent:
         that the guard is about to send back is held until it is known to be kept). The full text is returned either way;
         ``self.streamed`` tells whether it was already delivered through ``on_token``."""
         self.turn = new_clock()
+        self.turn_start = len(self.call_log)                 # this turn's tool calls begin here (for checking what the answer claims)
         began = time.time()
         try:
             return self._ask(text, on_token)
@@ -368,6 +417,13 @@ class Agent:
             add_clock(self.clock, self.turn)
 
     def _ask(self, text: str, on_token: Optional[Callable[[str], None]]) -> str:
+        refusal = limits.unsupported(text) if self.guard else None
+        if refusal:                                          # something this toolkit cannot do: say so, without a model that might do the nearest thing and imply it did
+            self.echo("  (a request for something the toolkit cannot do: answered without the model)")
+            self.messages.append({"role": "user", "content": text})
+            self.messages.append({"role": "assistant", "content": refusal})
+            self.streamed = False
+            return refusal
         if self.profile == "auto":
             self.names = routing.select(text, list(toolset.ALL))
             self.widened = []
@@ -383,7 +439,7 @@ class Agent:
                     "in `claims`, and report its verdicts.]")
             self.echo("  (verify_claims fits this question)")
         self.messages.append({"role": "user", "content": text + note})
-        used_tool = nudged = regrounded = False
+        used_tool = nudged = regrounded = reclaimed = False
         self.streamed = False
         question_about_data = bool(_DATA_WORDS.search(text))
         for _ in range(self.max_turns):
@@ -436,6 +492,16 @@ class Agent:
                 self.streamed = bool(on_token) and (live or bool(held))
                 cut = " (cut off: the model went past its length limit)" if parsed.get("finish_reason") == "length" else ""
                 answer = (parsed["content"] or "") + cut
+                if self.guard:
+                    claims = unsupported_claims(answer, self.call_log[getattr(self, "turn_start", 0):],
+                                                [m["content"] for m in self.messages if m["role"] == "tool"] + [text])
+                    if claims and not reclaimed and not on_token:
+                        reclaimed = True
+                        self.echo("  (the answer claims something no tool result shows; asking the model to correct it)")
+                        self.messages.append({"role": "user", "content": GROUND_CLAIMS.format(claims="; ".join(claims))})
+                        continue
+                    if claims:
+                        answer += "\n\n(Check this yourself: the answer says " + "; ".join(claims) + ".)"
                 if used_tool and self.guard:
                     bad = unsupported_numbers(answer, [m["content"] for m in self.messages if m["role"] == "tool"] + [text])
                     if bad and not regrounded and not on_token:

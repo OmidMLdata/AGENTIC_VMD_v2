@@ -651,13 +651,17 @@ def main(argv=None):
     if not (sys.argv[1:] if argv is None else argv):
         from vmd_agent import platform_info, wizard
         platform_info.console_safe()
+        from vmd_agent import settings as _settings
+        _settings.pin()                                   # the working folder's .vmd-agent stays the one in use even if a command changes directory
         try:
             return wizard.menu()
         except SystemExit as e:                  # Ctrl-C or end of input at a prompt
             return int(e.code or 0) if isinstance(e.code, int) else 1
     args = p.parse_args(argv)
     from vmd_agent import platform_info
+    from vmd_agent import settings as _settings
     platform_info.console_safe()
+    _settings.pin()                                       # the working folder's .vmd-agent stays the one in use even if a command changes directory
     import warnings
     warnings.filterwarnings("ignore", module=r"MDAnalysis(\..*)?")      # the library's own notices are not for a user at a terminal
     try:

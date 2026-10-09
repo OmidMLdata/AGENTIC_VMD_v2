@@ -153,3 +153,18 @@ def test_whole_jobs_can_show_their_outcome_in_vmd(tmp_path, monkeypatch):
         assert T["run_workflow"](name="structure_overview", files=[str(tmp_path / "protein.pdb")], out_dir=str(tmp_path / "w4"))["ok"]       # without the flag nothing is drawn
     finally:
         vmdlink.stop()
+
+
+@vmd
+def test_a_job_that_changed_nothing_in_the_window_says_so_and_the_agent_can_tell(folder):
+    from vmd_agent import agent
+    top, trj = os.path.join(folder, "protein.pdb"), os.path.join(folder, "protein.dcd")
+    T["window_load"](topology=top, trajectory=trj)                                  # the window already shows this system
+    r = T["run_workflow"](name="equilibration_check", files=["protein.pdb", "protein.dcd"], out_dir=os.path.join(folder, "eq"), show_in_window=True)
+    assert r["window"]["ok"] and r["window"]["changed"] is False and "nothing new was drawn" in r["window"]["summary"]
+    said = "The outcome is also displayed in the VMD window."
+    assert agent.unsupported_claims(said, [{"name": "run_workflow", "result": r}], [])        # exactly the sentence that was wrong in the demo
+    vmdlink.stop()
+    r2 = T["run_workflow"](name="equilibration_check", files=["protein.pdb", "protein.dcd"], out_dir=os.path.join(folder, "eq2"), show_in_window=True)
+    assert r2["window"]["changed"] is True                                         # an empty window now holds the system
+    assert not agent.unsupported_claims(said, [{"name": "run_workflow", "result": r2}], [])

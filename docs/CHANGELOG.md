@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.34.0: it only says what the tools did
+
+* **The guard checks claims, not only numbers.** An answer that says something is shown or drawn in the VMD window needs a tool that changed the window; one that says a file was written needs a tool result that names it. Otherwise the answer is sent back once, then flagged.
+* **Tools report what really happened.** Presenting a result in the VMD window now says whether the window changed (`changed`), and says "nothing new was drawn" when it did not. This was the cause of a false "displayed in the VMD window" in a demo: the tool's own summary over-claimed.
+* **Impossible requests are refused before the model sees them** (`limits.py`): clicking atoms with the mouse, VMD's own plugin windows, running NAMD. The agent's instructions also say what it cannot do and to say only what tools show. Three new benchmark tasks (70 in all).
+* **Fixed: the web page lost the project's `.vmd-agent`.** The page's server works inside the files folder, so a project's data folder was not found any more and a second Ollama and a second set of settings were created in the per-user folder. The folder is now pinned at start-up.
+* Download progress in the Model window no longer shows terminal control codes.
+* **The installers run in CI** on Linux, macOS and Windows, from this commit into a throwaway folder, followed by setup, `doctor` and a tool.
+
 ## 0.33.0: a friendlier first run
 
 * **README rewritten around installing and starting**: what you need, four install steps with the answers to give, how to start it, what to do when something goes wrong. The detail moved to pages: [How it works](guide/how-it-works.md), the model benchmark commands to [Models](guide/models.md), the repository layout to [Development](reference/development.md), and a cleaner [Install and set up](guide/install.md).

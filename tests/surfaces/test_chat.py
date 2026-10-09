@@ -274,3 +274,77 @@ def test_numbers_written_with_thousands_groups_or_inside_hex_like_words_are_read
     assert agent.unsupported_numbers("It holds 1,280 atoms.", ['{"n_atoms": 1280}']) == []
     assert agent.unsupported_numbers("See /tmp/0e6e9e2f-ba40-444e-845d-2e408ce50b16/x.pdb", ["{}"]) == []                    # no 2e408 = infinity
     assert agent.unsupported_numbers("There are 4 000 atoms.", ['{"n_atoms": 1280}']) == ["4000"]                              # a wrong number is still caught
+
+
+# ------------------------------------------- claims about the VMD window and about files are checked against what the tools did
+def test_a_claim_about_the_vmd_window_needs_a_tool_that_changed_it():
+    said = "I drew the protein as a surface and it is now displayed in the VMD window."
+    assert agent.unsupported_claims(said, [], [])                                                           # no tool at all
+    assert agent.unsupported_claims(said, [{"name": "list_representations", "result": {"ok": True}}], [])   # a tool that cannot touch the window
+    assert agent.unsupported_claims(said, [{"name": "run_workflow", "result": {"ok": True, "window": {"ok": True, "changed": False}}}], [])   # the window said nothing changed
+    assert not agent.unsupported_claims(said, [{"name": "window_representation", "result": {"ok": True}}], [])
+    assert not agent.unsupported_claims(said, [{"name": "run_workflow", "result": {"ok": True, "window": {"ok": True, "changed": True}}}], [])
+    assert agent.unsupported_claims(said, [{"name": "window_load", "result": {"ok": False, "error": "no VMD"}}], [])  # a failed call changed nothing
+    assert not agent.unsupported_claims("The RMSD is flat; see the report.", [], [])                       # no claim, no flag
+    assert not agent.unsupported_claims("The workflow did not change what is shown in the VMD window.", [], [])        # saying that nothing was drawn is the honest answer
+    assert not agent.unsupported_claims("Nothing was displayed in the VMD window.", [], [])
+
+
+def test_a_claim_that_a_file_was_written_needs_a_tool_result_that_names_it():
+    assert agent.unsupported_claims("The report was saved to out/report.md.", [], ["{\"other\": 1}", "question"])
+    assert not agent.unsupported_claims("The report was saved to out/report.md.", [], ["{\"report\": \"/data/out/report.md\"}"])
+    assert not agent.unsupported_claims("Look at protein.pdb for details.", [], [])                         # only 'saved/written/created ...' is a claim
+
+
+def test_an_answer_that_says_it_drew_in_vmd_without_a_tool_is_sent_back_and_corrected():
+    from conftest import scripted_server as _server
+    srv, url, requests = _server(_tool_then({"content": "Done: the surface is now shown in the VMD window."}, {"content": "I could not change the VMD window; the styles are listed above."}))
+    try:
+        answer = agent.Agent(url, "m").ask("List the surface styles.")
+    finally:
+        srv.shutdown()
+    assert answer.startswith("I could not change the VMD window") and len(requests) == 3
+    assert "no tool changed the window" in requests[2]["messages"][-1]["content"]
+
+
+def test_the_agent_is_told_what_it_cannot_do_and_to_say_only_what_tools_show():
+    assert "pick atoms with the mouse" in agent.SYSTEM_PROMPT and "Tk windows" in agent.SYSTEM_PROMPT
+    assert "Never say that something was drawn" in agent.SYSTEM_PROMPT
+
+
+# ------------------------------------------- impossible requests are refused before the model can do 'the nearest thing'
+@pytest.mark.parametrize("text", [
+    "Let me click an atom in the VMD window; tell me which residue I just picked.",
+    "Which residue did I hover the mouse over?",
+    "Open VMD's Timeline plugin window and show me the secondary structure timeline there.",
+    "Launch the Tk console in VMD.",
+    "Run NAMD on the system you built and tell me the final potential energy.",
+    "Please submit the simulation to the cluster and start the md run.",
+])
+def test_requests_for_what_the_toolkit_cannot_do_are_refused_in_plain_words(text):
+    from vmd_agent import limits
+    reply = limits.unsupported(text)
+    assert reply and reply.startswith("I cannot")
+
+
+@pytest.mark.parametrize("text", [
+    "Which residue has the highest RMSF in run.dcd?",
+    "Pick the three most flexible residues.",
+    "What is the secondary structure timeline of protein.pdb over protein.dcd?",
+    "Write a NAMD input for the built system.",
+    "How do I run NAMD on a cluster?",
+    "Show the protein as a surface in the VMD window.",
+])
+def test_ordinary_requests_are_not_mistaken_for_impossible_ones(text):
+    from vmd_agent import limits
+    assert limits.unsupported(text) is None
+
+
+def test_an_impossible_request_is_answered_without_asking_the_model():
+    from conftest import scripted_server as _server
+    srv, url, requests = _server([{"content": "should never be asked"}])
+    try:
+        answer = agent.Agent(url, "m").ask("Let me click an atom in the VMD window; tell me which residue I just picked.")
+    finally:
+        srv.shutdown()
+    assert answer.startswith("I cannot see or control the mouse") and requests == []

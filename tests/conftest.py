@@ -236,6 +236,15 @@ def _isolated_settings(tmp_path, monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _unpinned():
+    """cli.main pins the working folder's .vmd-agent for the life of the process; each test starts without that."""
+    from vmd_agent import settings
+    settings.unpin()
+    yield
+    settings.unpin()
+
+
+@pytest.fixture(autouse=True)
 def _clean_env(monkeypatch):
     """Tests must not inherit a developer's sandbox settings (VMD_BIN is kept: the
     real VMD must stay discoverable)."""

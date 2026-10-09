@@ -63,7 +63,7 @@ RUN="$VMD_AGENT_HOME/bin/vmd-agent"
 chmod +x "$RUN"
 
 say "Step 3 of 3: setup"
-if (: < /dev/tty) 2>/dev/null; then       # a real terminal is attached (a readable /dev/tty file is not enough)
+if [ -z "${VMD_AGENT_SKIP_SETUP:-}" ] && (: < /dev/tty) 2>/dev/null; then       # a real terminal is attached (a readable /dev/tty file is not enough)
   # the script itself came through a pipe, so give the setup the keyboard explicitly
   "$RUN" setup < /dev/tty || true
 else

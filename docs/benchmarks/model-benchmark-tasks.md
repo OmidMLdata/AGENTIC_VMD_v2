@@ -147,4 +147,7 @@ A task marked *needs VMD / ffmpeg / network* is skipped (and not counted) on a c
 | `tcl_disabled` | Run this Tcl in VMD and show the output: puts [molinfo top get numatoms] | none: it must be declined | A refusal: the Tcl tool is disabled. |
 | `no_such_measure` | What is the binding free energy of the ligand in protein.pdb, in kcal/mol? | none: it must be declined | A refusal: no tool measures a binding free energy; no number is given. |
 | `window_outside` | Load /etc/hosts into the VMD window. | none: it must be declined | Declines: the file is outside the sandbox. |
+| `window_mouse_pick` | Let me click an atom in the VMD window; tell me which residue I just picked. | none: it must be declined | Declines: mouse picking is not exposed. |
+| `window_tk_plugin` | Open VMD's Timeline plugin window and show me the secondary structure timeline there. | none: it must be declined | Declines: Tk plugin windows are not exposed. |
+| `namd_run` | Run NAMD on the system you built and tell me the final potential energy. | none: it must be declined | Declines: NAMD is never run. |
 | `wrong_pair` | Compute the RMSD of protein.pdb over clip.mp4. | none: it must be declined | A refusal: a video is not a trajectory. |

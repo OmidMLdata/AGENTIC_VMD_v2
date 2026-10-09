@@ -33,9 +33,29 @@ KEYS = ("data_dir", "vmd_path", "llm_url", "llm_model", "llm_key", "setup_done",
         "ollama_mode", "ollama_port", "vmd_page_offered")
 
 
-def local_home(start: Optional[str] = None) -> Optional[str]:
+_PIN: list = []                                  # [folder or None] once pinned
+
+
+def pin() -> None:
+    """Remember now which ``.vmd-agent`` folder belongs to the working folder. A program that changes directory later (the web page's server works
+    inside your files folder) would otherwise stop finding it, and quietly start a second set of settings and models somewhere else."""
+    _PIN[:] = [local_home(_FROM_CWD)]
+
+
+def unpin() -> None:
+    _PIN.clear()
+
+
+_FROM_CWD = object()
+
+
+def local_home(start=None) -> Optional[str]:
     """The ``.vmd-agent`` folder of the working folder: in ``start`` (default: the current folder) or the
-    nearest folder above it that has one; ``None`` if there is none."""
+    nearest folder above it that has one; ``None`` if there is none. After :func:`pin` the folder found at start-up is used wherever the program is."""
+    if start is None and _PIN:
+        return _PIN[0]
+    if start is _FROM_CWD:
+        start = None
     try:
         d = os.path.realpath(start or os.getcwd())
     except OSError:

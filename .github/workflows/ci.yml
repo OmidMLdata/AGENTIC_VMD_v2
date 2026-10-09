@@ -71,3 +71,45 @@ jobs:
       - name: Image contains no VMD
         run: |
           ! docker run --rm --entrypoint sh vmd-agent:ci -c 'command -v vmd || test -e /opt/vmd/bin/vmd'
+
+  installer:
+    # The one-line installers, run from this commit on a clean machine of each kind into a throwaway folder; then the installed program is used.
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install (Mac and Linux)
+        if: runner.os != 'Windows'
+        run: VMD_AGENT_HOME="$RUNNER_TEMP/vmd" VMD_AGENT_SKIP_SETUP=1 sh install/install.sh
+      - name: Use it (Mac and Linux)
+        if: runner.os != 'Windows'
+        run: |
+          R="$RUNNER_TEMP/vmd/bin/vmd-agent"
+          mkdir -p "$RUNNER_TEMP/files" && cd "$RUNNER_TEMP/files"
+          "$R" setup --yes --use skip --data-dir "$RUNNER_TEMP/files"
+          "$R" doctor
+          "$R" tool probe_environment | head -20
+          "$R" tools | head -5
+          "$R" models | head -4
+      - name: Install (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $env:VMD_AGENT_HOME = "$env:RUNNER_TEMP\vmd"
+          $env:VMD_AGENT_SKIP_SETUP = "1"
+          powershell -ExecutionPolicy Bypass -File install/install.ps1
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+      - name: Use it (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $r = "$env:RUNNER_TEMP\vmd\bin\vmd-agent.cmd"
+          New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP\files" | Out-Null
+          Set-Location "$env:RUNNER_TEMP\files"
+          & $r setup --yes --use skip --data-dir "$env:RUNNER_TEMP\files"; if ($LASTEXITCODE -ne 0) { exit 1 }
+          & $r doctor; if ($LASTEXITCODE -ne 0) { exit 1 }
+          & $r tool probe_environment | Select-Object -First 20; if ($LASTEXITCODE -ne 0) { exit 1 }
+          & $r models | Select-Object -First 4

@@ -231,3 +231,9 @@ def test_an_unreadable_version_is_said_so():
 def test_the_readme_says_which_vmd_version_and_that_none_was_tested():
     r = open(os.path.join(ROOT, "docs", "guide", "vmd.md")).read()
     assert "## Which VMD version?" in r and "1.9.x" in r and "1.9.4a57" in r and "Not tested:" in r
+
+
+def test_download_progress_text_has_no_terminal_codes():
+    from vmd_agent import ollama_local
+    raw = "\x1b[?2026h\x1b[?25l\x1b[1Gpulling 735af2139dc6:  26% ⠋  74 MB/291 MB   41 MB/s  \x1b[K\x1b[?25h"
+    assert ollama_local._plain(raw) == "pulling 735af2139dc6: 26% 74 MB/291 MB 41 MB/s"

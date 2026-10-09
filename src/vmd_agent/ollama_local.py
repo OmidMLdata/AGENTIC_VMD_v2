@@ -280,6 +280,14 @@ def start(wait: float = 20.0) -> bool:
     return False
 
 
+_ANSI = __import__("re").compile(r"\x1b\[[0-9;?]*[A-Za-z]|[\u2800-\u28ff]")
+
+
+def _plain(line: str) -> str:
+    """A progress line without the terminal's cursor and colour codes and its spinner."""
+    return " ".join(_ANSI.sub(" ", line).split())
+
+
 def pull(model: str, on_line: Optional[Callable[[str], None]] = None) -> bool:
     """Download a model into the private models folder. With ``on_line`` the progress text is passed to it as it arrives (about twice a second);
     without, it goes to the terminal as before."""
@@ -298,7 +306,7 @@ def pull(model: str, on_line: Optional[Callable[[str], None]] = None) -> bool:
         buf += chunk
         parts = buf.replace(b"\r", b"\n").split(b"\n")
         buf = parts.pop()
-        text = next((p.decode("utf-8", "replace").strip() for p in reversed(parts) if p.strip()), "")
+        text = next((_plain(p.decode("utf-8", "replace")) for p in reversed(parts) if _plain(p.decode("utf-8", "replace"))), "")
         if text and time.time() - last > 0.5:
             last = time.time()
             on_line(text[:160])

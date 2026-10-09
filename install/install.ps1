@@ -11,6 +11,9 @@
 $ErrorActionPreference = "Stop"
 $Source = if ($env:VMD_AGENT_SOURCE) { $env:VMD_AGENT_SOURCE } else { "https://github.com/OmidMLdata/AGENTIC_VMD_v2/archive/refs/heads/main.zip" }
 $Python = if ($env:VMD_AGENT_PYTHON) { $env:VMD_AGENT_PYTHON } else { "3.12" }
+# If this script sits inside a downloaded copy of vmd-agent, install that copy instead of fetching one.
+$Here = if ($PSScriptRoot) { Split-Path $PSScriptRoot -Parent } else { "" }
+if ($Here -and (Test-Path (Join-Path $Here "pyproject.toml")) -and (Select-String -Path (Join-Path $Here "pyproject.toml") -Pattern 'name = "vmd-agent"' -Quiet)) { $Source = "file:///" + ($Here -replace '\\', '/') }
 $Home_ = if ($env:VMD_AGENT_HOME) { $env:VMD_AGENT_HOME } else { Join-Path $env:USERPROFILE "vmd-agent" }
 
 function Say($m) { Write-Host ""; Write-Host "==> $m" }
@@ -45,7 +48,7 @@ $run = Join-Path $Home_ "bin\vmd-agent.cmd"
 Set-Content -Path $run -Encoding ASCII -Value "@echo off`r`nset VMD_AGENT_INSTALL=$Home_`r`n`"$Home_\internal-bin\vmd-agent.exe`" %*"
 
 Say "Step 3 of 3: setup"
-& $run setup
+if ($env:VMD_AGENT_SKIP_SETUP) { Write-Host "Installed. Now run:  $run setup" } else { & $run setup }
 
 Write-Host ""
 Write-Host "Done. The web page (your files, the chat, whole jobs):  $run ui"
