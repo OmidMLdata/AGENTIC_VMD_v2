@@ -354,7 +354,8 @@ def test_a_model_can_be_downloaded_from_the_page_later_but_only_with_a_go_ahead(
     assert any(e["type"] == "error" and "go-ahead" in e["text"] for e in _events(page.post("/api/model/install", {"model": "granite4.1:8b"})[1]))
     assert any(e["type"] == "error" and "not a model name" in e["text"] for e in _events(page.post("/api/model/install", {"model": "x; rm -rf /", "consent": True})[1]))
     pulled = []
-    monkeypatch.setattr(models, "check", lambda tag: {"tag": tag, "exists": True, "gb": 5.35, "error": ""})
+    monkeypatch.setattr(models, "check", lambda tag: {"tag": tag, "exists": True, "gb": 5.35, "tools": True, "error": ""})
+    monkeypatch.setattr(ollama_local, "free_gb", lambda path: 500.0)
     monkeypatch.setattr(ollama_local, "find_binary", lambda root=None: "/x/ollama")
     monkeypatch.setattr(ollama_local, "running", lambda timeout=2.0: True)
     monkeypatch.setattr(ollama_local, "installed_models", lambda root=None: pulled[:])
@@ -363,3 +364,17 @@ def test_a_model_can_be_downloaded_from_the_page_later_but_only_with_a_go_ahead(
     assert [e["type"] for e in ev] == ["progress", "progress", "done"] and "5.35 GB" in ev[0]["text"] and ev[1]["text"].startswith("pulling")
     assert pulled == ["granite4.1:8b"] and settings.get("llm_model") == "granite4.1:8b" and page.state.model == "granite4.1:8b"
     assert page.req("POST", "/api/model/install", body=b"{}", cookie=False)[0] == 403
+
+
+def test_the_page_refuses_a_model_that_cannot_call_tools_or_does_not_fit_the_disk(page, monkeypatch):
+    from vmd_agent import models, ollama_local
+    pulled = []
+    monkeypatch.setattr(ollama_local, "pull", lambda tag, on_line=None: pulled.append(tag) or True)
+    monkeypatch.setattr(models, "check", lambda tag: {"tag": tag, "exists": True, "gb": 0.29, "tools": False, "error": ""})
+    assert any("cannot call tools" in e.get("text", "") for e in _events(page.post("/api/model/install", {"model": "gemma3:270m", "consent": True})[1]))
+    monkeypatch.setattr(models, "check", lambda tag: {"tag": tag, "exists": True, "gb": 5.35, "tools": True, "error": ""})
+    monkeypatch.setattr(ollama_local, "free_gb", lambda path: 1.0)
+    assert any("not enough free disk space" in e.get("text", "") for e in _events(page.post("/api/model/install", {"model": "granite4.1:8b", "consent": True})[1]))
+    assert pulled == []
+    monkeypatch.setattr(models, "check", lambda tag: {"tag": tag, "exists": False, "gb": None, "tools": None, "error": "HTTP 404"})
+    assert any("no model called" in e.get("text", "") for e in _events(page.post("/api/model/install", {"model": "granit4:8b", "consent": True})[1]))

@@ -20,8 +20,10 @@ import json
 import os
 import shutil
 import subprocess
+import re
 import tarfile
 import time
+import urllib.error
 import urllib.request
 import zipfile
 from typing import Callable, Dict, List, Optional
@@ -121,12 +123,44 @@ def _get(u: str, timeout: float = 30.0) -> bytes:
         return r.read()
 
 
+RELEASE_DOWNLOAD = "https://github.com/ollama/ollama/releases/latest/download"
+
+
+def closest_asset(name: str, assets) -> Optional[str]:
+    """The release file that most plausibly is ``name`` under another spelling: same system, same CPU where the name has one, same kind of archive (never a GPU-specific extra)."""
+    low = name.lower()
+    want_os = next((o for o in ("darwin", "linux", "windows") if o in low), "")
+    want_arch = next((a for a in ("arm64", "amd64") if a in low), "")
+    ext = ".tar.zst" if low.endswith(".tar.zst") else os.path.splitext(low)[1]
+    best = [a for a in assets if want_os in a.lower() and a.lower().endswith(ext) and (not want_arch or want_arch in a.lower())
+            and not any(x in a.lower() for x in ("rocm", "jetpack", "sbsa", "cuda"))]
+    return sorted(best, key=len)[0] if best else None
+
+
+def _direct_release(name: str) -> Dict[str, object]:
+    """The same file through GitHub's plain download address, which needs no API call (the API refuses an address that asks too often)."""
+    url = f"{RELEASE_DOWNLOAD}/{name}"
+    try:
+        sha = checksum_for(_get(f"{RELEASE_DOWNLOAD}/sha256sum.txt").decode(), name)
+    except (urllib.error.URLError, OSError, ValueError):
+        sha = None
+    return {"tag": None, "url": url, "size": 0, "sha256": sha}
+
+
 def latest_release(name: str) -> Dict[str, object]:
-    """``{"tag", "url", "size", "sha256"}`` for archive ``name`` in Ollama's latest release."""
-    rel = json.loads(_get(RELEASE_API).decode())
+    """``{"tag", "url", "size", "sha256"}`` for archive ``name`` in Ollama's latest release. If GitHub's API cannot be used, the plain download address is used; if the file was
+    renamed, the closest one of the same kind is used."""
+    try:
+        rel = json.loads(_get(RELEASE_API).decode())
+    except (urllib.error.URLError, OSError, ValueError):
+        return _direct_release(name)
     assets = {a["name"]: a for a in rel.get("assets", [])}
     if name not in assets:
-        raise RuntimeError(f"Ollama's latest release ({rel.get('tag_name')}) has no file called {name}")
+        alt = closest_asset(name, list(assets))
+        if alt is None:
+            raise RuntimeError(f"Ollama's latest release ({rel.get('tag_name')}) has no file for this computer (looked for {name}); install Ollama from https://ollama.com/download "
+                               "and run `vmd-agent setup` again")
+        name = alt
     sha = None
     if "sha256sum.txt" in assets:
         sha = checksum_for(_get(assets["sha256sum.txt"]["browser_download_url"]).decode(), name)
@@ -285,7 +319,47 @@ _ANSI = __import__("re").compile(r"\x1b\[[0-9;?]*[A-Za-z]|[\u2800-\u28ff]")
 
 def _plain(line: str) -> str:
     """A progress line without the terminal's cursor and colour codes and its spinner."""
-    return " ".join(_ANSI.sub(" ", line).split())
+    text = " ".join(_ANSI.sub(" ", line).split())
+    if "%" in text and "pulling manifest" in text:               # Ollama redraws two lines in place; keep the one with the progress
+        text = " ".join(text.replace("pulling manifest", " ").split())
+    return text
+
+
+def free_gb(path: str) -> Optional[float]:
+    """Free space in GB on the disk that holds ``path`` (or the nearest folder above it that exists); None if it cannot be read."""
+    p = os.path.abspath(path)
+    while p and not os.path.exists(p) and os.path.dirname(p) != p:
+        p = os.path.dirname(p)
+    try:
+        return round(shutil.disk_usage(p).free / 1e9, 1)
+    except OSError:
+        return None
+
+
+_WRONG_NAME = re.compile(r"file does not exist|not found|404|manifest unknown|invalid model name|pull model manifest", re.I)
+
+
+def pull_model(model: str, on_line: Optional[Callable[[str], None]] = None, attempts: int = 3, pause: float = 4.0) -> str:
+    """Download ``model`` into the private folder, trying again (a pull resumes where it stopped) when the connection drops. Returns "" on success, else why not: a name
+    the library does not have is reported at once, since trying again cannot help."""
+    last = ""
+    for i in range(max(1, attempts)):
+        seen: List[str] = []
+
+        def note(text: str) -> None:
+            seen.append(text)
+            if on_line:
+                on_line(text)
+        if pull(model, on_line=note) and model in installed_models():
+            return ""
+        last = (seen[-1] if seen else "no answer from the model server")[:200]
+        if _WRONG_NAME.search(last):
+            return f"the Ollama library has no model called '{model}' ({last})"
+        if i + 1 < attempts:
+            if on_line:
+                on_line(f"the download stopped ({last}); trying again, it resumes where it stopped")
+            time.sleep(pause)
+    return f"the download did not finish ({last}). Check the internet connection and run the same command again: it resumes where it stopped"
 
 
 def pull(model: str, on_line: Optional[Callable[[str], None]] = None) -> bool:

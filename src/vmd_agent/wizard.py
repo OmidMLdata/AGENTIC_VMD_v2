@@ -36,6 +36,10 @@ class IO:
     def say(self, msg: str = "") -> None:
         print(msg, flush=True)
 
+    def progress(self, msg: str) -> None:
+        """A line that is rewritten in place (a download's progress)."""
+        print("\r  " + msg[:100].ljust(100), end="", flush=True)
+
     def ask(self, prompt: str, default: Optional[str] = None) -> str:
         suffix = f" [{default}]" if default else ""
         try:
@@ -324,6 +328,15 @@ def setup_local_model(io: IO, system_name: str, model: Optional[str] = None,
         pick = default if assume_yes else io.choose("  Which one?", labels, default=default)
         model = (models.CATALOGUE[pick - 1].tag if pick <= len(models.CATALOGUE)
                  else io.ask("  Model name (as in the Ollama library, e.g. granite4.1:8b)"))
+    found = models.check(model)                              # the name and the tools badge first: nothing is installed or saved for a model that cannot work
+    if found["exists"] is False:
+        io.say(f"  The Ollama library has no model called '{model}' (it may have been renamed or misspelt). Suggested ones that exist: "
+               + ", ".join(m.tag for m in models.CATALOGUE[:4]) + ". `vmd-agent models` lists them all.")
+        return False
+    if found.get("tools") is False:
+        io.say(f"  '{model}' cannot call tools, and vmd-agent works by calling tools, so it would not be able to answer. Nothing was downloaded. "
+               "Choose one that can: `vmd-agent models` lists suggested ones.")
+        return False
     private = ollama_local.find_binary() is not None or not shutil.which("ollama")
     url = ollama_local.url() if private else DEFAULT_URL
     settings.save(llm_url=url, llm_model=model, llm_key=None,
@@ -346,24 +359,28 @@ def setup_local_model(io: IO, system_name: str, model: Optional[str] = None,
     if model in have:
         io.say(f"  The model {model} is already downloaded.")
         return True
-    found = models.check(model)
-    if found["exists"] is False:
-        io.say(f"  The Ollama library has no model called '{model}' (it may have been renamed). "
-               "Run `vmd-agent models` to see the current suggestions.")
-        return False
     if found["exists"] is None:
-        io.say("  I could not reach the Ollama library to confirm the name; trying anyway.")
+        io.say("  I could not reach the Ollama library to confirm the name (are you online?); trying anyway.")
     elif found["gb"]:
-        io.say(f"  The library confirms {model} exists ({found['gb']} GB).")
+        io.say(f"  The library confirms {model} exists ({found['gb']} GB) and can call tools." if found.get("tools") else f"  The library confirms {model} exists ({found['gb']} GB).")
+    free = ollama_local.free_gb(ollama_local.models_dir() if private else os.path.expanduser("~"))
+    if found.get("gb") and free is not None and free < found["gb"] * 1.15 + 0.5:
+        io.say(f"  Not enough free disk space: {model} needs about {found['gb'] * 1.15 + 0.5:.1f} GB and there is {free} GB free where it would be kept. "
+               "Free some space, or choose a smaller model (`vmd-agent models`). Nothing was downloaded.")
+        return False
     size = f" ({found['gb']} GB)" if found.get("gb") else ""
     if not (assume_yes or io.confirm(f"  Download {model}{size} now? It happens once and needs the window kept open.", True)):
         io.say(f"  Not downloaded. Your choice ({model}) is saved. Download it whenever you like:  vmd-agent models --install {model}")
         io.say("  or use the Model button in the web page (vmd-agent ui).")
         return False
-    io.say(f"  Downloading {model}. Please keep this window open.")
-    ok = ollama_local.pull(model) if private else _run(["ollama", "pull", model]).returncode == 0
-    if not ok:
-        io.say(f"  The download failed. Check your internet connection and the name '{model}', then try again:  vmd-agent models --install {model}")
+    io.say(f"  Downloading {model}. Please keep this window open. If it stops, run the same command again: it resumes where it stopped.")
+    if private:
+        problem = ollama_local.pull_model(model, on_line=io.progress)
+    else:
+        problem = "" if _run(["ollama", "pull", model]).returncode == 0 else "the download did not finish; check the internet connection and run the same command again"
+    io.say("")
+    if problem:
+        io.say(f"  Not downloaded: {problem}.  Try again:  vmd-agent models --install {model}")
         return False
     io.say("  Done.")
     return True

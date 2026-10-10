@@ -25,6 +25,18 @@ they returned, which is why the chat flags any number a tool did not return; **s
 unverified. Any other Ollama model, or any online OpenAI-compatible service, can be used instead. `vmd-agent tool verify_claims` checks any
 statement against the data.
 
+### Only models that can call tools
+
+vmd-agent works by calling tools, so a model that cannot is no use. Every suggested model can; the Ollama library marks them with a `tools` badge, and a test checks that for each one. If you
+name a model yourself (`vmd-agent models --install NAME`, or setup's "I know the model name"), the same badge is checked **before anything is installed or downloaded**: a model without it, or a
+name the library does not have, is refused with a plain message and suggestions.
+
+### A download that gives a plain answer
+
+Before a download vmd-agent checks the name, the tools badge and that the disk has room (the size plus a margin). The download shows its progress and, if the connection drops, tries again twice: a
+pull resumes where it stopped, and running the same command again does too. A name the library does not have is reported at once instead of retried. The private Ollama itself comes from GitHub's
+release page with its checksum checked; if GitHub's API refuses (too many requests) the plain download address is used, and a renamed file is matched to the closest one of the same kind.
+
 ### Which one suits this computer, and downloading later
 
 `vmd-agent models` reads this computer (memory, any NVIDIA graphics card and its memory; on Apple Silicon the memory is shared with the graphics, so all of it counts) and marks each model

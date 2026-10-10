@@ -416,7 +416,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return emit({"type": "error", "text": "that is not a model name"})
         found = models.check(model)
         if found["exists"] is False:
-            return emit({"type": "error", "text": f"the Ollama library has no model called '{model}'"})
+            return emit({"type": "error", "text": f"the Ollama library has no model called '{model}' (renamed or misspelt?): choose one from the list"})
+        if found.get("tools") is False:
+            return emit({"type": "error", "text": f"'{model}' cannot call tools, and vmd-agent works by calling tools: choose one from the list"})
+        free = ollama_local.free_gb(ollama_local.models_dir())
+        if found.get("gb") and free is not None and free < found["gb"] * 1.15 + 0.5:
+            return emit({"type": "error", "text": f"not enough free disk space: {model} needs about {found['gb'] * 1.15 + 0.5:.1f} GB and {free} GB is free"})
         if ollama_local.find_binary() is None:
             emit({"type": "progress", "text": "Downloading the private Ollama (the program that runs models), checked against its published checksum…"})
             try:
@@ -427,8 +432,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
             return emit({"type": "error", "text": "the private model server did not start"})
         if model not in ollama_local.installed_models():
             emit({"type": "progress", "text": f"Downloading {model}" + (f" ({found['gb']} GB)" if found.get("gb") else "") + "…"})
-            if not ollama_local.pull(model, on_line=lambda t: emit({"type": "progress", "text": t})):
-                return emit({"type": "error", "text": f"the download of {model} failed; check the connection and try again"})
+            problem = ollama_local.pull_model(model, on_line=lambda t: emit({"type": "progress", "text": t}))
+            if problem:
+                return emit({"type": "error", "text": f"not downloaded: {problem}"})
         settings.save(llm_url=ollama_local.url(), llm_model=model, llm_key=None, ollama_mode="private")
         self.state.reconnect(ollama_local.url(), model, None)
         emit({"type": "done", "info": self.state.model_info()})

@@ -185,6 +185,25 @@ def test_every_catalogue_model_exists_in_the_live_ollama_registry(tag):
     assert abs(r["gb"] - m.gb) < max(0.3, 0.05 * m.gb), f"{tag}: registry says {r['gb']} GB, catalogue {m.gb}"
 
 
+@pytest.mark.requires_network
+@pytest.mark.parametrize("tag", [m.tag for m in models.CATALOGUE])
+def test_every_suggested_model_can_call_tools(tag):
+    """vmd-agent works by calling tools: a model that cannot is not suggested. The library's own badge says which can."""
+    caps = models.capabilities(tag)
+    if caps is None:
+        pytest.skip("the Ollama library page could not be reached")
+    assert "tools" in caps, f"{tag} has no 'tools' badge in the Ollama library ({sorted(caps)}): remove it from models.CATALOGUE"
+
+
+def test_capabilities_are_read_from_the_library_pages_badges(monkeypatch):
+    page = '<span class="x text-indigo-600 y">tools</span><span class="text-indigo-600">vision</span><span class="text-blue-600">latest</span>'
+    monkeypatch.setattr(models, "_page", lambda name, timeout: page if name == "fam" else None if name == "offline" else "<html>no badges</html>")
+    assert models.capabilities("fam:7b") == {"tools", "vision"} and models.supports_tools("fam:7b") is True
+    assert models.capabilities("plain:1b") == set() and models.supports_tools("plain:1b") is False
+    assert models.supports_tools("offline:1b") is None                      # not knowing is not the same as no
+    assert models.capabilities("someone/custom:1b") is None                 # only the library's own models have badges
+
+
 # --------------------------------------------------------------------- the VMD self-test
 @pytest.mark.skipif(shutil.which("false") is None, reason="no 'false' program")
 def test_a_program_that_is_not_vmd_fails_the_self_test_with_a_reason():
@@ -237,3 +256,4 @@ def test_download_progress_text_has_no_terminal_codes():
     from vmd_agent import ollama_local
     raw = "\x1b[?2026h\x1b[?25l\x1b[1Gpulling 735af2139dc6:  26% ⠋  74 MB/291 MB   41 MB/s  \x1b[K\x1b[?25h"
     assert ollama_local._plain(raw) == "pulling 735af2139dc6: 26% 74 MB/291 MB 41 MB/s"
+    assert ollama_local._plain("pulling 7f40: 9% \u2595\u2588\u258f 45 MB/522 MB 41 MB/s 11s pulling manifest") == "pulling 7f40: 9% \u2595\u2588\u258f 45 MB/522 MB 41 MB/s 11s"

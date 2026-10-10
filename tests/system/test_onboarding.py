@@ -424,9 +424,11 @@ def _local_setup_with_ollama_ready(monkeypatch, pulled):
     monkeypatch.setattr(wizard, "_have_ollama", lambda: True)
     monkeypatch.setattr(wizard, "_start_model_server", lambda io, url: True)
     monkeypatch.setattr(llm_client, "list_models", lambda *a, **k: [])
-    monkeypatch.setattr(models, "check", lambda tag: {"tag": tag, "exists": True, "gb": 5.35, "error": ""})
+    monkeypatch.setattr(models, "check", lambda tag: {"tag": tag, "exists": True, "gb": 5.35, "tools": True, "error": ""})
     monkeypatch.setattr(ollama_local, "find_binary", lambda root=None: "/x/ollama")
     monkeypatch.setattr(ollama_local, "pull", lambda tag, on_line=None: pulled.append(tag) or True)
+    monkeypatch.setattr(ollama_local, "installed_models", lambda root=None: list(pulled))
+    monkeypatch.setattr(ollama_local, "free_gb", lambda path: 500.0)
 
 
 def test_the_model_download_is_confirmed_with_its_size_and_a_no_says_how_to_do_it_later(monkeypatch):
@@ -534,3 +536,84 @@ def test_a_listing_of_models_from_a_non_address_is_an_error_not_a_traceback():
     from vmd_agent import llm_client
     with pytest.raises(llm_client.LLMError, match="not a web address"):
         llm_client.list_models("7")
+
+
+# ------------------------------------------- the model download: only models that can call tools, and a download that gives a plain answer when it cannot finish
+def test_a_model_that_cannot_call_tools_is_refused_before_anything_is_downloaded(monkeypatch):
+    pulled = []
+    _local_setup_with_ollama_ready(monkeypatch, pulled)
+    monkeypatch.setattr(models, "check", lambda tag: {"tag": tag, "exists": True, "gb": 0.29, "tools": False, "error": ""})
+    io_ = Typed()
+    assert wizard.setup_local_model(io_, "linux", model="gemma3:270m", assume_yes=True) is False
+    assert pulled == [] and "cannot call tools" in io_.text and "Nothing was downloaded" in io_.text
+
+
+def test_a_model_name_the_library_does_not_have_gets_suggestions_not_a_404(monkeypatch):
+    pulled = []
+    _local_setup_with_ollama_ready(monkeypatch, pulled)
+    monkeypatch.setattr(models, "check", lambda tag: {"tag": tag, "exists": False, "gb": None, "tools": None, "error": "HTTP 404"})
+    io_ = Typed()
+    assert wizard.setup_local_model(io_, "linux", model="granit4:8b", assume_yes=True) is False
+    assert pulled == [] and "no model called 'granit4:8b'" in io_.text and "granite4.1:3b" in io_.text and "404" not in io_.text
+
+
+def test_a_download_stops_early_with_a_plain_message_when_the_disk_is_too_full(monkeypatch):
+    pulled = []
+    _local_setup_with_ollama_ready(monkeypatch, pulled)
+    monkeypatch.setattr(ollama_local_module(), "free_gb", lambda path: 2.0)
+    io_ = Typed()
+    assert wizard.setup_local_model(io_, "linux", model="granite4.1:8b", assume_yes=True) is False
+    assert pulled == [] and "Not enough free disk space" in io_.text and "2.0 GB free" in io_.text
+
+
+def ollama_local_module():
+    from vmd_agent import ollama_local
+    return ollama_local
+
+
+def test_a_dropped_connection_is_retried_and_resumes_but_a_wrong_name_is_not_retried(monkeypatch):
+    from vmd_agent import ollama_local
+    calls, shown = [], []
+    monkeypatch.setattr(ollama_local.time, "sleep", lambda s: None)
+    monkeypatch.setattr(ollama_local, "installed_models", lambda root=None: ["granite4.1:8b"] if len(calls) >= 3 else [])
+
+    def flaky(tag, on_line=None):
+        calls.append(tag)
+        if len(calls) < 3:
+            on_line("Error: connection reset by peer")
+            return False
+        on_line("success")
+        return True
+    monkeypatch.setattr(ollama_local, "pull", flaky)
+    assert ollama_local.pull_model("granite4.1:8b", on_line=shown.append) == "" and len(calls) == 3
+    assert any("trying again, it resumes" in s for s in shown)
+    calls.clear()
+
+    def wrong(tag, on_line=None):
+        calls.append(tag)
+        on_line("pull model manifest: file does not exist")
+        return False
+    monkeypatch.setattr(ollama_local, "pull", wrong)
+    why = ollama_local.pull_model("nope:1b", on_line=lambda s: None)
+    assert len(calls) == 1 and "no model called 'nope:1b'" in why                       # one try: another cannot help
+
+
+def test_the_ollama_download_survives_a_renamed_file_and_a_refused_api(monkeypatch):
+    import json
+    import urllib.error
+    from vmd_agent import ollama_local
+    assert ollama_local.closest_asset("ollama-darwin.tgz", ["ollama-darwin.zip", "Ollama-darwin.tgz", "ollama-linux-amd64.tgz", "ollama-darwin-rocm.tgz"]) == "Ollama-darwin.tgz"
+    assert ollama_local.closest_asset("ollama-linux-arm64.tar.zst", ["ollama-linux-amd64.tar.zst", "ollama-linux-arm64.tar.zst", "ollama-linux-arm64-jetpack5.tar.zst"]) == "ollama-linux-arm64.tar.zst"
+    assert ollama_local.closest_asset("ollama-windows-amd64.zip", ["ollama-darwin.tgz"]) is None
+    rel = {"tag_name": "v9", "assets": [{"name": "Ollama-darwin.tgz", "browser_download_url": "http://x/Ollama-darwin.tgz", "size": 5}, {"name": "sha256sum.txt", "browser_download_url": "http://x/sums"}]}
+    monkeypatch.setattr(ollama_local, "_get", lambda u, timeout=30.0: json.dumps(rel).encode() if "api.github" in u else b"abc123  Ollama-darwin.tgz\n")
+    got = ollama_local.latest_release("ollama-darwin.tgz")
+    assert got["url"].endswith("Ollama-darwin.tgz") and got["sha256"] == "abc123"             # the renamed file, with its checksum
+
+    def refuse(u, timeout=30.0):
+        if "api.github" in u:
+            raise urllib.error.HTTPError(u, 403, "rate limit exceeded", None, None)
+        return b"def456  ollama-darwin.tgz\n"
+    monkeypatch.setattr(ollama_local, "_get", refuse)
+    again = ollama_local.latest_release("ollama-darwin.tgz")
+    assert again["url"].startswith("https://github.com/ollama/ollama/releases/latest/download/") and again["sha256"] == "def456"

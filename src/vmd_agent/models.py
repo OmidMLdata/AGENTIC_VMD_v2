@@ -15,6 +15,7 @@ Nothing here imports the rest of the package.
 from __future__ import annotations
 
 import json
+import re
 import urllib.error
 import urllib.request
 from typing import Dict, List, NamedTuple, Optional
@@ -97,6 +98,36 @@ def _split(tag: str):
     return name, (version or "latest")
 
 
+LIBRARY_PAGE = "https://ollama.com/library"
+
+
+def _page(name: str, timeout: float) -> Optional[str]:
+    req = urllib.request.Request(f"{LIBRARY_PAGE}/{name}", headers={"User-Agent": "vmd-agent"})
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return r.read().decode("utf-8", "replace")
+    except (urllib.error.URLError, OSError, ValueError):
+        return None
+
+
+def capabilities(tag: str, timeout: float = 15.0) -> Optional[set]:
+    """What the Ollama library says a model can do: the badges on its page (``tools``, ``vision``, ``thinking`` ...). An empty set means the page lists none; ``None`` means the
+    page could not be read (offline) or the name is not a library model, so nothing is known. The page is about the model family, not one size of it."""
+    name = _split(tag)[0]
+    if "/" in name:
+        return None
+    html = _page(name, timeout)
+    if html is None:
+        return None
+    return set(re.findall(r"text-indigo-600[^>]*>([a-z]+)</span>", html))
+
+
+def supports_tools(tag: str, timeout: float = 15.0) -> Optional[bool]:
+    """Can this model call tools? vmd-agent works by calling tools, so a model that cannot is no use. True or False from the library's badge, None if it cannot be found out."""
+    caps = capabilities(tag, timeout)
+    return None if caps is None else "tools" in caps
+
+
 def check(tag: str, timeout: float = 15.0, registry: str = REGISTRY) -> Dict[str, object]:
     """Ask the Ollama registry whether ``tag`` exists. Returns
     ``{"tag", "exists": True|False|None, "gb": float|None, "error": str}``;
@@ -105,12 +136,14 @@ def check(tag: str, timeout: float = 15.0, registry: str = REGISTRY) -> Dict[str
     name, version = _split(tag)
     req = urllib.request.Request(f"{registry}/{name}/manifests/{version}",
                                  headers={"Accept": MANIFEST_TYPE, "User-Agent": "vmd-agent"})
-    out: Dict[str, object] = {"tag": tag, "exists": None, "gb": None, "error": ""}
+    out: Dict[str, object] = {"tag": tag, "exists": None, "gb": None, "tools": None, "error": ""}
     try:
         with urllib.request.urlopen(req, timeout=timeout) as r:
             m = json.loads(r.read().decode("utf-8", "replace"))
         total = sum(int(l.get("size", 0)) for l in m.get("layers", []))
         out.update(exists=True, gb=round(total / 1e9, 2))
+        if registry == REGISTRY:                                  # the capability badges are on the real library's pages only
+            out["tools"] = supports_tools(tag, timeout)
     except urllib.error.HTTPError as e:
         out.update(exists=False if e.code == 404 else None, error=f"HTTP {e.code}")
     except (urllib.error.URLError, OSError, ValueError) as e:
