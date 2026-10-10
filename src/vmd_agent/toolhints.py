@@ -57,6 +57,7 @@ CHOICES: Dict[tuple, tuple] = {
 
 #: parameter name -> what it means, where the name alone does not say
 PARAM_HELP: Dict[str, str] = {
+    "color_method": "how to colour: Structure = secondary structure (helix, sheet, coil); ResType = residue type; Name = by element; Chain = by chain; Beta = by B-factor; leave empty for the default",
     "align": "superpose every frame on the reference frame first (true, the default); false measures the raw movement",
     "mass_weighted": "weight atoms by mass (true) or count them equally (false)",
     "wrap": "wrap molecules back into the periodic box",

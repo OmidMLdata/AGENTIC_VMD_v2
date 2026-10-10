@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.38.0: the checks on what an answer says get stricter
+
+* **Explanations and causes no tool measured are flagged** (mechanisms such as van der Waals or stacking, "driven by", "caused by", free energy, affinity), unless the question or a result says them. The tools measure; they do not explain.
+* **Counts are typed.** "5 frames" is accepted only from a result that holds a number of frames, "6 residues" only from one about residues; a number that is merely a residue id in a list no longer passes as a count. Where no result has any value of that kind the older loose rule still applies.
+* **Firm conclusions are refused when the results say the data are thin** ("too few frames", "insufficient data"): "stays bound", "is stable", "has settled", "proves" are sent back unless the sentence says it is about the frames that were seen. The real 8B model said "the ligand stays bound" from 8 frames; it is now sent back, and a scoped rewording passes.
+* **A job's own verdict and grading are appended to the answer, word for word, marked as the tool's.**
+* **What an answer says about colour and drawing style is checked against what the window tool reported drawing.** Found by the benchmark: the real model called `window_visualize` with `color_method='Beta'` and told the user the protein was coloured by secondary structure. The parameter now says what each colouring method means (Structure = secondary structure), the model picks it correctly, and a mismatch is flagged.
+* Limits that remain: explanations phrased in ways the lists do not cover, and conclusions drawn too firmly from correct numbers where the results do not say the data are thin.
+
 ## 0.37.0: what an audit of the tools, the jobs and a new user's first run found
 
 * **Every tool and job was run against a real VMD.** All 57 tools have a case on generated data with known answers (83 cases, all pass); all eleven jobs ran with and without `show_in_window`.

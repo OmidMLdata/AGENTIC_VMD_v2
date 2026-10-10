@@ -401,3 +401,50 @@ def test_a_conclusion_of_no_problems_or_no_warnings_cannot_contradict_the_workfl
     clean = [_result(finding_counts={"ok": 3, "warning": 0, "problem": 0})]
     assert not _checks("No problems were found and there were no warnings.", clean)
     assert not _checks("Everything looks fine: no problems were found.", [_result(finding_counts={"ok": 1, "warning": 1, "problem": 0})])        # warnings are not problems
+
+
+# ------------------------------------------- explanations, strictly typed counts, firm conclusions on thin data, and the tool's own verdict on the page
+def test_a_cause_or_mechanism_no_tool_measured_is_flagged_unless_the_question_or_a_result_says_it():
+    assert any("explanation or cause" in b for b in _checks("It stays in the pocket through van der Waals contacts."))
+    assert any("explanation or cause" in b for b in _checks("The distance is stable, driven by the hydrophobic core."))
+    assert not _checks("The ligand is within 4 A of the protein in all frames.")
+    assert not _checks("It is held by van der Waals contacts.", question="Is it van der Waals?", evidence=[])                    # the user asked about it: a measured answer may name it
+
+
+def test_a_count_must_come_from_a_result_that_holds_that_kind_of_number():
+    calls = [{"name": "t", "arguments": {}, "result": {"ok": True, "n_frames": 8, "n_residues": 12, "touching_residues": [5, 6]}}]
+    ok = lambda s: agent.unsupported_claims(s, calls, [str(calls[0]["result"]), "q"], None, "q")                       # noqa: E731
+    assert not ok("It was analysed over 8 frames and has 12 residues.")
+    assert any("5 frames" in b for b in ok("It was analysed over 5 frames."))                                           # 5 is a residue number, not a frame count
+    assert any("6 residues" in b for b in ok("Only 6 residues are in the protein."))                                    # 6 is in the results but is not how many residues there are
+    assert any("residue 7" in b for b in ok("It touches residue 7.")) and not ok("It touches residues 5 and 6.")
+
+
+def test_a_firm_conclusion_is_flagged_when_the_results_say_there_is_too_little_data():
+    thin = [{"name": "run_workflow", "arguments": {}, "result": {"ok": True, "findings": [{"level": "warning", "text": "only 8 frame(s) were analysed: too few to say that a ligand stays bound."}]}}]
+    firm = agent.unsupported_claims("The ligand stays bound throughout the trajectory.", thin, [str(thin[0]["result"]), "q"], None, "q")
+    assert any("firm conclusion" in b for b in firm)
+    careful = agent.unsupported_claims("In the 8 frames analysed the ligand was within 4 A of the protein in every frame.", thin, [str(thin[0]["result"]), "q"], None, "q")
+    assert not careful
+    scoped = agent.unsupported_claims("Within the limited sampling of 8 frames, the ligand stays bound in the pocket.", thin, [str(thin[0]["result"]), "q"], None, "q")
+    assert not scoped                                                   # a conclusion that says it is about the frames seen is honest about its reach
+    assert not agent.unsupported_claims("The ligand stays bound throughout the trajectory.", [{"name": "t", "arguments": {}, "result": {"ok": True}}], ["{}", "q"], None, "q")   # enough data: no objection
+
+
+def test_the_jobs_own_verdict_is_appended_in_the_tools_words_unless_the_answer_already_has_it():
+    call = {"name": "run_workflow", "arguments": {}, "result": {"ok": True, "verdict": "1 problem(s) and 0 warning(s) found: read the findings before using this.",
+                                                               "finding_counts": {"ok": 1, "note": 2, "warning": 0, "problem": 1}, "report": "/data/o/report.md"}}
+    footer = agent.tool_footer("It all looks fine.", [call])
+    assert "not written by the model" in footer and "1 problem(s) and 0 warning(s)" in footer and "1 problem" in footer and "/data/o/report.md" in footer
+    assert agent.tool_footer("The tool says: 1 problem(s) and 0 warning(s) found: read the findings before using this.", [call]) == ""
+    assert agent.tool_footer("Anything", [{"name": "t", "arguments": {}, "result": {"ok": True}}]) == ""
+
+
+def test_what_an_answer_says_about_colour_and_style_must_match_what_the_window_tool_drew():
+    drew = [{"name": "window_visualize", "arguments": {}, "result": {"ok": True, "representations": [{"selection": "protein", "style": "NewCartoon", "color": "Beta"},
+                                                                                                          {"selection": "resname LIG", "style": "Licorice", "color": "Name"}]}}]
+    say = lambda s: agent.unsupported_claims(s, drew, [str(drew[0]["result"]), "q"], None, "q")                        # noqa: E731
+    assert any("coloured by secondary structure" in b and "beta" in b for b in say("It is shown as a cartoon coloured by secondary structure."))      # the real mistake
+    assert not say("It is shown as a cartoon coloured by B-factor, with the ligand as licorice coloured by element.")
+    assert any("drawn as surface" in b for b in say("The protein is drawn as a surface."))
+    assert not say("The ligand is drawn as licorice.")

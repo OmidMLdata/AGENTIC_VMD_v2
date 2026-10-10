@@ -24,7 +24,7 @@ import re
 import threading
 import time
 from dataclasses import dataclass, field
-from typing import Callable, List, Optional
+from typing import Callable, Dict, List, Optional
 
 from vmd_agent import argfix, limits, models, ollama_local, progress, routing, security, toolhints, toolset
 from vmd_agent.llm_client import (
@@ -198,6 +198,64 @@ def _result_ints(value, out: set) -> set:
     return out
 
 
+# A count is only accepted from a result that holds *that kind* of number (frames from a key about frames, residues from one about residues ...). Only when no result
+# has any such key does it fall back to accepting the same whole number anywhere.
+_GROUPS = {"frame": r"frame", "residue": r"resid|residue|rmsf_values", "atom": r"atom", "chain": r"chain", "bond": r"bond|pair", "water": r"water", "ion": r"(?<![a-z])ions?(?![a-z])",
+           "bridge": r"bridge|disulfid|salt", "contact": r"contact|pair", "pair": r"pair", "step": r"step", "molecule": r"molecul", "segment": r"segment"}
+
+
+def _typed_numbers(value, path: str, out: Dict[str, set], seen_keys: set) -> None:
+    """Walk a structured result; for every key path that names a kind of thing (frames, residues, atoms ...) collect the whole numbers, list lengths and dict sizes under it."""
+    low = path.lower()
+    groups = [g for g, rx in _GROUPS.items() if re.search(rx, low)]
+    for g in groups:
+        seen_keys.add(g)
+    if isinstance(value, bool):
+        return
+    if isinstance(value, (int, float)) and (isinstance(value, int) or value == int(value)):
+        for g in groups:
+            out.setdefault(g, set()).add(int(value))
+    elif isinstance(value, dict):
+        for g in groups:
+            out.setdefault(g, set()).add(len(value))
+        for k, v in value.items():
+            _typed_numbers(v, f"{path}.{k}", out, seen_keys)
+    elif isinstance(value, (list, tuple)):
+        for g in groups:
+            out.setdefault(g, set()).add(len(value))
+        for v in value:
+            if isinstance(v, (int, float)) and not isinstance(v, bool):
+                continue                                       # the items of a list of numbers are ids or values, not counts: only the list's length is
+            _typed_numbers(v, path, out, seen_keys)
+    elif isinstance(value, str):
+        for g in groups:
+            out.setdefault(g, set()).update(int(m) for m in re.findall(r"(?<![\d.])\d{1,4}(?![\d.])", value))
+
+
+def _residue_ids(calls) -> set:
+    """Residue numbers the results really name: values under residue-like keys, numeric keys of per-residue tables, and labels like ALA:5 or LIG:100."""
+    ids: set = set()
+
+    def walk(v, path):
+        low = path.lower()
+        if isinstance(v, dict):
+            if re.search(r"resid|residue|rmsf_values|per_residue", low):
+                ids.update(int(k) for k in v if str(k).isdigit())
+            for k, x in v.items():
+                walk(x, f"{path}.{k}")
+        elif isinstance(v, (list, tuple)):
+            for x in v:
+                walk(x, path)
+        elif isinstance(v, int) and not isinstance(v, bool) and re.search(r"resid|residue", low):
+            ids.add(v)
+        elif isinstance(v, str):
+            ids.update(int(m) for m in re.findall(r"[A-Za-z]{2,4}[: ]\s?(\d{1,4})\b", v))
+            ids.update(int(m) for m in re.findall(r"(?:resid|residues?)s?[ =:]+(\d{1,4})\b", v, re.I))
+    for c in calls:
+        walk(c.get("result"), "")
+    return ids
+
+
 def _files_in(root: Optional[str], limit: int = 3000) -> set:
     names: set = set()
     if not root or not os.path.isdir(root):
@@ -210,6 +268,104 @@ def _files_in(root: Optional[str], limit: int = 3000) -> set:
     return names
 
 
+#: things a model likes to add that no tool here measures: mechanisms and causes. The tools measure; they do not explain.
+_MECHANISMS = [r"van der waals", r"π[- ]?stacking|pi[- ]?stacking|cation[- ]?π", r"\bhydrophobic (?:effect|interaction|core|collapse)", r"\belectrostatic (?:interaction|attraction|repulsion)s?",
+               r"\bcovalent", r"\ballosteric", r"induced[- ]fit", r"\bentropy|\benthalp|free energy|binding affinity|\bkd\b|\bic50",
+               r"\b(?:driven|caused|mediated|explained|responsible) (?:by|for)\b", r"\b(?:stabili[sz]ed|destabili[sz]ed) by\b", r"\bdue to the\b",
+               r"\bunfold(?:s|ing|ed)\b|\bdenatur", r"\bbiologically|\bphysiolog|\bclinical|\btherapeutic"]
+#: firm conclusions: not allowed when the results themselves say there is too little data to support them
+_STRONG = re.compile(r"\b(?:stays|stay|remains?|stayed|remained) (?:stably )?(?:bound|stable|folded|in the pocket)|\b(?:is|are|was|were) (?:stable|equilibrated|converged|settled)\b|"
+                     r"\b(?:has|have) (?:settled|equilibrated|converged)\b|\bconfirms?\b|\bproves?\b|\bdefinitely\b|\bthroughout the (?:trajectory|simulation|run)\b", re.I)
+#: a sentence that says it is about the frames that were looked at ("in the 8 frames analysed", "within the limited sampling") is honest about its reach
+_SCOPED = re.compile(r"\b(?:within|in|over|across|from) (?:the |these |those )?(?:limited |small |short )?(?:sampl\w+|\d+ (?:analy[sz]ed |examined |sampled )?frames?|frames? (?:analy[sz]ed|examined|sampled|looked at)|"
+                     r"every (?:sampled|analy[sz]ed|examined) frame|window (?:sampled|analy[sz]ed))|\b(?:in|for) (?:the )?(?:sampled|analy[sz]ed|examined) (?:window|frames?)\b|\bso far\b", re.I)
+_LIMITED = re.compile(r"too few[^.]{0,60}|only \d+ (?:frame|effectively)[^.]{0,60}|insufficient[_ ]data|not enough (?:frames|data|samples)[^.]{0,40}", re.I)
+
+
+def limited_evidence(calls) -> str:
+    """A phrase from the results saying there is too little data to support a firm conclusion (too few frames, insufficient data), or ''."""
+    def walk(v):
+        if isinstance(v, str):
+            m = _LIMITED.search(v)
+            if m:
+                return m.group(0).strip()
+        elif isinstance(v, dict):
+            for x in v.values():
+                r = walk(x)
+                if r:
+                    return r
+        elif isinstance(v, (list, tuple)):
+            for x in v:
+                r = walk(x)
+                if r:
+                    return r
+        return ""
+    for c in calls:
+        r = walk(c.get("result"))
+        if r:
+            return r
+    return ""
+
+
+def tool_footer(answer: str, calls) -> str:
+    """For a whole job, the job's own verdict and grading, appended word for word and marked as the tool's, so the truth is on the page next to whatever the model wrote."""
+    for c in reversed(calls):
+        r = c.get("result")
+        if isinstance(r, dict) and r.get("verdict") and isinstance(r.get("finding_counts"), dict):
+            if str(r["verdict"]).rstrip(".") in answer:
+                return ""
+            k = r["finding_counts"]
+            return (f"\n\n(From the tool, not written by the model. Verdict: {r['verdict']} Graded findings: {k.get('ok', 0)} ok, {k.get('note', 0)} note, "
+                    f"{k.get('warning', 0)} warning, {k.get('problem', 0)} problem." + (f" Report: {r['report']}" if r.get("report") else "") + ")")
+    return ""
+
+
+#: what a person says versus VMD's own name for it (colouring methods and drawing styles)
+_COLOUR_WORDS = {"secondary structure": "structure", "structure": "structure", "residue type": "restype", "residue types": "restype", "element": "name", "elements": "name",
+                 "atom name": "name", "chain": "chain", "b-factor": "beta", "b factor": "beta", "beta": "beta", "residue name": "resname", "resname": "resname", "charge": "charge",
+                 "mass": "mass", "index": "index", "position": "position", "molecule": "molecule", "occupancy": "occupancy"}
+_STYLE_WORDS = {"newcartoon": "newcartoon", "cartoon": "newcartoon", "licorice": "licorice", "quicksurf": "quicksurf", "surface": "quicksurf", "lines": "lines", "vdw": "vdw",
+                "cpk": "cpk", "tube": "tube", "ribbons": "newribbons", "bonds": "bonds", "beads": "beads", "points": "points", "trace": "trace"}
+_COLOURED_BY = re.compile(r"\bcolou?r(?:ed|ing)?\s+(?:by|according to|using|with)\s+(?:the\s+)?([A-Za-z][A-Za-z -]{1,24}?)(?=[.,;:)]|\s+(?:and|with|while|as|in|on|for|\()|$)", re.I)
+
+
+def _values_for(calls, key: str) -> set:
+    """Every string a result holds under ``key`` (the colours and styles a window tool reports it drew), lower-cased and without style parameters."""
+    found: set = set()
+
+    def walk(v):
+        if isinstance(v, dict):
+            for k, x in v.items():
+                if k == key and isinstance(x, str):
+                    found.add(x.split()[0].lower())
+                else:
+                    walk(x)
+        elif isinstance(v, (list, tuple)):
+            for x in v:
+                walk(x)
+    for c in calls:
+        walk(c.get("result"))
+    return found
+
+
+def drawing_claims(body: str, calls) -> List[str]:
+    """What an answer says about how something was coloured or drawn, against the colours and styles the window tools report. A model that asks for one colouring and says it
+    chose another is the kind of mistake this catches."""
+    bad: List[str] = []
+    colours, styles = _values_for(calls, "color"), _values_for(calls, "style")
+    if colours:
+        for m in _COLOURED_BY.finditer(body):
+            said = _COLOUR_WORDS.get(m.group(1).strip().lower())
+            if said and said not in colours:
+                bad.append(f"that it is coloured by {m.group(1).strip()} (the tool drew it coloured by {', '.join(sorted(colours))})")
+    if styles:
+        for word, canon in _STYLE_WORDS.items():
+            if re.search(r"\b(?:as|in|with|using)(?: an?| the)?\s+(?:\*\*)?" + word + r"\b", body, re.I) and canon not in styles and not any(s.startswith(canon) for s in styles):
+                bad.append(f"that it is drawn as {word} (the tool drew {', '.join(sorted(styles))})")
+                break
+    return bad
+
+
 def exact_checks(answer: str, calls, question: str, evidence: str, root: Optional[str] = None) -> List[str]:
     """What an answer states that the structured results do not back: a count (frames, residues, atoms ...) no result contains, a residue number no result
     mentions, a file that is neither in the question, a result, nor your files folder, and a conclusion of "no problems" or "no warnings" over a workflow
@@ -217,21 +373,42 @@ def exact_checks(answer: str, calls, question: str, evidence: str, root: Optiona
     body = re.sub(r"```.*?```", "", answer, flags=re.S)
     bad: List[str] = []
     ints: set = set()
+    typed: Dict[str, set] = {}
+    typed_keys: set = set()
     for c in calls:
         _result_ints(c.get("result"), ints)
-    ints.update(int(m) for m in re.findall(r"(?<![\d.])\d{1,4}(?![\d.])", question + "\n" + evidence))
+        _typed_numbers(c.get("result"), "", typed, typed_keys)
+    asked = {int(m) for m in re.findall(r"(?<![\d.])\d{1,4}(?![\d.])", question)}
+    loose = ints | asked | {int(m) for m in re.findall(r"(?<![\d.])\d{1,4}(?![\d.])", evidence)}
     for n, noun in _COUNT.findall(body):
-        if int(n) not in ints and f"{n} {noun.lower()}" not in bad:
-            bad.append(f"{n} {noun.lower()} (no tool result has that count)")
+        group = noun.lower().rstrip("s") if noun.lower() not in ("bridges",) else "bridge"
+        group = {"bridg": "bridge", "pairs": "pair"}.get(group, group)
+        allowed = (typed.get(group, set()) | asked) if group in typed_keys else loose          # strict where a result has numbers of that kind, loose where none does
+        if int(n) not in allowed and f"{n} {noun.lower()}" not in bad:
+            bad.append(f"{n} {noun.lower()} (no tool result has that count" + (f" of {group}s)" if group in typed_keys else ")"))
     mentioned = [m for seg in _RESIDUES.findall(body) for m in re.findall(r"\d+", seg)] + _RESNAME_NUM.findall(body)
-    seen = set(re.findall(r"(?<![\d.])\d{1,4}(?![\d.])", question + "\n" + evidence))
+    named = _residue_ids(calls)
     for r in dict.fromkeys(mentioned):
-        if int(r) not in seen and int(r) not in ints:
-            bad.append(f"residue {r} (no tool result mentions it)")
+        allowed_r = (named | asked) if named else loose
+        if int(r) not in allowed_r:
+            bad.append(f"residue {r} (no tool result names it)")
     have_files, low = _files_in(root), (question + "\n" + evidence).lower()
     for f in dict.fromkeys(m.lower() for m in _FILE_NAME.findall(body)):
         if f not in low and f not in have_files and os.path.basename(f) not in have_files:
             bad.append(f"the file {f} (not in your files, the question or any tool result)")
+    low_ev = (question + "\n" + evidence).lower()
+    for s in re.split(r"(?<=[.!?])\s+|\n+", body):
+        sl = s.lower()
+        for term in _MECHANISMS:
+            if re.search(term, sl) and not re.search(term, low_ev) and f"an explanation ({term})" not in bad:
+                bad.append(f"an explanation or cause that no tool measured: \"{s.strip()[:90]}\"")
+                break
+    limited = limited_evidence(calls)
+    if limited:
+        for s in re.split(r"(?<=[.!?])\s+|\n+", body):
+            if _STRONG.search(s) and not _NEGATED.search(s) and not _SCOPED.search(s):
+                bad.append(f"a firm conclusion (\"{s.strip()[:80]}\") although the results say \"{limited}\": say what was seen in the frames analysed instead")
+                break
     counts = [c["result"].get("finding_counts") for c in calls if isinstance(c.get("result"), dict) and isinstance(c["result"].get("finding_counts"), dict)]
     problems = sum(int(k.get("problem", 0)) for k in counts)
     warnings = sum(int(k.get("warning", 0)) for k in counts)
@@ -250,6 +427,7 @@ def unsupported_claims(answer: str, calls, evidence_texts, root: Optional[str] =
     bad += exact_checks(answer, calls, question, "\n".join(evidence_texts), root)
     if not window_changed(calls) and any(_WINDOW_CLAIM.search(s) and not _NEGATED.search(s) for s in re.split(r"(?<=[.!?])\s+|\n+", body)):
         bad.append("that something is shown in the VMD window (no tool changed the window)")
+    bad += drawing_claims(body, calls)
     ran = called_names(calls)
     known = set(toolset.TOOLS) | set(workflows_named())
     for s in re.split(r"(?<=[.!?])\s+|\n+", body):
@@ -615,6 +793,7 @@ class Agent:
                         continue
                     if claims:
                         answer += "\n\n(Check this yourself: the answer says " + "; ".join(claims) + ".)"
+                    answer += tool_footer(answer, self.call_log[getattr(self, "turn_start", 0):])
                 if used_tool and self.guard:
                     bad = unsupported_numbers(answer, [m["content"] for m in self.messages if m["role"] == "tool"] + [text])
                     if bad and not regrounded and not on_token:
