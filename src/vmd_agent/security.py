@@ -146,7 +146,7 @@ def check_tcl(script: str, allow_unsafe: Optional[bool] = None) -> None:
 # representation could otherwise close a brace and append commands.
 _PATH_BAD = re.compile(r"[{}\\\x00-\x1f\x7f]")
 # \Z, not $: "$" also matches before a trailing newline, which would let
-# "name CA\n" through (found by the property tests).
+# "name CA\n" through.
 _SELECTION_OK = re.compile(r"^[A-Za-z0-9_ ()+\-.'*:,<>=]+\Z")
 _WORD_OK = re.compile(r"^[A-Za-z][A-Za-z0-9_ ]{0,39}\Z")
 _RESNAME_OK = re.compile(r"^[A-Za-z0-9_+\-']{1,8}\Z")

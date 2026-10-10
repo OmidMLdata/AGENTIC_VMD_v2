@@ -178,7 +178,7 @@ the private Ollama keeps a 16,384-token context. So the chat and the web page of
   files, build, maps, render, video, records, network, ...) to a small base set (look at files, describe a system, check a statement, run a whole job), and so usually offers well under half of the tools.
   A question that matches nothing gets a wider set, never an empty menu.
 * **It is keyword matching, so it misses.** Questions worded differently from what its vocabulary expects can reach the model without the tool that would answer them (the tests keep two sets of such
-  paraphrases, and every miss found was added as a new question). That is why `offer_tools` exists: a model that needs a tool it was not given asks for its group, and a model that calls a real tool it was
+  paraphrases). That is why `offer_tools` exists: a model that needs a tool it was not given asks for its group, and a model that calls a real tool it was
   not offered is allowed it (the agent says so). If your model does not use `offer_tools`, `--tools all` is the safe choice.
 * Whether `auto` is better than `all` for your model is a measurement, not a given: run the [model benchmark](../benchmarks/model-benchmark.md) with each (`--tools all`, then `--tools auto`) and compare;
   the summary puts both side by side.

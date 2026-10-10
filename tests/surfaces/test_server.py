@@ -161,7 +161,7 @@ def test_invalid_input_becomes_a_structured_result(server, ubq, tmp_path):
 
 def test_tool_wrapper_converts_both_policy_exception_types(server):
     """The pipeline catches bad representations itself, so the wrapper's own
-    InvalidInput branch needs a direct test (found by mutation testing). Tested
+    InvalidInput branch needs a direct test. Tested
     through the real SDK registry, then unregistered so the tool set is unchanged."""
     from vmd_agent.security import InvalidInput, SecurityError
 

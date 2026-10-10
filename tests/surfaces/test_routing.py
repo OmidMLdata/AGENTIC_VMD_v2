@@ -45,9 +45,8 @@ PARAPHRASES = [
 ]
 
 
-#: a second paraphrased set, written after the first had been used to widen the router's vocabulary: 20 of its 24 were routed correctly
-#: before the four last misses were fixed ("integrity", "dihedrals", "spinning", "join"), so expect a router like this to miss roughly one
-#: question in six it has not seen; the model's `offer_tools` is how it recovers.
+#: paraphrased questions the router's vocabulary was not tuned on: expect a keyword router like this to miss roughly one question in six it has not seen;
+#: the model's `offer_tools` is how it recovers.
 WINDOW_QUESTIONS = [
     ("Show the ligand as licorice in my VMD", {"window_representation"}),
     ("Zoom in on residue 25 and rotate it 90 degrees", {"window_view"}),

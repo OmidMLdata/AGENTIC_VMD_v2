@@ -5,7 +5,7 @@ from vmd_agent.structure.detect import detect_system
 
 
 def test_recipe_summary_reflects_focus_and_plddt(ubq):
-    """Regression: representations_added ignored focus/pLDDT/explicit reps."""
+    """representations_added reflects focus, pLDDT colouring and explicit representations."""
     from vmd_agent.visual.recipes import generate_visualization_recipe
     det = detect_system(ubq)
     assert "Tube" in str(generate_visualization_recipe(det, focus="fold")

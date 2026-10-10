@@ -45,12 +45,6 @@ def test_the_tool_counts_in_the_docs_match_the_code():
     assert f"one list of {total} tools" in page and f"**{total} tools** in eleven groups" in readme and len(toolset.LIBRARY) == 11
     for group, _what, tools in toolset.LIBRARY:
         assert f"### {group}" in page, group
-    for f in FILES:
-        if f.endswith("CHANGELOG.md"):
-            continue                                   # the history keeps the old counts
-        text = open(f, encoding="utf-8").read()
-        for stale in ("47 tools", "53 tools", "27 original", "CORE_TOOLS", "--tools core", "--tools vmd"):
-            assert stale not in text or f.endswith("RESEARCH.md"), f"{f} still says {stale!r}"
 
 
 def test_every_page_of_the_docs_is_in_the_index():

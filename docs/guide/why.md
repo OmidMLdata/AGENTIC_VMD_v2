@@ -42,7 +42,7 @@ You can reach all of them from:
 
 Eleven workflows run several tools in a fixed order, grade what they find (ok, note, warning, problem), give a verdict and write `report.md` and `report.html`: has this run settled, which residues are flexible, does the ligand stay bound, can this trajectory be trusted, what is in this structure, which interactions persist, how do two runs or two structures compare, are these statements true, prepare a simulation, fit a model into a map. They bundle good practice, so a routine check is one request and the report can be sent on as it is. [Whole jobs](workflows.md).
 
-## A real VMD, not an imitation
+## VMD itself
 
 The agent drives the VMD window you can see. Every picture and number is VMD's own. A result can be drawn straight into that window (`show_in_window`), and the page lets you rotate, zoom, change representations and step through frames while you talk to the agent. [Your VMD window](window.md).
 

@@ -71,7 +71,7 @@ def test_cli_analyze_dt_ps(tmp_path, capsys):
     ["tool", "assemble_report", "/proc/definitely/not/writable"],
 ])
 def test_bad_paths_give_a_clean_error_not_a_traceback(argv, capsys):
-    """Six invocations used to die with a raw Python traceback."""
+    """Six bad invocations end with a plain message, not a raw Python traceback."""
     from vmd_agent import cli
     rc = cli.main(argv)
     out = capsys.readouterr()

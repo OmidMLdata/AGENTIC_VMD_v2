@@ -36,7 +36,7 @@ def test_legend_describes_what_the_backend_drew(ubq, tmp_path):
 
 
 def test_hidden_water_gets_no_colour_key(lyz, tmp_path):
-    """Regression: the key listed O/H swatches for water that was not drawn."""
+    """The key lists swatches only for what is drawn: water that is not drawn gets none."""
     det = detect_system(lyz)
     assert det["components"]["water"]["present"]
     hidden = auto.build_color_keys(det, show_water=False)

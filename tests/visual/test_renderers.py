@@ -100,7 +100,7 @@ def test_missing_file_is_structured_error(tmp_path):
 
 @pytest.mark.parametrize("w,h", [(0, 0), (-5, 100), (100, 0), (30000, 100), ("a", 5)])
 def test_unusable_image_sizes_get_a_clear_error(ubq, tmp_path, w, h):
-    """width=0 used to surface as a bare ZeroDivisionError message."""
+    """width=0 is refused with a clear message, not a bare ZeroDivisionError."""
     out = MatplotlibRenderer().render_views(ubq, out_dir=str(tmp_path), width=w,
                                             height=h)
     assert not out["ok"] and ("size" in out["error"] or "integers" in out["error"])

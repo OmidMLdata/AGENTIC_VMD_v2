@@ -257,7 +257,7 @@ def test_vmd_driver_reports_ignored_views(real_vmd, real_tachyon, ubq,
 @pytest.mark.requires_ffmpeg
 def test_movie_is_one_vmd_session_not_one_per_frame(
         real_vmd, real_tachyon, sample, tmp_path, vmd_launches):
-    """Regression: the old code launched VMD once per frame."""
+    """A movie launches VMD once, not once per frame."""
     pdb, dcd = sample
     before = _leftovers("vmd_movie_frames_")
     out = render.render_movie(pdb, dcd, detection=detect_system(pdb, dcd),

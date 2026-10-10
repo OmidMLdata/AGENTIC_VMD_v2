@@ -72,9 +72,8 @@ Limit: only events that move a chosen signal are detectable.
 Sentences → structured claims via templates, otherwise `unparsed` (never guessed). A matched sentence is accepted
 only if **every word** is accounted for by that claim type (`_ALLOWED`); anything else is a qualifier the measurement
 does not check ("near the loop", "between residues 40 and 60", "intact", "for 40 ns", a second component) and the
-sentence is returned unparsed with a note. Sentences over 400 characters are refused. An audit found the earlier
-parser reduced such sentences to a weaker claim ("bridge the ligand and Asp 52" → "has water") and reported them
-*supported*. Verdicts:
+sentence is returned unparsed with a note. Sentences over 400 characters are refused. A parser that reduced such a sentence to a weaker claim
+("bridge the ligand and Asp 52" → "has water") would report it *supported*; this one does not. Verdicts:
 supported / contradicted / unverifiable. "Mostly helical" = helix ≥ 30 % and larger than the sheet fraction
 (coil is the remainder, not a competing class). **Ligand burial** = 1 − SASA(ligand in complex)/SASA(ligand
 alone), Shrake-Rupley, probe 1.4 Å, 240 points, Bondi radii; buried if ≥ 0.5. Dynamic claims reuse the

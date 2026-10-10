@@ -55,8 +55,8 @@ def test_lysozyme_claims(lyz):
 
 
 def test_mostly_helical_ignores_coil_as_a_competitor(lyz):
-    """Regression: coil (48 %) used to beat helix (42 %) and refute 'mostly
-    helical' for the textbook alpha-rich lysozyme."""
+    """Coil (48 %) must not beat helix (42 %) and refute 'mostly helical' for the
+    textbook alpha-rich lysozyme."""
     r = verify_claims(lyz, ["The protein is mostly helical"])
     assert r["results"][0]["verdict"] == SUPPORTED
     assert "coil excluded" in r["results"][0]["criterion"]
@@ -165,7 +165,7 @@ def test_fully_enclosed_atom_is_buried():
     "The two chains are identical",
 ])
 def test_sentences_that_say_more_than_can_be_checked_are_not_parsed(sentence):
-    """These used to collapse to 'has water' / 'has lipid' and be SUPPORTED."""
+    """These must not collapse to 'has water' / 'has lipid' and be SUPPORTED."""
     assert P(sentence)["type"] is None
 
 
@@ -223,7 +223,7 @@ def test_secondary_structure_verdict_on_a_real_structure(lyz):
 
 
 def test_non_sentence_claims_are_unparsed_not_a_crash():
-    """verify_claims(['', None, 3, {...}]) used to raise TypeError on None."""
+    """verify_claims(['', None, 3, {...}]) must not raise on None."""
     r = verify_claims(_any_structure(),
                       ["", None, 3, {"x": 1}, {"type": "n_chains"}])
     assert r["n_claims"] == 5 == sum(r["counts"].values())

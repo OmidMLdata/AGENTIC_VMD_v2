@@ -69,7 +69,7 @@ def test_is_cif():
 
 
 def test_detect_works_on_cif(tmp_path):
-    """The actual regression: the mmCIF fallback must reach detection."""
+    """The mmCIF fallback must reach detection."""
     from vmd_agent.structure.detect import detect_system
     p = tmp_path / "t.cif"
     p.write_text(CIF)

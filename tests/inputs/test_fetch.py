@@ -137,7 +137,7 @@ def test_identifier_routing_against_real_rcsb(tmp_path):
 @pytest.mark.requires_network
 def test_entry_without_a_pdb_file_falls_back_to_mmcif_and_the_pipeline_works(
         tmp_path):
-    """The headline regression: mmCIF was downloaded but nothing could load it.
+    """An mmCIF download must be loadable.
     9NFN is a real entry too large for the PDB format (RCSB returns 404 for
     its .pdb), so only the mmCIF route can work."""
     pkg = auto.fetch_and_visualize("9NFN", out_dir=str(tmp_path),

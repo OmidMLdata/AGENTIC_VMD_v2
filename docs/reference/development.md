@@ -46,9 +46,6 @@ Every other command is in [Every command](../guide/using.md#ways-to-work). The b
 | `validate`, `validate-dssp` | cross-check the toolkit's numbers against independent code (below) |
 | `synth` | generate novel structures with known properties |
 
-An earlier study (end-to-end automation tasks for language-model agents, a grounded-interpretation benchmark and a paper with a preregistration) is not part of the
-product any more; it is kept in the Git tag `archive/research-benchmark`.
-
 ## Contributing
 
 * **Set up for development:** `pip install -e ".[dev]"` (the `dev` extra is pytest, hypothesis, pyyaml, ruff and vulture; `".[all]"` adds the optional parts).

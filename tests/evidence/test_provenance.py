@@ -52,7 +52,7 @@ def test_large_file_hash_skipped(tmp_path):
 
 
 def test_rerun_with_new_parameters_is_not_reported_as_tampering(tmp_path):
-    """Overwriting earlier outputs is normal; verification used to fail."""
+    """Overwriting earlier outputs is normal; verification of the recorded hashes still reports it."""
     out = tmp_path / "o"
     f = tmp_path / "result.txt"
     inp = tmp_path / "in.txt"

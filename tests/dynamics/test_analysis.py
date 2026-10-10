@@ -92,7 +92,7 @@ def test_rmsf_is_per_residue_and_flags_the_loop(run):
 
 
 def test_short_trajectory_is_not_called_stable(run):
-    """8 frames cannot support a stability claim; the old code said 'stable'."""
+    """8 frames cannot support a stability claim, so none is made."""
     interp = run["results"]["rmsd"]["interpretation"]
     assert "too few" in interp
     assert "stable" not in interp.lower()
@@ -245,8 +245,8 @@ def test_dt_ps_overrides_the_header(ubq_md, tmp_path):
 
 # ------------------------------------------------------------ audit fixes
 def test_contacts_and_distance_require_a_second_selection(sample, tmp_path):
-    """Previously sel2 silently defaulted to the selection itself: 333
-    'contacts' (self-pairs, each pair twice) and a COM distance of exactly 0."""
+    """sel2 must be given: a selection compared with itself would report self-pairs
+    (each pair twice) and a COM distance of exactly 0."""
     pdb, dcd = sample
     r = analyze_trajectory(pdb, dcd, ["contacts", "distance", "rgyr"],
                            selection="protein", out_dir=str(tmp_path))
@@ -279,7 +279,7 @@ def test_box_validity_rules():
 
 @pytest.mark.parametrize("dt", [0, -5, float("nan"), float("inf"), "abc"])
 def test_dt_ps_must_be_positive_and_finite(sample, tmp_path, dt):
-    """These used to be accepted and produce a 'user-supplied' axis of NaN."""
+    """A NaN, infinite or non-positive time step is refused, not turned into an axis of NaN."""
     pdb, dcd = sample
     r = analyze_trajectory(pdb, dcd, ["rgyr"], dt_ps=dt, out_dir=str(tmp_path))
     assert "dt_ps must be" in r["error"]
@@ -292,8 +292,7 @@ def test_step_below_one_is_reported_not_silently_changed(sample, tmp_path):
 
 
 def test_nonfinite_frames_are_reported_not_silently_dropped(sample, tmp_path):
-    """Found by the automation benchmark: frames with NaN coordinates were
-    excluded from the statistics with no warning (n quietly shrank)."""
+    """Frames with NaN coordinates are reported, not silently left out of the statistics."""
     pdb, dcd = sample
     u = mda.Universe(pdb, dcd)
     ag = u.atoms

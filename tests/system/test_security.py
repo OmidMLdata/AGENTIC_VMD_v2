@@ -121,8 +121,8 @@ def test_tcl_word_and_resname_filters():
 
 @pytest.mark.parametrize("script", ["source /data/x.tcl", "catch {source /data/x.tcl}"])
 def test_source_alone_is_denied(script):
-    """Earlier test combined `open` and `source`, so removing the `source`
-    rule went unnoticed (found by mutation testing)."""
+    """`source` is denied on its own, so removing that rule cannot go unnoticed
+    (a test that combined it with `open` would not notice)."""
     with pytest.raises(SecurityError):
         check_tcl(script)
 

@@ -39,7 +39,7 @@ interpolated into it is validated instead (`security.tcl_path`, `tcl_selection`,
 * selections are a character whitelist; representation, colour and material names are letters/digits/spaces and the
   representation must be in the catalogue; `background` must be `white` or `black`;
 * **residue names read from a structure file are filtered** (`^[A-Za-z0-9_+\-']{1,8}$`), because mmCIF allows arbitrary
-  text. Before this was fixed a crafted file could close a Tcl brace and run commands when rendered with VMD.
+  text; an unfiltered name could close a Tcl brace and run commands when rendered with VMD.
   Rejected names are reported in `detect_system(...)["warnings"]`.
 
 Violations return a structured error (`blocked: true`), never an exception.

@@ -144,6 +144,6 @@ def test_event_aware_selection_beats_uniform_on_an_abrupt_event_and_uniform_matc
 
 @pytest.mark.parametrize("k", [0, -1, 2.5, None, True])
 def test_k_must_be_a_positive_integer(sample, k):
-    """k <= 0 used to be silently answered with two frames."""
+    """k <= 0 (or anything that is not a positive whole number) is refused, not answered with two frames."""
     r = kf.select_keyframes(*sample, k=k)
     assert r["ok"] is False and "k must be" in r["error"]

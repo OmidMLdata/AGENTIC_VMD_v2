@@ -29,7 +29,7 @@ def test_real_structure_types(ubq, hbb):
 
 
 def test_sulfur_rich_protein_is_not_a_material(write_pdb):
-    """Regression: 'S' used to count as a material element at >= 50 atoms."""
+    """'S' (sulfur) does not make a protein a material at >= 50 atoms."""
     atoms = []
     for i in range(60):                       # 60 isolated S atoms in LIG residues
         atoms.append(("S1", "LIG", 100 + i, "L", i * 4.0, 0.0, 0.0, "S"))
@@ -55,7 +55,7 @@ def test_missing_file_is_reported():
 
 # ------------------------------------------------------------------- stats
 def test_partial_conect_bonds_are_supplemented(lyz):
-    """Regression: a PDB with only CONECT records reported '4 bonds'."""
+    """A PDB with only CONECT records is not counted as '4 bonds'."""
     st = structure_stats(lyz)
     assert st["bonds_explicit"] < 50
     assert st["n_bonds"] > 900
@@ -157,8 +157,7 @@ def test_hbond_cutoff_is_honoured_not_swallowed(ubq):
 
 # ------------------------------------------------ chain counting (benchmark-found)
 def test_ligand_chain_is_not_counted_as_a_protein_chain(tmp_path):
-    """Regression found by the benchmark: a ligand on chain 'L' made a
-    3-chain protein read as 4 chains in the figure panel."""
+    """A ligand on chain 'L' does not make a 3-chain protein read as 4 chains in the figure panel."""
     from vmd_agent.structure.stats import structure_stats, stats_caption
     spec = {"fold": "helical", "n_chains": 3, "ligand": "exposed",
             "n_disulfides": 0}
