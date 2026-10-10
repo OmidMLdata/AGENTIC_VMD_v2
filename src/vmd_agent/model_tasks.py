@@ -168,8 +168,8 @@ def _tasks() -> List[Task]:
                         mentions(r.text, r"\b0\b", r"\b19\b")))
     add("drift", "trajectory", "How far does the protein move from its first frame to its last in protein.dcd, without aligning? Use VMD's RMSD.", ("measure_with_vmd",),
         number_task(lambda t: t["drift_total"], 0.4, "the un-aligned RMSD of the last frame"), needs=("vmd",))
-    add("rmsf", "trajectory", "Which residues fluctuate most in protein.dcd? Give the RMSF analysis for protein.pdb.", ("analyze_trajectory", "measure_with_vmd"),
-        lambda r: None if (r.called("analyze_trajectory", "measure_with_vmd") and re.search(r"rmsf|fluctuat", r.text, re.I)) else "no RMSF was measured and reported")
+    add("rmsf", "trajectory", "Which residues fluctuate most in protein.dcd? Give the RMSF analysis for protein.pdb.", ("analyze_trajectory", "measure_with_vmd", "run_workflow"),
+        lambda r: None if (r.called("analyze_trajectory", "measure_with_vmd", "run_workflow") and re.search(r"rmsf|fluctuat", r.text, re.I)) else "no RMSF was measured and reported")
 
     # ---- 4. measure_with_vmd: VMD's own measurements
     add("contacts", "measure_with_vmd", "Which protein residues stay in contact (within 5 A) with the ligand in protein.dcd, topology protein.pdb?", ("find_interactions", "analyze_trajectory"),

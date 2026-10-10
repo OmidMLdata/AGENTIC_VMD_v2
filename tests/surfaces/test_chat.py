@@ -297,7 +297,7 @@ def test_a_claim_about_the_vmd_window_needs_a_tool_that_changed_it():
 def test_a_claim_that_a_file_was_written_needs_a_tool_result_that_names_it():
     assert agent.unsupported_claims("The report was saved to out/report.md.", [], ["{\"other\": 1}", "question"])
     assert not agent.unsupported_claims("The report was saved to out/report.md.", [], ["{\"report\": \"/data/out/report.md\"}"])
-    assert not agent.unsupported_claims("Look at protein.pdb for details.", [], [])                         # only 'saved/written/created ...' is a claim
+    assert not agent.unsupported_claims("Look at protein.pdb for details.", [], ["protein.pdb"])           # only 'saved/written/created ...' is a claim about writing
 
 
 def test_an_answer_that_says_it_drew_in_vmd_without_a_tool_is_sent_back_and_corrected():
@@ -360,3 +360,44 @@ def test_an_answer_that_says_a_tool_was_run_must_name_one_that_really_ran():
     assert not agent.unsupported_claims("The `ligand_report` workflow ran detect_system and analyze_trajectory.", ran, [])
     assert not agent.unsupported_claims("Run `trajectory_qc` separately to check the periodic box.", ran, [])            # advice, not a claim of having done it
     assert not agent.unsupported_claims("`trajectory_qc` was not run here.", ran, [])
+
+
+
+# ------------------------------------------- exact checks: counts, residues, files, and a conclusion that contradicts the grading
+def _result(**extra):
+    return {"name": "run_workflow", "arguments": {"name": "ligand_report"},
+            "result": {"ok": True, "n_frames": 8, "facts": {"touching_residues": [5, 6]}, "finding_counts": {"ok": 2, "note": 3, "warning": 1, "problem": 0}, **extra}}
+
+
+def _checks(answer, calls=None, question="Does the ligand stay bound? Use sample.pdb.", evidence=None, root=None):
+    calls = calls or [_result()]
+    return agent.unsupported_claims(answer, calls, [str(c["result"]) for c in calls] + [question] + (evidence or []), root, question)
+
+
+def test_a_count_no_result_contains_is_flagged_and_one_it_does_contain_is_not():
+    assert not _checks("It was analysed over 8 frames.")
+    assert any("200 frames" in b for b in _checks("It was analysed over 200 frames."))
+    assert not _checks("Two residues touch it.")                                           # a count the model made by counting a returned list of 2 is fine
+    assert any("9 bonds" in b for b in _checks("The ligand makes 9 hydrogen bonds."))
+
+
+def test_a_residue_number_no_result_mentions_is_flagged():
+    assert not _checks("Residues 5 and 6 touch the ligand (ALA 5, ALA 6).")
+    assert any("residue 87" in b for b in _checks("It sits against residue 87."))
+    assert any("residue 31" in b for b in _checks("The contacts are ALA 31 and ALA 5."))
+
+
+def test_a_file_that_exists_nowhere_is_flagged(tmp_path):
+    (tmp_path / "run.dcd").write_text("x")
+    assert not _checks("I used sample.pdb and run.dcd.", root=str(tmp_path))                  # one is in the question, one is in your files
+    assert any("result.pdb" in b for b in _checks("See result.pdb for the output.", root=str(tmp_path)))
+    assert not _checks("The report is report.md.", evidence=["/data/out/report.md"], root=str(tmp_path))
+
+
+def test_a_conclusion_of_no_problems_or_no_warnings_cannot_contradict_the_workflows_own_grading():
+    graded = [_result(finding_counts={"ok": 1, "warning": 2, "problem": 1})]
+    assert any("no problems" in b for b in _checks("Everything looks fine: no problems were found.", graded))
+    assert any("no warnings" in b for b in _checks("The run raised no warnings.", graded))
+    clean = [_result(finding_counts={"ok": 3, "warning": 0, "problem": 0})]
+    assert not _checks("No problems were found and there were no warnings.", clean)
+    assert not _checks("Everything looks fine: no problems were found.", [_result(finding_counts={"ok": 1, "warning": 1, "problem": 0})])        # warnings are not problems

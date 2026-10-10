@@ -166,11 +166,88 @@ def called_names(calls) -> set:
     return names
 
 
-def unsupported_claims(answer: str, calls, evidence_texts) -> List[str]:
+# Exact checks of what an answer says against the structured results: the numbers the decimal-number guard lets through (counts, residue numbers), the
+# files it names, and whether its conclusion contradicts a workflow's own grading.
+_COUNT = re.compile(r"(?<![\w.])(\d{1,4})\s+(?:[A-Za-z-]+\s+)?(frames?|residues?|atoms?|chains?|waters?|ions?|bonds?|bridges?|contacts?|pairs?|steps?|molecules?|segments?)\b", re.I)
+_RESIDUES = re.compile(r"\b(?:residues?|resids?)\s+((?:\d+(?:\s*(?:,|and|&|to|-|\u2013)\s*)?)+)", re.I)
+_RESNAME_NUM = re.compile(r"\b(?:ALA|ARG|ASN|ASP|CYS|GLN|GLU|GLY|HIS|HSD|HSE|HSP|ILE|LEU|LYS|MET|PHE|PRO|SER|THR|TRP|TYR|VAL|LIG)[ :-]?(\d{1,4})\b")
+_FILE_NAME = re.compile(r"(?<![\w/.-])([\w.-]+\.(?:pdb|psf|dcd|xtc|trr|gro|cif|mmcif|mol2|xyz|prmtop|nc|dx|mrc|ccp4|cube|mp4|png|md|html|json|tcl|sbatch|namd))\b", re.I)
+_ALL_CLEAR = re.compile(r"\b(?:no (?:significant )?(?:problems?|issues?|concerns?)|all (?:the )?(?:checks )?(?:passed|(?:look )?(?:ok|good|fine))|nothing (?:wrong|of concern))\b", re.I)
+_NO_WARNINGS = re.compile(r"\bno warnings?\b", re.I)
+
+
+def _result_ints(value, out: set) -> set:
+    """Every whole number in a structured result, and the length of every list or dict in it (a count a model may legitimately state)."""
+    if isinstance(value, bool):
+        return out
+    if isinstance(value, int):
+        out.add(value)
+    elif isinstance(value, float):
+        if value == int(value):
+            out.add(int(value))
+    elif isinstance(value, dict):
+        out.add(len(value))
+        for v in value.values():
+            _result_ints(v, out)
+    elif isinstance(value, (list, tuple)):
+        out.add(len(value))
+        for v in value:
+            _result_ints(v, out)
+    elif isinstance(value, str):
+        out.update(int(m) for m in re.findall(r"(?<![\d.])\d{1,4}(?![\d.])", value))
+    return out
+
+
+def _files_in(root: Optional[str], limit: int = 3000) -> set:
+    names: set = set()
+    if not root or not os.path.isdir(root):
+        return names
+    for dirpath, dirs, files in os.walk(root):
+        dirs[:] = [d for d in dirs if not d.startswith(".")]
+        names.update(f.lower() for f in files)
+        if len(names) > limit:
+            break
+    return names
+
+
+def exact_checks(answer: str, calls, question: str, evidence: str, root: Optional[str] = None) -> List[str]:
+    """What an answer states that the structured results do not back: a count (frames, residues, atoms ...) no result contains, a residue number no result
+    mentions, a file that is neither in the question, a result, nor your files folder, and a conclusion of "no problems" or "no warnings" over a workflow
+    that graded some."""
+    body = re.sub(r"```.*?```", "", answer, flags=re.S)
+    bad: List[str] = []
+    ints: set = set()
+    for c in calls:
+        _result_ints(c.get("result"), ints)
+    ints.update(int(m) for m in re.findall(r"(?<![\d.])\d{1,4}(?![\d.])", question + "\n" + evidence))
+    for n, noun in _COUNT.findall(body):
+        if int(n) not in ints and f"{n} {noun.lower()}" not in bad:
+            bad.append(f"{n} {noun.lower()} (no tool result has that count)")
+    mentioned = [m for seg in _RESIDUES.findall(body) for m in re.findall(r"\d+", seg)] + _RESNAME_NUM.findall(body)
+    seen = set(re.findall(r"(?<![\d.])\d{1,4}(?![\d.])", question + "\n" + evidence))
+    for r in dict.fromkeys(mentioned):
+        if int(r) not in seen and int(r) not in ints:
+            bad.append(f"residue {r} (no tool result mentions it)")
+    have_files, low = _files_in(root), (question + "\n" + evidence).lower()
+    for f in dict.fromkeys(m.lower() for m in _FILE_NAME.findall(body)):
+        if f not in low and f not in have_files and os.path.basename(f) not in have_files:
+            bad.append(f"the file {f} (not in your files, the question or any tool result)")
+    counts = [c["result"].get("finding_counts") for c in calls if isinstance(c.get("result"), dict) and isinstance(c["result"].get("finding_counts"), dict)]
+    problems = sum(int(k.get("problem", 0)) for k in counts)
+    warnings = sum(int(k.get("warning", 0)) for k in counts)
+    if problems and any(_ALL_CLEAR.search(s) for s in re.split(r"(?<=[.!?])\s+|\n+", body)):
+        bad.append(f"that there were no problems (the workflow graded {problems} as a problem)")
+    if warnings and _NO_WARNINGS.search(body):
+        bad.append(f"that there were no warnings (the workflow raised {warnings})")
+    return bad
+
+
+def unsupported_claims(answer: str, calls, evidence_texts, root: Optional[str] = None, question: str = "") -> List[str]:
     """Statements in an answer about the VMD window, or about files it says were written, that no tool result backs. The number guard cannot see these.
     ``calls`` are this turn's tool calls (name and result); ``evidence_texts`` the tool results and the question as text."""
     body = re.sub(r"```.*?```", "", answer, flags=re.S)
     bad: List[str] = []
+    bad += exact_checks(answer, calls, question, "\n".join(evidence_texts), root)
     if not window_changed(calls) and any(_WINDOW_CLAIM.search(s) and not _NEGATED.search(s) for s in re.split(r"(?<=[.!?])\s+|\n+", body)):
         bad.append("that something is shown in the VMD window (no tool changed the window)")
     ran = called_names(calls)
@@ -530,7 +607,7 @@ class Agent:
                 answer = (parsed["content"] or "") + cut
                 if self.guard:
                     claims = unsupported_claims(answer, self.call_log[getattr(self, "turn_start", 0):],
-                                                [m["content"] for m in self.messages if m["role"] == "tool"] + [text])
+                                                [m["content"] for m in self.messages if m["role"] == "tool"] + [text], self.root(), text)
                     if claims and not reclaimed and not on_token:
                         reclaimed = True
                         self.echo("  (the answer claims something no tool result shows; asking the model to correct it)")

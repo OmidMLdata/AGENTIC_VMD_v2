@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.36.0: more exact checks on what an answer says
+
+* **Counts, residue numbers, files and conclusions are checked against the structured results.** A count of frames, residues, atoms, bonds and so on that no result contains, a residue number no result mentions, a file that is not in your files, the question or a result, and a conclusion of "no problems" or "no warnings" over a workflow that graded some, are sent back once, then flagged. A count is accepted if the same whole number appears anywhere in the results, so a coincidence can still pass.
+* Checked on real model answers: the true ligand and flexibility answers produce no flags, an invented one is caught, and six of seven real-model answers in a benchmark run raised none (the seventh failed its grade because the model, correctly, used the new `flexibility_report`: that task now accepts it).
+
 ## 0.35.0: five more whole jobs (eleven in all)
 
 * **`flexibility_report`**: which residues are most flexible and most rigid, the size, and whether helix and strand content holds over the run.

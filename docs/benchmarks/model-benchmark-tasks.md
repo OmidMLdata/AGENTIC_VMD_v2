@@ -33,7 +33,7 @@ A task marked *needs VMD / ffmpeg / network* is skipped (and not counted) on a c
 | `rmsd_settled` | Over protein.dcd (topology protein.pdb), what is the mean RMSD of the protein after alignment, and does it look converged? | `analyze_trajectory`, `measure_with_vmd`, `run_workflow` | About 0.12 A (the built-in noise of 0.05 A per coordinate, differenced between frames) and no drift: converged. |
 | `keyframes` | Pick the 3 most informative frames of protein.dcd (topology protein.pdb). | `select_keyframes` | Three frames that include the first (0) and the last (19). |
 | `drift` *(needs vmd)* | How far does the protein move from its first frame to its last in protein.dcd, without aligning? Use VMD's RMSD. | `measure_with_vmd` | 5.7 A at the last frame (19 frames x 0.3 A drift per frame). |
-| `rmsf` | Which residues fluctuate most in protein.dcd? Give the RMSF analysis for protein.pdb. | `analyze_trajectory`, `measure_with_vmd` | Per-residue RMSF reported; fluctuations are uniformly small (no flexible region was built in). |
+| `rmsf` | Which residues fluctuate most in protein.dcd? Give the RMSF analysis for protein.pdb. | `analyze_trajectory`, `measure_with_vmd`, `run_workflow` | Per-residue RMSF reported; fluctuations are uniformly small (no flexible region was built in). |
 
 ## measure_with_vmd
 
