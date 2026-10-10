@@ -83,6 +83,9 @@ def _request(url: str, payload: Optional[dict], api_key: Optional[str],
             raw = resp.read()
     except urllib.error.HTTPError as e:
         body = e.read()[:600].decode("utf-8", "replace")
+        if e.code == 400 and "does not support tools" in body:
+            raise LLMError("this model cannot call tools, and vmd-agent works by calling tools. Choose a model that can: `vmd-agent models` lists suggested ones "
+                           "and `vmd-agent models --install` downloads one (or use Model, then Download a model, in the web page).") from e
         raise LLMError(f"the model server answered HTTP {e.code} for {url}: "
                        f"{body}") from e
     except (urllib.error.URLError, OSError) as e:

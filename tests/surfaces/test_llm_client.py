@@ -221,3 +221,27 @@ def test_a_streamed_tool_call_is_rebuilt_from_its_pieces():
         srv.shutdown()
     call = L.parse_choice(resp)["tool_calls"][0]
     assert call["name"] == "inspect_files" and call["arguments"] == {"paths": ["a.pdb"]} and call["id"] == "c1"
+
+
+def test_a_model_that_cannot_call_tools_gets_a_plain_message_not_a_raw_http_error():
+    import http.server
+    import threading
+
+    class H(http.server.BaseHTTPRequestHandler):
+        def do_POST(self):
+            body = b'{"error":{"message":"registry.ollama.ai/library/tiny:1b does not support tools","type":"invalid_request_error"}}'
+            self.send_response(400)
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *a):
+            pass
+    srv = http.server.HTTPServer(("127.0.0.1", 0), H)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        with pytest.raises(L.LLMError, match="cannot call tools") as e:
+            L.chat_completion(f"http://127.0.0.1:{srv.server_port}/v1", "tiny:1b", [{"role": "user", "content": "hi"}], tools=[{"type": "function", "function": {"name": "t", "parameters": {"type": "object"}}}])
+        assert "vmd-agent models" in str(e.value) and "HTTP 400" not in str(e.value)
+    finally:
+        srv.shutdown()
