@@ -6,6 +6,7 @@
   (`bench/agent`, `vmd-agent bench agent-suite|agent-run|agent-preflight|agent-plan|agent-compare`), the grounded-interpretation study (`bench run`, `bench truth`, the questions, conditions, scorer and runner),
   the sampling and event studies (`bench sampling|events`), the rating-study instrument, the container wrapper for them (`bench docker` and the `bench*` compose services), the `anthropic` extra, and the research
   paper with its preregistration (`docs/reference/RESEARCH.md`). The Git tag `archive/research-benchmark` holds the repository as it was just before, so nothing is lost.
+* **Also removed** as no longer used: the frame-selection scoring helpers that only the old study and the tests used (now `tests/keyframe_theory.py`), a leftover help string, the methods-page sections describing the removed studies, the `requires_api` test marker, and ignore rules for folders nothing writes any more.
 * **Kept:** `bench tools`, `bench models`, `bench dataset`, `bench validate`, `bench validate-dssp` and `bench synth` (the structure generator the tool test set is made from).
 
 ## 0.38.0: the checks on what an answer says get stricter

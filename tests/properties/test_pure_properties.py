@@ -32,6 +32,7 @@ def test_mean_ci_block_trend_halves_never_raise(x):
     ts.equilibration_start(x); ts.compare_endpoints(x)
 
 # ---------------- keyframes
+import keyframe_theory as kt
 from vmd_agent.dynamics import keyframes as kf
 @S
 @given(st.integers(1, 5000), st.integers(1, 60))
@@ -52,19 +53,19 @@ def test_select_keyframes_invariants(sigs, k):
 @S
 @given(st.lists(st.integers(0, 999), max_size=30), st.integers(0, 900), st.integers(0, 100), st.integers(0, 10))
 def test_evaluate_sampling_bounds(sel, start, length, tol):
-    r = kf.evaluate_sampling(sel, [{"start": start, "end": start + length}], tol)
+    r = kt.evaluate_sampling(sel, [{"start": start, "end": start + length}], tol)
     assert 0 <= r["recall_hit"] <= 1 and 0 <= r["recall_bracketed"] <= 1
 
 @S
 @given(st.integers(2, 100000), st.integers(2, 200), st.integers(1, 5000))
 def test_hit_probability_in_unit_interval(n, k, L):
-    assert 0.0 <= kf.hit_probability_uniform(n, k, L) <= 1.0
+    assert 0.0 <= kt.hit_probability_uniform(n, k, L) <= 1.0
 
 @S
 @given(st.integers(10, 100000), st.integers(1, 5000), st.floats(0.05, 0.99))
 def test_frames_needed_meets_target(n, L, p):
-    k = kf.frames_needed_uniform(n, L, p)
-    assert k >= 1 and (k == 1 or kf.hit_probability_uniform(n, k, L) >= p - 1e-9 or L + 1 >= n)
+    k = kt.frames_needed_uniform(n, L, p)
+    assert k >= 1 and (k == 1 or kt.hit_probability_uniform(n, k, L) >= p - 1e-9 or L + 1 >= n)
 
 # ---------------- the structure generator's fold classification
 from vmd_agent.bench.truth import classify_fold

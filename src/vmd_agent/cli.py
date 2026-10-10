@@ -327,8 +327,8 @@ def build_parser():
     b.add_argument("ids", nargs="+", help="PDB IDs (downloaded) or .pdb files")
     b.add_argument("--cache", default="pdb_cache")
     b.add_argument("--mdtraj", action="store_true", help="also compare with MDTraj's independent DSSP (needs `pip install mdtraj`; .pdb files only)")
-    b = bsub.add_parser("synth", help="generate novel, contamination-free "
-                                       "structures with validated truth")
+    b = bsub.add_parser("synth", help="generate novel structures that no model can have seen, "
+                                       "with validated truth")
     b.add_argument("n", type=int); b.add_argument("--out", default="synth")
     b.add_argument("--seed", type=int, default=0)
     b.add_argument("--no-validate", action="store_true")

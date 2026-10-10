@@ -19,8 +19,6 @@ from typing import Callable, Dict, List, Optional
 from vmd_agent import security, vmdlink
 
 PRESENTERS: Dict[str, Callable] = {}
-#: what the extra parameter says, for a model and for a person
-SHOW_HELP = "also draw the result in the VMD window (opened if needed), so you see it in VMD itself"
 
 
 def presenter(*names: str):

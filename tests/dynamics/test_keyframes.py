@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 from vmd_agent import auto
+import keyframe_theory as kt
 from vmd_agent.dynamics import keyframes as kf
 
 
@@ -30,8 +31,8 @@ def test_injected_event_is_found_and_uniform_misses_it():
     ev = [{"start": 400, "end": 420}]
     sel = kf.select_keyframes_from_signals({"obs": x, "noise": ar1(rng, n)},
                                            k=9)["indices"]
-    assert kf.evaluate_sampling(sel, ev)["recall_hit"] == 1.0
-    assert kf.evaluate_sampling(kf.uniform_frames(n, 9), ev)["recall_hit"] == 0.0
+    assert kt.evaluate_sampling(sel, ev)["recall_hit"] == 1.0
+    assert kt.evaluate_sampling(kf.uniform_frames(n, 9), ev)["recall_hit"] == 0.0
 
 
 def test_budget_and_endpoints_respected():
@@ -68,10 +69,10 @@ def test_change_scores_peak_at_the_step():
 
 def test_evaluate_sampling_metrics():
     ev = [{"start": 10, "end": 20}, {"start": 50, "end": 60}]
-    r = kf.evaluate_sampling([0, 15, 99], ev)
+    r = kt.evaluate_sampling([0, 15, 99], ev)
     assert r["recall_hit"] == 0.5 and r["recall_bracketed"] == 1.0
     assert r["per_event"][0]["localisation_error_frames"] == 0
-    assert kf.evaluate_sampling([0, 12, 55, 99], ev)["recall_hit"] == 1.0
+    assert kt.evaluate_sampling([0, 12, 55, 99], ev)["recall_hit"] == 1.0
 
 
 def test_analytic_uniform_hit_probability_matches_simulation():
@@ -83,16 +84,16 @@ def test_analytic_uniform_hit_probability_matches_simulation():
         N = 4000
         for _ in range(N):
             s = int(rng.integers(100, 900 - L))
-            hits += kf.evaluate_sampling(sel, [{"start": s, "end": s + L}])[
+            hits += kt.evaluate_sampling(sel, [{"start": s, "end": s + L}])[
                 "recall_hit"]
-        assert hits / N == pytest.approx(kf.hit_probability_uniform(n, k, L),
+        assert hits / N == pytest.approx(kt.hit_probability_uniform(n, k, L),
                                          abs=0.04)
 
 
 def test_frames_needed_is_consistent_with_probability():
-    k = kf.frames_needed_uniform(1000, 20, p=0.95)
-    assert kf.hit_probability_uniform(1000, k, 20) >= 0.95
-    assert kf.hit_probability_uniform(1000, k - 1, 20) < 0.95
+    k = kt.frames_needed_uniform(1000, 20, p=0.95)
+    assert kt.hit_probability_uniform(1000, k, 20) >= 0.95
+    assert kt.hit_probability_uniform(1000, k - 1, 20) < 0.95
 
 
 def test_end_to_end_on_a_trajectory(sample, tmp_path):
@@ -136,9 +137,9 @@ def test_event_aware_selection_beats_uniform_on_an_abrupt_event_and_uniform_matc
         picks = {"uniform": kf.uniform_frames(n, k),
                  "event_aware": kf.select_keyframes_from_signals({"obs": x, "other": ar1()}, k=k, z_min=6.0)["indices"]}
         for name, sel in picks.items():
-            hit[name] += kf.evaluate_sampling(sel, events)["recall_hit"]
+            hit[name] += kt.evaluate_sampling(sel, events)["recall_hit"]
     assert hit["uniform"] / trials < 0.3 and hit["event_aware"] / trials > 0.8
-    assert abs(hit["uniform"] / trials - kf.hit_probability_uniform(n, k, length)) < 0.15          # simulated uniform sampling agrees with the closed form
+    assert abs(hit["uniform"] / trials - kt.hit_probability_uniform(n, k, length)) < 0.15          # simulated uniform sampling agrees with the closed form
 
 
 @pytest.mark.parametrize("k", [0, -1, 2.5, None, True])

@@ -1,9 +1,9 @@
-"""Procedural, contamination-free structures for the benchmark.
+"""Procedural structures that no model can have seen, with every property known.
 
 A language model may recognise ubiquitin or lysozyme from its shape and answer
-from memory, which no ``blind`` control can detect. These structures are
-generated from scratch, so no model can have seen them, while every property
-the benchmark asks about is still known:
+from memory. These structures are generated from scratch, so a test built on
+them (the tool test set, the model benchmark) cannot be passed from memory, while
+every property it asks about is still known:
 
 * **design intent** is recorded (chains, helices/strands, ligand placement,
   disulfides);

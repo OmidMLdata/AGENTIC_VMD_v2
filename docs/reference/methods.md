@@ -80,30 +80,6 @@ supported / contradicted / unverifiable. "Mostly helical" = helix ≥ 30 % and l
 alone), Shrake-Rupley, probe 1.4 Å, 240 points, Bondi radii; buried if ≥ 0.5. Dynamic claims reuse the
 statistics above, so a short trajectory yields `unverifiable`, not support.
 
-## Automation benchmark (`bench/agent`)
-
-* **Tasks** are generated from real trajectories and structures; **truth is independent of any model and of the toolkit's
-  analysis code**: RMSD by an NumPy Kabsch (`bench/events.kabsch_rmsd_series`), mass-weighted Rg, centre-of-geometry
-  distance, a SciPy KD-tree for residue neighbourhoods and chain interfaces, injected events (known onset) and injected
-  defects (periodic-boundary shift of one segment by one box length, topology with 5 atoms removed, NaN coordinates).
-* **Scoring.** Numbers: `|x - t| <= max(atol, rtol*|t|)` (RMSD 3 %, Rg/distance 2 %, elapsed time 1 %). Events: onset in
-  `[start - 5, end]`; controls require `null`. Diagnosis: the exact label; for a damaged file a number counts against the
-  answer. Selections: exact atom-set equality, evaluated with `periodic=False`. Keyframes: distinct, non-blank images
-  inside the workspace plus one frame within 5 of the event window. Report: claim verification, any contradicted claim fails.
-* **Silent error** = answered, wrong, not abstained, no data problem flagged.
-* **Statistics.** Differences paired by task (repeats averaged); bootstrap resamples *clusters* (trajectory or structure).
-  Intervals use `alpha`, so a Bonferroni-corrected family is `alpha = 0.05/m`.
-* **Events** are rigid hinge/translation/scaling on real ping-pong-extended noise (see the next section); 120 frames,
-  abrupt (10-frame) and slow (30-frame) ramps.
-
-## Real-noise event study (`bench/events`)
-Real trajectory frames extended by ping-pong reflection (preserves every real frame-to-frame step; makes the base
-signal periodic with period 2(F−1)). Events: `hinge` (first half of the residues rotates about a pivot near the
-rest, ramping to the stated angle), `dissociation` (last ~10 % of residues translate away, ramping to the stated
-distance), `expansion` (uniform scaling about the centroid). Ramp over `length` frames, then held. Signals:
-Kabsch RMSD to frame 0, mass-weighted Rg, and moving-vs-rest COM distance for hinge/dissociation. Hit = a selected
-frame inside the event window. Negative control = no event. The event is synthetic by design.
-
 ## Procedural structures (`bench/synth`)
 NeRF-built ideal helices (φ,ψ = −57,−47) arranged on a ring with alternating direction; antiparallel strands in a
 plane with spacing/register chosen by grid search so DSSP recognises them; coil = short random-φ,ψ pieces; 2-residue

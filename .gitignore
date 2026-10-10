@@ -26,8 +26,7 @@ Thumbs.db
 /pdb_cache/
 /structures/
 /vmd_agent_output/
-/bench_out/
-/agent_bench_out/
+/model_bench_out/
 vmd_scripts/
 
 # ---- anything that could hold a secret

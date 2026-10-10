@@ -11,7 +11,7 @@ GIT = shutil.which("git")
 
 SHOULD_BE_IGNORED = ["vmd_scripts/x.tcl", "data/a.pdb", "pdb_cache/a.pdb", ".env", "config/settings.json", "settings.json",
                      "src/vmd_agent.egg-info/PKG-INFO", "build/x", "dist/x", "docker/vmd-dist/vmd.tar.gz", ".venv/bin/python",
-                     "src/vmd_agent/__pycache__/x.pyc", ".DS_Store", "vmd_agent_output/a", "bench_out/a", ".hypothesis/a"]
+                     "src/vmd_agent/__pycache__/x.pyc", ".DS_Store", "vmd_agent_output/a", "model_bench_out/a", ".hypothesis/a"]
 MUST_STAY_TRACKED = ["tests/data/1ubq.pdb", "tests/data/ubq_md/protein.dcd", "docker/vmd-dist/README.md",
                      "src/vmd_agent/structure/detect.py", "src/vmd_agent/vmdkit/build.py", "src/vmd_agent/inputs/volume.py",
                      "README.md", "pyproject.toml"]
