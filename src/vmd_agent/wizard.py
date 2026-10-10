@@ -202,8 +202,26 @@ def step_data_dir(io: IO, data_dir: Optional[str] = None, assume_yes: bool = Fal
     local = settings.local_home()
     default = data_dir or settings.get("data_dir") or (os.path.dirname(local) if local else DEFAULT_DATA)
     chosen = default if assume_yes else io.ask("  Which folder?", default)
-    folder = os.path.abspath(os.path.expanduser(chosen))
-    os.makedirs(folder, exist_ok=True)
+    fallbacks = [default, DEFAULT_DATA, os.getcwd()]                  # tried in turn when what was typed cannot be used and nobody is left to ask
+    folder, asked = "", 0
+    while True:
+        folder = os.path.abspath(os.path.expanduser(chosen))
+        problem = ""
+        if os.path.isfile(folder):
+            problem = f"'{folder}' is a file, not a folder."
+        else:
+            try:
+                os.makedirs(folder, exist_ok=True)
+                break
+            except OSError as e:
+                problem = f"I cannot make the folder '{folder}' ({e.strerror or type(e).__name__})."
+        asked += 1
+        if not assume_yes and asked < 3:
+            io.say(f"  {problem} Please give another folder.")
+            chosen = io.ask("  Which folder?", default)
+            continue
+        chosen = fallbacks.pop(0) if fallbacks else os.getcwd()
+        io.say(f"  {problem} Using {chosen} instead.")
     settings.save(data_dir=folder)
     io.say(f"  Using: {folder}")
     return folder
@@ -362,6 +380,10 @@ def setup_online_model(io: IO, url: Optional[str] = None, model: Optional[str] =
     if not url or not model:
         io.say("  I need both a web address and a model name. Nothing was saved.")
         return False
+    if not re.match(r"^https?://[^\s/]+(/\S*)?$", url.strip()):
+        io.say(f"  '{url}' is not a web address (it should start with http:// or https://, for example https://api.example.com/v1). Nothing was saved.")
+        return False
+    url = url.strip()
     settings.save(llm_url=url.rstrip("/"), llm_model=model, llm_key=key or None)
     io.say(f"  Saved. The key is stored in {settings.path()}, readable only by you.")
     try:

@@ -57,7 +57,7 @@ function renderBanner(s) {
   const box = $("#banner"); box.textContent = "";
   if (s.model_ready) return;
   const b = el("div", "banner"), why = s.model_state === "no_model" ? `The server answers but has no model called "${s.model}".` : `No model server answers at ${s.server}.`;
-  b.append(el("div", null, "The chat has no model to talk to. " + why + " The viewer, the files, the look buttons and the whole jobs work without one."));
+  b.append(el("div", null, "The chat has no model to talk to. " + why + " The files, the tools, the whole jobs and the VMD window work without one."));
   if ((s.local_models || []).length && s.model_state === "no_server") b.append(el("div", null, `${s.local_models.length} models are downloaded on this computer (${s.local_models.join(", ")}): start the local server and pick one.`));
   if ((s.found_servers || []).length) b.append(el("div", null, "A model server does answer at " + s.found_servers.map(f => f.base_url).join(", ") + ": choose it under Choose a model…"));
   const acts = el("div", "acts");
@@ -184,7 +184,7 @@ function openFile(f) {
   if (f.kind === "image" || f.kind === "video") return media(f.path, f.kind);
   if (f.kind === "structure") return loadMolecule(f.path);
   if (f.kind === "trajectory") return addTrajectory(f.path);
-  toast("This kind of file has no picture; use the look buttons.", "");
+  toast("This kind of file cannot be loaded into VMD; select it and use the buttons under the file list.", "");
 }
 
 // ------------------------------------------------------------------------------------------------ the VMD window

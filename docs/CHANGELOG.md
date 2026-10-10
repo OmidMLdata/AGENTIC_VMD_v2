@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.37.0: what an audit of the tools, the jobs and a new user's first run found
+
+* **Every tool and job was run against a real VMD.** All 57 tools have a case on generated data with known answers (83 cases, all pass); all eleven jobs ran with and without `show_in_window`.
+* **A job now stops before any work if a file is missing or plainly the wrong kind** (a trajectory where the topology goes, the files the wrong way round, a non-map for a map). Before, swapping the two files of `equilibration_check` still wrote a report that said "no problem found".
+* **First-run crashes found by running 300 scripted new-user sessions with random answers at every prompt** (numbers in and out of range, blanks, words, odd paths): giving an existing *file* as the files folder, a folder that cannot be made, and an online-service address that is not a web address (`7`, `not a url`) each ended in a traceback. They now say what is wrong and ask again, or fall back. After the fixes, 240 further sessions produced no crash and no inconsistent saved settings.
+* Stale wording from the removed imitation viewer ("the viewer, the look buttons") is gone from the page and the docs.
+
 ## 0.36.0: more exact checks on what an answer says
 
 * **Counts, residue numbers, files and conclusions are checked against the structured results.** A count of frames, residues, atoms, bonds and so on that no result contains, a residue number no result mentions, a file that is not in your files, the question or a result, and a conclusion of "no problems" or "no warnings" over a workflow that graded some, are sent back once, then flagged. A count is accepted if the same whole number appears anywhere in the results, so a coincidence can still pass.

@@ -215,3 +215,14 @@ def test_check_claims_reads_a_file_of_statements_only_from_inside_the_files_fold
     with pytest.raises(security.SecurityError):
         workflows.run_named("check_claims", [str(work / "protein.pdb")], str(work / "c3"), {"claims_file": str(outside)})
     assert workflows.run_named("check_claims", [str(work / "protein.pdb")], str(work / "c4"), {})["verdict"] == "Nothing to check."
+
+
+def test_a_job_stops_before_any_work_when_a_file_is_missing_or_the_files_are_the_wrong_way_round(work):
+    with pytest.raises(security.InvalidInput, match="was not found"):
+        workflows.run_named("trajectory_qc", [str(work / "nope.pdb"), str(work / "protein.dcd")], str(work / "o"), {})
+    with pytest.raises(security.InvalidInput, match="wrong way round"):
+        workflows.run_named("equilibration_check", [str(work / "protein.dcd"), str(work / "protein.pdb")], str(work / "o"), {})
+    with pytest.raises(security.InvalidInput, match="not a density map"):
+        workflows.run_named("cryoem_fit", [str(work / "protein.pdb"), str(work / "protein.pdb")], str(work / "o"), {})
+    r = toolset.TOOLS["run_workflow"](name="equilibration_check", files=["protein.dcd", "protein.pdb"], out_dir=str(work / "o2"))
+    assert r["ok"] is False and "wrong way round" in r["error"] and not (work / "o2").exists()                  # nothing was written

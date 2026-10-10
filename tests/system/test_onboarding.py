@@ -506,3 +506,31 @@ def test_the_working_folders_data_is_still_found_after_the_program_changes_direc
     assert settings.home_dir() == os.path.realpath(project / ".vmd-agent") and settings.config_dir().startswith(os.path.realpath(project))
     settings.unpin()
     assert ".vmd-agent" not in settings.home_dir()                                    # without the pin the folder is lost, which is the bug
+
+
+# ------------------------------------------- first-run answers that a new user really types
+def test_the_files_folder_answer_can_be_a_file_or_a_place_that_cannot_be_made(tmp_path):
+    a_file = tmp_path / "notes.txt"
+    a_file.write_text("x")
+    io_ = Typed([str(a_file), str(tmp_path / "ok")])               # a file first, then a real folder
+    assert wizard.step_data_dir(io_) == str(tmp_path / "ok") and "is a file, not a folder" in io_.text
+    io_ = Typed([str(a_file)] * 5)                                 # keeps giving a file: falls back, never a traceback
+    folder = wizard.step_data_dir(io_)
+    assert os.path.isdir(folder) and "Using" in io_.text
+    blocked = tmp_path / "blocker"
+    blocked.write_text("x")
+    io_ = Typed([str(blocked / "inside"), str(tmp_path / "fine")])  # a folder under a file cannot be made
+    assert wizard.step_data_dir(io_) == str(tmp_path / "fine") and "cannot make the folder" in io_.text
+
+
+@pytest.mark.parametrize("address", ["7", "not a url", "api.example.com/v1", "ftp://x/v1"])
+def test_an_online_service_address_that_is_not_a_web_address_is_refused_and_not_saved(address):
+    io_ = Typed()
+    assert wizard.setup_online_model(io_, address, "some-model", "k") is False
+    assert "not a web address" in io_.text and settings.get("llm_url") is None
+
+
+def test_a_listing_of_models_from_a_non_address_is_an_error_not_a_traceback():
+    from vmd_agent import llm_client
+    with pytest.raises(llm_client.LLMError, match="not a web address"):
+        llm_client.list_models("7")

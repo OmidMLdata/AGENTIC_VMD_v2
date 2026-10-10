@@ -73,8 +73,11 @@ def _request(url: str, payload: Optional[dict], api_key: Optional[str],
     headers = {"Content-Type": "application/json"}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
-    req = urllib.request.Request(url, data=data, headers=headers,
-                                 method="POST" if payload is not None else "GET")
+    try:
+        req = urllib.request.Request(url, data=data, headers=headers,
+                                     method="POST" if payload is not None else "GET")
+    except ValueError as e:                                  # not a web address at all (no http://)
+        raise LLMError(f"'{url}' is not a web address for a model server (it should start with http:// or https://)") from e
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             raw = resp.read()

@@ -533,6 +533,30 @@ WORKFLOWS: Dict[str, Workflow] = {
 }
 
 
+_NOT_A_STRUCTURE = {".dcd", ".xtc", ".trr", ".nc", ".mdcrd", ".mp4", ".mov", ".gif", ".png", ".jpg", ".dx", ".mrc", ".ccp4", ".map", ".cube", ".json", ".txt", ".md"}
+_NOT_A_TRAJECTORY = {".psf", ".prmtop", ".parm7", ".mol2", ".cif", ".mmcif", ".mp4", ".mov", ".gif", ".png", ".jpg", ".dx", ".mrc", ".ccp4", ".map", ".cube", ".json", ".txt", ".md"}
+_VOLUMES = {".dx", ".mrc", ".ccp4", ".map", ".cube", ".situs"}
+
+
+def check_inputs(name: str, roles: List[str], files: List[str]) -> None:
+    """Stop before any work if an input file is missing or is plainly the wrong kind for its place (a trajectory where the topology goes, the files the wrong way round).
+    A job that carries on regardless would write a report that looks fine about files that never fitted together."""
+    for role, path in zip(roles, files):
+        if not os.path.isfile(path):
+            raise security.InvalidInput(f"{name}: the {role} file '{os.path.basename(path)}' was not found. Check the name, and that it is in your files folder.")
+    wrong = []
+    for role, path in zip(roles, files):
+        ext = os.path.splitext(path)[1].lower()
+        if role.startswith("trajectory") and ext in _NOT_A_TRAJECTORY:
+            wrong.append(f"the {role} '{os.path.basename(path)}' is not a trajectory")
+        elif role == "map_file" and ext not in _VOLUMES:
+            wrong.append(f"the {role} '{os.path.basename(path)}' is not a density map ({', '.join(sorted(_VOLUMES))})")
+        elif role in ("topology", "structure", "model", "structure_a", "structure_b") and ext in _NOT_A_STRUCTURE:
+            wrong.append(f"the {role} '{os.path.basename(path)}' is not a structure file")
+    if wrong:
+        raise security.InvalidInput(f"{name}: " + "; ".join(wrong) + f". It needs: {', '.join(roles)}, in that order. The files may be the wrong way round.")
+
+
 def run_named(name: str, files: List[str], out_dir: str, options: Optional[dict] = None) -> dict:
     """Run workflow ``name`` on ``files`` (in the order its roles list), writing the report and everything else to ``out_dir``."""
     if name not in WORKFLOWS:
@@ -540,6 +564,7 @@ def run_named(name: str, files: List[str], out_dir: str, options: Optional[dict]
     wf = WORKFLOWS[name]
     if len(files) != len(wf.roles):
         raise security.InvalidInput(f"{name} needs {len(wf.roles)} file(s): {', '.join(wf.roles)}")
+    check_inputs(name, wf.roles, files)
     os.makedirs(out_dir, exist_ok=True)
     return wf.fn(*files, out_dir, dict(options or {}))
 

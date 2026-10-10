@@ -547,7 +547,7 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if problem["state"] != "ready":
             return emit({"type": "error", "kind": "model", "state": problem["state"],
                          "text": f"No model is answering ({problem['problem']}). Choose or start one with Extensions, Model. "
-                                 "The viewer, the files, the look buttons and the whole jobs work without one."})
+                                 "The files, the tools, the whole jobs and the VMD window work without one."})
 
         def on_event(ev: dict) -> None:
             if ev["type"] == "tool_end":
