@@ -66,20 +66,8 @@ def test_frames_needed_meets_target(n, L, p):
     k = kf.frames_needed_uniform(n, L, p)
     assert k >= 1 and (k == 1 or kf.hit_probability_uniform(n, k, L) >= p - 1e-9 or L + 1 >= n)
 
-# ---------------- scorer / bench
-from vmd_agent.bench import scorer as sc
+# ---------------- the structure generator's fold classification
 from vmd_agent.bench.truth import classify_fold
-@S
-@given(st.text(max_size=400))
-def test_parse_response_total(t):
-    r = sc.parse_response(t)
-    assert {"answer", "confidence", "abstain", "parsed"} <= set(r)
-
-@S
-@given(st.lists(st.tuples(st.floats(0, 1), st.booleans()), min_size=1, max_size=200), st.integers(1, 20))
-def test_ece_bounded(pairs, bins):
-    c, y = zip(*pairs); assert 0.0 <= sc.ece(list(c), list(y), bins) <= 1.0 + 1e-9
-
 @S
 @given(st.floats(0, 100), st.floats(0, 100))
 def test_classify_fold_total(h, s):

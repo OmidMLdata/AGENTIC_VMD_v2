@@ -9,8 +9,6 @@ did not run, not a test that passed.
 * real VMD / Tachyon:  set ``VMD_BIN`` or install VMD; marker ``requires_vmd``
 * real ffmpeg:         ``requires_ffmpeg``
 * real MCP SDK:        Python >= 3.10 and ``pip install mcp``; ``requires_mcp``
-* real model API:      ``VMD_AGENT_LIVE_TESTS=1`` and ``ANTHROPIC_API_KEY``
-                       (spends a few cents); ``requires_api``
 * real local model:    a running OpenAI-style server (e.g. Ollama) and
                        ``VMD_AGENT_LIVE_LLM_MODEL=<name>``; ``requires_llm``
 * real network:        reachable rcsb.org; ``requires_network``
@@ -184,8 +182,6 @@ def pytest_report_header(config):
         f"real network: {'reachable' if have_network() else 'UNREACHABLE (requires_network tests will be skipped)'}",
         "live local-model tests: " + ("ON" if have_llm() else
                                       "off (set VMD_AGENT_LIVE_LLM_MODEL and run a model server)"),
-        "live model API tests: " + ("ON" if os.environ.get("VMD_AGENT_LIVE_TESTS") == "1"
-                                    and os.environ.get("ANTHROPIC_API_KEY") else "off"),
     ]
 
 
@@ -201,10 +197,6 @@ def pytest_collection_modifyitems(config, items):
                          "(e.g. `ollama serve` and `ollama pull <model>`)"),
         "requires_mcp": (not _have_mcp(), "real MCP SDK not importable "
                          "(needs Python >= 3.10 and `pip install mcp`)"),
-        "requires_api": (not (os.environ.get("VMD_AGENT_LIVE_TESTS") == "1"
-                              and os.environ.get("ANTHROPIC_API_KEY")),
-                         "live model tests are off (set VMD_AGENT_LIVE_TESTS=1 "
-                         "and ANTHROPIC_API_KEY; this spends a few cents)"),
     }
     for item in items:
         for marker, (missing, why) in skips.items():

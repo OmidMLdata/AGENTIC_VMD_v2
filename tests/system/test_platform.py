@@ -133,15 +133,6 @@ def test_on_posix_a_backslash_in_a_path_is_still_refused():
         security.tcl_path("/data/a\\b.pdb", windows=False)
 
 
-def test_windows_system_variables_reach_model_written_code(monkeypatch):
-    """Without SYSTEMROOT and friends, programs often will not start on Windows."""
-    from vmd_agent.bench.agent import tools
-    monkeypatch.setenv("SYSTEMROOT", "C:\\Windows")
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-secret")
-    env = tools.sanitized_env()
-    assert env["SYSTEMROOT"] == "C:\\Windows" and "ANTHROPIC_API_KEY" not in env
-
-
 def test_a_console_that_cannot_show_a_character_does_not_crash_printing(monkeypatch):
     raw = io.BytesIO()
     stream = io.TextIOWrapper(raw, encoding="ascii")

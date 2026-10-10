@@ -125,8 +125,4 @@ because headers often keep a default or pre-stride timestep. `dt_ps` overrides.
 `n_protein_chains` / `n_nucleic_chains` count chain IDs (or segment IDs) among polymer atoms only; `n_chains_all`
 includes ligand/water chain IDs.
 
-## Benchmark statistics
-See [the grounding study](RESEARCH.md#appendix-e-grounding-study-specification). Cluster bootstrap over structures (1000 resamples default); unpaired
-cluster bootstrap for group gaps; difference-of-differences for the adjusted contamination estimate.
-
 ---

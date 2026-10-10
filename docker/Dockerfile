@@ -7,7 +7,6 @@
 #   docker build -f docker/Dockerfile --target vmd-libs -t vmd-agent:hostvmd .  # + libs, mount your VMD
 #   docker build -f docker/Dockerfile --target with-vmd -t vmd-agent:vmd .      # build in YOUR tarball
 #
-# Benchmark runs with a real VMD: `vmd-agent bench docker` (see the Docker section of README.md).
 # VMD is a Linux binary: it must match the image CPU architecture (see
 # VMD_PLATFORM in docker/docker-compose.yml).
 #
@@ -37,9 +36,7 @@ RUN useradd --create-home --uid 10001 vmdagent \
 WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY src ./src
-# [bench] adds the Anthropic SDK so `vmd-agent bench agent-run --model anthropic:...`
-# works in the image. The key is never baked in: pass ANTHROPIC_API_KEY at run time.
-RUN pip install ".[server,bench]" \
+RUN pip install ".[server]" \
  && (pip install freesasa || echo "freesasa unavailable on this platform; SASA analysis disabled")
 COPY docker/entrypoint.sh docker/install_vmd.sh /app/docker/
 RUN chmod 0755 /app/docker/*.sh

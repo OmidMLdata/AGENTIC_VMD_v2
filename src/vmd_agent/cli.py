@@ -1,4 +1,4 @@
-"""The command line: setup and chat, the tool library (``tool``), whole jobs (``workflow``), the MCP connection and the benchmarks.
+"""The command line: setup and chat, the tool library (``tool``), whole jobs (``workflow``), the MCP connection and the benchmarks (every tool on data with known answers, language models in front of the tools).
 
 Examples
 --------
@@ -7,7 +7,7 @@ Examples
     vmd-agent tool analyze_trajectory system.psf traj.dcd --analyses rmsd rmsf rgyr
     vmd-agent tool visualize_and_interpret 1ubq.pdb
     vmd-agent workflow equilibration_check system.psf traj.dcd
-    vmd-agent bench sampling                        # uniform vs event-aware study
+    vmd-agent bench tools                           # run every tool on data with known answers
 """
 from __future__ import annotations
 
@@ -69,112 +69,6 @@ def _print_brief(pkg):
         print("\nNOTE:", pkg["note"])
     if pkg.get("render_error"):
         print("\nRENDER ERROR:", pkg["render_error"][:400])
-
-
-def _make_model(spec: str):
-    from vmd_agent.bench import models
-    if spec == "stats-reader":
-        return models.StatsReaderModel()
-    if spec == "constant":
-        return models.ConstantModel()
-    if spec == "random":
-        return models.RandomModel()
-    if spec == "oracle":
-        return models.OracleModel()
-    if spec.startswith("anthropic:"):
-        return models.AnthropicModel(spec.split(":", 1)[1])
-    raise SystemExit(f"unknown model '{spec}'")
-
-
-def _bench_agent(args):
-    from vmd_agent.bench.agent import suite, runner, agents
-    if args.bench_cmd == "agent-suite":
-        import glob
-        bases = [{"id": f"b{i}", "topology": t, "trajectory": d}
-                 for i, (t, d) in enumerate(args.base or [])]
-        syn = sorted(glob.glob(f"{args.synthetic_dir}/*.pdb")) \
-            if args.synthetic_dir else []
-        out = suite.build_suite(
-            args.out, bases, structures=args.structures or [],
-            synthetic=syn, seed=args.seed, n_events=args.events,
-            n_controls=args.controls, n_keyframes=args.keyframes,
-            families=args.families)
-        print(f"wrote {out['suite']['n_tasks']} tasks to {args.out}: "
-              f"{out['suite']['families']}")
-    elif args.bench_cmd == "agent-preflight":
-        from vmd_agent.bench.agent import preflight
-        res = preflight.preflight(
-            args.arms or ["vmd_agent"], vmd_path=args.vmd,
-            allow_exec=args.allow_exec, suite_dir=args.suite,
-            out_dir=args.out_dir,
-            model=(args.model.partition(":")[2] if args.model else None),
-            provider=(args.model.partition(":")[0]
-                      if args.model and ":" in args.model else "anthropic"),
-            base_url=args.base_url, live_api=args.live_api,
-            require_container=not args.no_require_container)
-        print(preflight.report_text(res))
-        if not res["ready"]:
-            raise SystemExit(2)
-    elif args.bench_cmd == "agent-compare":
-        from vmd_agent.bench.agent import scoring
-        with open(args.records) as fh:
-            recs = [json.loads(ln) for ln in fh if ln.strip()]
-        _print(scoring.paired_arms(recs, args.a, args.b, metric=args.metric,
-                                   family=args.family, alpha=args.alpha))
-    elif args.bench_cmd == "agent-plan":
-        _print(runner.plan_agent_run(
-            args.suite, args.labels, repeats=args.repeats,
-            avg_turns=args.avg_turns, price_in=args.price_in,
-            price_out=args.price_out))
-    else:
-        truth = suite.load_suite(args.suite)["truth"]
-        known = {"oracle": lambda: agents.OracleAgent(truth),
-                 "sloppy": agents.SloppyAgent,
-                 "reference": agents.ReferenceAgent}
-        runs = [{"label": n, "agent": known[n](), "arm": "vmd_agent"}
-                for n in args.baselines or []]
-        provider = mid = None
-        if args.model:
-            provider, _, mid = args.model.partition(":")
-            if provider not in ("anthropic", "openai") or not mid:
-                raise SystemExit("--model must look like anthropic:<model-id> "
-                                 "or openai:<model-id> (any OpenAI-compatible "
-                                 "server, e.g. Ollama; set --base-url)")
-            base_url = args.base_url or os.environ.get(
-                "VMD_AGENT_LLM_URL") or "http://localhost:11434/v1"
-            for arm in args.arms or ["vmd_agent"]:
-                if provider == "anthropic":
-                    try:
-                        import anthropic
-                    except ImportError as e:
-                        raise SystemExit(
-                            "pip install anthropic to run a model") from e
-                    agent = agents.LLMAgent(anthropic.Anthropic(), mid)
-                else:
-                    agent = agents.OpenAICompatAgent(
-                        base_url, mid, os.environ.get("VMD_AGENT_LLM_KEY"))
-                runs.append({"label": f"{provider}:{mid}@{arm}", "arm": arm,
-                             "agent": agent})
-        if not runs:
-            raise SystemExit("nothing to run: pass --baselines and/or --model")
-        if not args.skip_preflight:
-            from vmd_agent.bench.agent import preflight
-            res = preflight.preflight(
-                sorted({r["arm"] for r in runs}), vmd_path=args.vmd,
-                allow_exec=args.allow_exec, suite_dir=args.suite,
-                out_dir=args.out_dir, model=mid, provider=provider or "anthropic",
-                base_url=base_url if provider == "openai" else None,
-                require_container=not args.no_require_container)
-            if not res["ready"]:
-                print(preflight.report_text(res))
-                raise SystemExit("preflight failed (see above); fix it or "
-                                 "pass --skip-preflight")
-        runner.run_agent_benchmark(
-            args.suite, runs, args.out_dir, repeats=args.repeats,
-            allow_exec=args.allow_exec, vmd_path=args.vmd,
-            max_steps=args.max_steps, families=args.families,
-            progress=lambda m: print(m, flush=True))
-        print(open(f"{args.out_dir}/summary.md").read())
 
 
 def _bench_models(args) -> int:
@@ -269,26 +163,10 @@ def _bench_tools(args) -> int:
 
 def _bench(args):
     from vmd_agent import bench
-    from vmd_agent.bench import sampling, rating_study, conditions
     if args.bench_cmd in ("tools", "dataset"):
         return _bench_tools(args)
     if args.bench_cmd == "models":
         return _bench_models(args)
-    if args.bench_cmd == "docker":
-        from vmd_agent import launcher
-        rest, mode = list(args.rest), args.mode
-        for i, a in enumerate(rest):                      # --mode may come anywhere: argparse leaves everything after the action in `rest`
-            if a == "--mode" and i + 1 < len(rest):
-                mode = rest[i + 1]
-                del rest[i:i + 2]
-                break
-            if a.startswith("--mode="):
-                mode = a.split("=", 1)[1]
-                del rest[i]
-                break
-        return launcher.docker_bench(args.action, rest, mode)
-    if args.bench_cmd.startswith("agent-"):
-        return _bench_agent(args)
     if args.bench_cmd == "validate":
         from vmd_agent.evidence import validation
         r = validation.cross_check(args.topology, args.trajectory, selection=args.sel, sel2=args.sel2, cutoff=args.cutoff)
@@ -304,29 +182,6 @@ def _bench(args):
             _print([validation.dssp_vs_records(f) for f in files])
         else:
             _print(validation.dssp_benchmark(args.ids, args.cache))
-    elif args.bench_cmd == "truth":
-        _print(bench.ground_truth(args.structure))
-    elif args.bench_cmd == "run":
-        import glob
-        structures = list(args.structures)
-        groups = {p: "real" for p in structures}
-        if args.synthetic_dir:
-            syn = sorted(glob.glob(f"{args.synthetic_dir}/*.pdb"))
-            groups.update({p: "synthetic" for p in syn})
-            structures += syn
-        conds = args.conditions or conditions.DEFAULT_CONDITIONS
-        if args.dry_run:
-            _print(bench.plan_benchmark(
-                structures, conds, n_repeats=args.repeats,
-                price_in_per_mtok=args.price_in,
-                price_out_per_mtok=args.price_out))
-            return
-        s = bench.run_benchmark(
-            structures, _make_model(args.model), args.out_dir,
-            conditions=conds, renderer=args.renderer,
-            n_repeats=args.repeats, render=not args.no_render,
-            groups=groups, progress=lambda m: print(m, flush=True))
-        print(open(f"{s['out_dir']}/summary.md").read())
     elif args.bench_cmd == "synth":
         items = bench.synth.generate_set(args.n, args.out, seed=args.seed)
         print(f"wrote {len(items)} structures + design.json to {args.out}")
@@ -335,26 +190,6 @@ def _bench(args):
             print("generator vs measured truth (fraction agreeing):")
             for k, x in v["agreement"].items():
                 print(f"  {k:18s} {x:.2f}")
-    elif args.bench_cmd == "events":
-        base = bench.events.load_real_positions(args.topology, args.trajectory)
-        nc = bench.events.negative_control(base, n_frames=args.frames, k=args.k)
-        print(f"negative control (no event): {nc['change_points_detected']} "
-              f"change point(s) in {nc['n_frames']} frames "
-              f"({nc['per_100_frames']:.2f}/100)")
-        st = bench.events.event_study(base, n_frames=args.frames, k=args.k,
-                                      n_trials=args.trials, seed=args.seed)
-        print(bench.events.table_markdown(st))
-    elif args.bench_cmd == "sampling":
-        st = sampling.simulate_sampling_study(
-            n_frames=args.n_frames, k=args.k, n_trials=args.trials,
-            seed=args.seed)
-        print(sampling.table_markdown(st))
-    elif args.bench_cmd == "rating-sheet":
-        _print(rating_study.make_rating_sheet(
-            args.structures, args.out_dir, vmd_path=args.vmd))
-    elif args.bench_cmd == "rating-summary":
-        _print(rating_study.summarize_ratings(args.ratings_csv,
-                                              args.key_json))
 
 
 #: the commands, grouped the way a person would look for them (every command must appear exactly once: a test checks)
@@ -492,97 +327,11 @@ def build_parser():
     b.add_argument("ids", nargs="+", help="PDB IDs (downloaded) or .pdb files")
     b.add_argument("--cache", default="pdb_cache")
     b.add_argument("--mdtraj", action="store_true", help="also compare with MDTraj's independent DSSP (needs `pip install mdtraj`; .pdb files only)")
-    b = bsub.add_parser("truth", help="ground truth for one structure")
-    b.add_argument("structure")
-    b = bsub.add_parser("run", help="evaluate a model on structures")
-    b.add_argument("structures", nargs="+")
-    b.add_argument("--out-dir", default="bench_out")
-    b.add_argument("--model", default="stats-reader",
-                   help="stats-reader | constant | random | oracle | "
-                        "anthropic:<model-id>")
-    b.add_argument("--conditions", nargs="+",
-                   choices=sorted(__import__("vmd_agent.bench.conditions", fromlist=["x"]).CONDITIONS))
-    b.add_argument("--renderer", default="auto",
-                   choices=["auto", "vmd", "matplotlib"])
-    b.add_argument("--repeats", type=int, default=1)
-    b.add_argument("--no-render", action="store_true")
-    b.add_argument("--synthetic-dir",
-                   help="also evaluate every .pdb here as group 'synthetic' "
-                        "(see `bench synth`); the others are group 'real'")
-    b.add_argument("--dry-run", action="store_true",
-                   help="count calls and estimate tokens; call no model")
-    b.add_argument("--price-in", type=float,
-                   help="USD per million input tokens (for --dry-run)")
-    b.add_argument("--price-out", type=float,
-                   help="USD per million output tokens (for --dry-run)")
     b = bsub.add_parser("synth", help="generate novel, contamination-free "
                                        "structures with validated truth")
     b.add_argument("n", type=int); b.add_argument("--out", default="synth")
     b.add_argument("--seed", type=int, default=0)
     b.add_argument("--no-validate", action="store_true")
-    b = bsub.add_parser("events", help="uniform vs event-aware keyframes on "
-                                       "real noise with injected events")
-    b.add_argument("topology"); b.add_argument("trajectory")
-    b.add_argument("--trials", type=int, default=100)
-    b.add_argument("--frames", type=int, default=300)
-    b.add_argument("-k", type=int, default=9)
-    b.add_argument("--seed", type=int, default=0)
-    b = bsub.add_parser("sampling",
-                        help="simulate uniform vs event-aware frame selection")
-    b.add_argument("--n-frames", type=int, default=1000)
-    b.add_argument("-k", type=int, default=9)
-    b.add_argument("--trials", type=int, default=200)
-    b.add_argument("--seed", type=int, default=0)
-    fam = ["measure", "event", "diagnosis", "selection", "keyframes",
-           "report"]
-    b = bsub.add_parser("agent-suite", help="generate automation tasks with "
-                                            "known answers")
-    b.add_argument("--out", required=True)
-    b.add_argument("--base", nargs=2, action="append",
-                   metavar=("TOPOLOGY", "TRAJECTORY"),
-                   help="a real trajectory (repeat for several)")
-    b.add_argument("--structures", nargs="*")
-    b.add_argument("--synthetic-dir")
-    b.add_argument("--seed", type=int, default=0)
-    b.add_argument("--events", type=int, default=6)
-    b.add_argument("--controls", type=int, default=2)
-    b.add_argument("--keyframes", type=int, default=3)
-    b.add_argument("--families", nargs="+", choices=fam)
-    b = bsub.add_parser("agent-run", help="run agents on a task suite")
-    b.add_argument("--suite", required=True)
-    b.add_argument("--out-dir", default="agent_bench_out")
-    b.add_argument("--baselines", nargs="*",
-                   choices=["oracle", "sloppy", "reference"],
-                   help="scripted agents (no model, no network)")
-    b.add_argument("--model", help="anthropic:<model-id> or openai:<model-id>")
-    b.add_argument("--base-url", help="for openai:<id>: the server address "
-                   "(default $VMD_AGENT_LLM_URL, else Ollama on localhost)")
-    b.add_argument("--arms", nargs="+", choices=sorted(
-        __import__("vmd_agent.bench.agent.tools", fromlist=["x"]).ARMS))
-    b.add_argument("--repeats", type=int, default=1)
-    b.add_argument("--max-steps", type=int, default=30)
-    b.add_argument("--allow-exec", action="store_true",
-                   help="allow model-written code (python/Tcl); only inside a "
-                        "container or VM")
-    b.add_argument("--vmd")
-    b.add_argument("--families", nargs="+", choices=fam)
-    b.add_argument("--skip-preflight", action="store_true")
-    b.add_argument("--no-require-container", action="store_true",
-                   help="allow model-written code outside a container "
-                        "(only on a disposable VM)")
-    b = bsub.add_parser("agent-preflight", help="check that a run can work: "
-                        "VMD, key, container, selections, secrets")
-    b.add_argument("--arms", nargs="+", choices=sorted(
-        __import__("vmd_agent.bench.agent.tools", fromlist=["x"]).ARMS))
-    b.add_argument("--vmd")
-    b.add_argument("--allow-exec", action="store_true")
-    b.add_argument("--suite")
-    b.add_argument("--out-dir")
-    b.add_argument("--model", help="anthropic:<model-id> or openai:<model-id>")
-    b.add_argument("--base-url", help="for openai:<id>: the server address")
-    b.add_argument("--live-api", action="store_true",
-                   help="make one tiny API call to prove the key and model work")
-    b.add_argument("--no-require-container", action="store_true")
     b = bsub.add_parser("tools", help="the tool test set: run every tool on a generated dataset whose answers are known "
                         "by construction, with the wall-clock seconds of each")
     b.add_argument("--data-dir", default="tool_testset", help="where the dataset and the tools' outputs are written")
@@ -615,36 +364,6 @@ def build_parser():
     b.add_argument("--summarize", action="store_true", help="only rebuild summary.md from the records already in --out-dir")
     b = bsub.add_parser("dataset", help="write the tool test set's files (a protein, a trajectory, maps, a video) and stop")
     b.add_argument("folder")
-    b = bsub.add_parser("docker", help="run the benchmark commands in a container with your VMD (Linux VMD only; "
-                        "check-vmd tests the VMD you point at)")
-    b.add_argument("action", choices=["check-vmd", "preflight", "suite", "plan", "run", "shell"])
-    b.add_argument("--mode", choices=["plain", "hostvmd", "withvmd"], default="plain",
-                   help="plain: no VMD; hostvmd: mount a Linux VMD ($VMD_HOME); withvmd: VMD built into a local image "
-                        "from docker/vmd-dist/")
-    b.add_argument("rest", nargs=argparse.REMAINDER, help="arguments for the benchmark command")
-    b = bsub.add_parser("agent-compare", help="mean per-task difference between two runs "
-                        "(label A minus label B) with a cluster-bootstrap interval")
-    b.add_argument("records", help="records.jsonl written by agent-run")
-    b.add_argument("--a", required=True, help="label of the first run")
-    b.add_argument("--b", required=True, help="label of the second run")
-    b.add_argument("--metric", default="success", choices=["success", "silent_error", "abstained", "no_answer"])
-    b.add_argument("--family", help="only tasks of this family")
-    b.add_argument("--alpha", type=float, default=0.05, help="interval is 1 - alpha (use 0.05/3 for 3 hypotheses)")
-    b = bsub.add_parser("agent-plan", help="estimate calls, tokens, cost")
-    b.add_argument("--suite", required=True)
-    b.add_argument("--labels", type=int, default=1,
-                   help="number of (model, arm) combinations")
-    b.add_argument("--repeats", type=int, default=1)
-    b.add_argument("--avg-turns", type=int, default=8)
-    b.add_argument("--price-in", type=float)
-    b.add_argument("--price-out", type=float)
-    b = bsub.add_parser("rating-sheet",
-                        help="build a blinded expert-rating sheet (needs VMD)")
-    b.add_argument("structures", nargs="+"); b.add_argument("--out-dir",
-                                                            default="rating")
-    b.add_argument("--vmd")
-    b = bsub.add_parser("rating-summary", help="unblind and analyse ratings")
-    b.add_argument("ratings_csv"); b.add_argument("key_json")
     return p, sub
 
 

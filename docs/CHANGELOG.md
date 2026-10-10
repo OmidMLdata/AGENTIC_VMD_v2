@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.39.0: the earlier research study is removed from the product
+
+* **Removed** (about 3,600 lines of code, 1,500 lines of tests and 1,500 lines of paper), none of it used by anything a person runs: the end-to-end automation benchmark for language-model agents
+  (`bench/agent`, `vmd-agent bench agent-suite|agent-run|agent-preflight|agent-plan|agent-compare`), the grounded-interpretation study (`bench run`, `bench truth`, the questions, conditions, scorer and runner),
+  the sampling and event studies (`bench sampling|events`), the rating-study instrument, the container wrapper for them (`bench docker` and the `bench*` compose services), the `anthropic` extra, and the research
+  paper with its preregistration (`docs/reference/RESEARCH.md`). The Git tag `archive/research-benchmark` holds the repository as it was just before, so nothing is lost.
+* **Kept:** `bench tools`, `bench models`, `bench dataset`, `bench validate`, `bench validate-dssp` and `bench synth` (the structure generator the tool test set is made from).
+
 ## 0.38.0: the checks on what an answer says get stricter
 
 * **Explanations and causes no tool measured are flagged** (mechanisms such as van der Waals or stacking, "driven by", "caused by", free energy, affinity), unless the question or a result says them. The tools measure; they do not explain.

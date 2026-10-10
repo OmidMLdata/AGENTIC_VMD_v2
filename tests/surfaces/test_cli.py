@@ -40,32 +40,15 @@ def test_cli_tool_keyframes_and_provenance(sample, ubq, tmp_path, capsys):
     assert '"ok": true' in run_cli(["tool", "verify_provenance", str(tmp_path)], capsys)
 
 
-def test_cli_bench_commands(ubq, lyz, tmp_path, capsys):
-    out = run_cli(["bench", "sampling", "--trials", "10", "--n-frames", "300"],
-                  capsys)
-    assert "hit: uniform" in out
-    out = run_cli(["bench", "truth", ubq], capsys)
-    assert '"fold_class": "mixed"' in out
-    out = run_cli(["bench", "run", ubq, lyz, "--out-dir", str(tmp_path),
-                   "--renderer", "matplotlib", "--conditions", "raw",
-                   "legend_stats", "text_only"], capsys)
-    assert "| legend_stats |" in out
-
-
 def test_cli_tool_representations_and_recipe(ubq, tmp_path, capsys):
     assert "Licorice" in run_cli(["tool", "list_representations", "--name", "Licorice"], capsys)
     run_cli(["tool", "generate_visualization_recipe", ubq, "--out", str(tmp_path / "r.tcl")], capsys)
     assert (tmp_path / "r.tcl").exists()
 
 
-def test_cli_bench_synth_and_dry_run(ubq, tmp_path, capsys):
-    out = run_cli(["bench", "synth", "6", "--out", str(tmp_path / "s"),
-                   "--seed", "1"], capsys)
+def test_cli_bench_synth(tmp_path, capsys):
+    out = run_cli(["bench", "synth", "6", "--out", str(tmp_path / "s"), "--seed", "1"], capsys)
     assert "wrote 6 structures" in out and "fold_class" in out
-    plan = run_cli(["bench", "run", ubq, "--synthetic-dir", str(tmp_path / "s"),
-                    "--dry-run", "--conditions", "raw", "text_only",
-                    "--price-in", "1", "--price-out", "5"], capsys)
-    assert '"n_calls"' in plan and '"est_cost"' in plan
 
 
 def test_cli_validate_dssp_on_files(ubq, lyz, capsys):
@@ -85,7 +68,6 @@ def test_cli_analyze_dt_ps(tmp_path, capsys):
     ["tool", "analyze_trajectory", "/nope.pdb", "/nope.dcd", "--analyses", "rmsd"],
     ["bench", "validate", "/nope", "/nope"],
     ["bench", "validate-dssp", "/nope.pdb"],
-    ["bench", "events", "/nope", "/nope"],
     ["tool", "assemble_report", "/proc/definitely/not/writable"],
 ])
 def test_bad_paths_give_a_clean_error_not_a_traceback(argv, capsys):

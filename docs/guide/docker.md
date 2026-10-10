@@ -75,62 +75,21 @@ docker run -i --rm \
 
 The image is labelled `vmd-agent.redistributable=false`.
 
-## Running the benchmark with your VMD (and your key)
+## Supplying VMD to the container
 
-Three ways to supply VMD. Pick by where you work:
+VMD is never part of an image you could publish. Two routes put a **Linux** VMD in:
 
-| Route | When | Command prefix |
+| Route | When | Command |
 |---|---|---|
-| **Native** | You run on the machine that has VMD (a Mac with VMD.app, or a Linux box). Simplest, but model-written code runs on your machine: use a disposable VM. | `vmd-agent bench ... --vmd <path>` |
-| **Mounted VMD** (`--mode hostvmd`) | Linux host, VMD installed there, same CPU architecture as the image. | `VMD_HOME=/opt/vmd vmd-agent bench docker ... --mode hostvmd` |
-| **Baked VMD** (`--mode withvmd`) | **Use this on a Mac.** Put the **Linux** VMD tarball in `docker/vmd-dist/`; it is installed inside a local image. Local use only; never push. | `vmd-agent bench docker ... --mode withvmd` |
+| **Mounted VMD** (profile `hostvmd`) | Linux host, VMD installed there, same CPU architecture as the image | `VMD_HOME=/opt/vmd docker compose -f docker/docker-compose.yml --profile hostvmd run --rm hostvmd tool probe_environment` |
+| **Baked VMD** (profile `withvmd`) | Put the **Linux** VMD tarball in `docker/vmd-dist/`; it is installed inside a local image. Local use only; never push. | `docker compose -f docker/docker-compose.yml --profile withvmd run --rm withvmd tool probe_environment` |
 
-A Mac's VMD.app is a macOS binary and **cannot run in a Linux container**, so mounting it fails (`vmd-agent bench docker
-check-vmd` says so). VMD is also architecture-specific: the Linux tarball must match `VMD_PLATFORM` (default
-`linux/amd64`; on Apple Silicon this runs under emulation, which is slow). Check what VMD offers for your CPU.
+A Mac's VMD.app is a macOS binary and **cannot run in a Linux container**, so mounting it fails; run natively on a Mac instead (`vmd-agent ui`). VMD is also architecture-specific: the Linux tarball must match
+`VMD_PLATFORM` (default `linux/amd64`; on Apple Silicon this runs under emulation, which is slow).
 
-```bash
-export ANTHROPIC_API_KEY=...        # a dedicated key with a spending limit; passed by name, never stored
-export DATA_DIR=$PWD/data           # holds your trajectories; the suite and outputs go here too
-
-vmd-agent bench docker preflight --mode withvmd --arms vmd_agent python_mdanalysis vmd_plain \
-    --allow-exec --model anthropic:<id> --live-api            # first: prove VMD, selection, key, scrubbing
-vmd-agent bench docker suite --mode withvmd --out /data/suite --seed 100 \
-    --base /data/top.pdb /data/traj.dcd --structures /data/real/*.pdb
-vmd-agent bench docker plan --mode withvmd --suite /data/suite --labels 6 --repeats 3 --price-in <USD/M> --price-out <USD/M>
-vmd-agent bench docker run --mode withvmd --suite /data/suite --out-dir /data/out --repeats 3 --allow-exec \
-    --model anthropic:<id> --arms vmd_agent vmd_agent_no_verify python_mdanalysis vmd_plain
-```
-
-Native equivalent: `vmd-agent bench agent-preflight --vmd "/Applications/VMD 1.9.4.app/Contents/vmd" --arms vmd_plain
---allow-exec --no-require-container`. On macOS the app's bare `vmd_MACOSX...` binary is found and `VMDDIR` is set for you
-when it is unset.
-
-**What `preflight` checks** (and `agent-run` re-runs, refusing to start if a blocking check fails): VMD found and
-launching headless; a PDB loads and counts atoms; VMD evaluates a selection to 0-based indices (how the plain-VMD arm
-is scored); `render TachyonInternal` writes an image (the plain-VMD arm's only way to make keyframe images); code
-execution only with `--allow-exec` and only inside a container; model-written code sees no key, token or secret
-variable; the key is set and the SDK installed; the suite and output directories exist. A model call is made only
-with `--live-api`. The run's `manifest.json` records versions, the VMD path and version, the renderer, whether it ran in
-a container and a hash of the suite, never a secret.
-
-**What protects the key.** The benchmark process holds `ANTHROPIC_API_KEY`. Code the model writes (`run_python`,
-`run_tcl`) runs with a **whitelisted environment** (search paths, locale, `VMD*`), so it cannot read the key. This is
-not a sandbox: that code can still use the network from inside the container, so use a dedicated, spend-capped key and
-a throwaway data directory. The container is also limited (`pids_limit`, `mem_limit`, read-only root, no
-capabilities, no new privileges).
-
-**Selections differ by arm.** For the plain-VMD arm the task asks for a *VMD* atom-selection string and a real VMD
-scores it; every other arm uses MDAnalysis syntax. Results on the `selection` family therefore compare tool-native
-syntax, not identical strings.
-
-> **Status: never run against Docker or a Linux VMD.** Docker does not exist on the machine this was written on. The
-> real-VMD tests (headless load, selection evaluation, rendering, the plain-VMD arm's workspace) were run once, on
-> 2026-10-06, against VMD 1.9.4a57 on macOS Apple Silicon, and passed; they have not been run on Linux or Windows. What
-> is tested without Docker: the shell scripts' syntax, the compose file's structure, the macOS-binary guard, the scrubbed
-> environment, input screening before anything launches, preflight decisions, and the manifest. Whether `docker/install_vmd.sh` works for your tarball, whether the image
-> builds, and whether VMD behaves headless in the container are unverified. `preflight` is how you find out, and
-> `pytest -m requires_vmd -rs` runs the real-VMD tests on a machine that has it.
+> **Status: never run against Docker or a Linux VMD.** The real-VMD tests (headless load, selection evaluation, rendering, the VMD window) were run on macOS Apple Silicon with VMD 1.9.4a57, and
+> have not been run on Linux or Windows. What is tested without Docker: the shell scripts' syntax, the compose file's structure, and the hardening settings. CI builds the open-source image (no VMD) and runs a tool in it.
+> Whether `docker/install_vmd.sh` works for your tarball, and whether VMD behaves headless in the container, are unverified; `vmd-agent tool probe_environment` inside the container tells you.
 
 ## Writing to the mounted folder
 

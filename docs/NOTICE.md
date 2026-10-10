@@ -38,7 +38,6 @@ commercially with VMD, contact <vmd@ks.uiuc.edu>. This note is not legal advice.
 | Pillow | HPND |
 | mcp (optional) | MIT |
 | freesasa (optional) | MIT |
-| anthropic (optional) | MIT |
 
 > **Note on MDAnalysis.** MDAnalysis is licensed GPL-3.0-or-later. This project
 > depends on it as an imported library. If you redistribute a container that

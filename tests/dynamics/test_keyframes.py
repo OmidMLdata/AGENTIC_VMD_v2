@@ -115,14 +115,30 @@ def test_bad_selection_is_structured_error(sample):
     assert not r["ok"] and "matched 0 atoms" in r["error"]
 
 
-def test_sampling_study_reproduces_theory_and_shows_advantage():
-    from vmd_agent.bench import sampling
-    st = sampling.simulate_sampling_study(n_frames=600, k=9,
-                                          event_lengths=(10,), snrs=(8.0,),
-                                          n_trials=60, seed=0)
-    row = st["rows"][0]
-    assert row["hit_uniform"] < 0.3 and row["hit_event_aware"] > 0.8
-    assert "| 10 |" in sampling.table_markdown(st)
+def test_event_aware_selection_beats_uniform_on_an_abrupt_event_and_uniform_matches_its_theory():
+    """A short event (10 of 600 frames) in autocorrelated noise: nine uniform frames mostly miss it, as the closed-form hit probability says; the event-aware selection finds it."""
+    rng = np.random.default_rng(0)
+    n, k, length, snr, phi, trials = 600, 9, 10, 8.0, 0.9, 60
+
+    def ar1():
+        e, x = rng.normal(0, 1, n), np.zeros(n)
+        x[0] = e[0]
+        for i in range(1, n):
+            x[i] = phi * x[i - 1] + np.sqrt(1 - phi ** 2) * e[i]
+        return x
+    hit = {"uniform": 0, "event_aware": 0}
+    for _ in range(trials):
+        start = int(rng.integers(int(0.1 * n), int(0.9 * n) - length))
+        x = ar1()
+        x[start:start + length] += np.linspace(0, snr, length)
+        x[start + length:] += snr
+        events = [{"start": start, "end": start + length}]
+        picks = {"uniform": kf.uniform_frames(n, k),
+                 "event_aware": kf.select_keyframes_from_signals({"obs": x, "other": ar1()}, k=k, z_min=6.0)["indices"]}
+        for name, sel in picks.items():
+            hit[name] += kf.evaluate_sampling(sel, events)["recall_hit"]
+    assert hit["uniform"] / trials < 0.3 and hit["event_aware"] / trials > 0.8
+    assert abs(hit["uniform"] / trials - kf.hit_probability_uniform(n, k, length)) < 0.15          # simulated uniform sampling agrees with the closed form
 
 
 @pytest.mark.parametrize("k", [0, -1, 2.5, None, True])

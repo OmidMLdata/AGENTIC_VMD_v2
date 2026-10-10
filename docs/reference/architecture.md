@@ -14,13 +14,13 @@
 ## Layout follows the pipeline
 
 ```
- inputs ──► structure ──► dynamics ──► visual ──► evidence          bench (on top)
- get data   one frame     trajectories draw       verify + record    measure the model
+ inputs ──► structure ──► dynamics ──► visual ──► evidence
+ get data   one frame     trajectories draw       verify + record
 ```
 
 ```
 src/vmd_agent/
-  cli.py          command-line surface: setup, chat, the `tool` command (generated from the tools by toolcli.py), workflows, MCP, benchmarks
+  cli.py          command-line surface: setup, chat, the `tool` command (generated from the tools by toolcli.py), workflows, MCP, the model benchmark and the tool test set
   settings.py     remembered choices (files folder, VMD, model): per-OS config file, private, never raises
   wizard.py       `vmd-agent setup` and the plain-language menu behind a bare `vmd-agent`
   platform_info.py  OS, CPU, Docker, GPU, Ollama; where VMD and client configs live on each OS
@@ -71,12 +71,7 @@ src/vmd_agent/
                   provenance versions, hashes, exact Tcl
                   media      video evidence (ffmpeg; ffprobe if present, else read through ffmpeg)
                   report     Session + the A-M Markdown report
-  bench/          grounding study: truth, questions, conditions, models, scorer, runner (+ cost planner)
-  bench/agent/    automation benchmark: suite (tasks + truth), tools (arms, sandboxed env), agents, scoring, runner
-                  synth      procedural novel structures with measured truth
-                  events     real-noise event study
-                  sampling   AR(1) sampling study
-                  rating_study  blinded expert-rating instrument
+  bench/          truth + synth: procedural novel structures with known properties (the tool test set is made from them)
 ```
 
 Dependencies point one way, and **`tests/system/test_layering.py` enforces it** (every import, including lazy
@@ -93,7 +88,7 @@ ones; no cycles):
 | `visual` | `inputs`, `structure`, `environment`, `security` |
 | `evidence` | `inputs`, `structure`, `dynamics`, `environment`, `security` |
 | `vmdkit` | `inputs`, `structure`, `visual`, `environment`, `security`, `progress` |
-| `bench` | all of the above, `auto` and `llm_client` |
+| `bench` | `structure`, `evidence`, `inputs` (it makes test structures; nothing imports it except the tool test set) |
 | `auto.py`, `cli.py`, `server.py`, `toolset.py`, `vmd_tools.py`, `vmd_cli.py`, `workflows.py`, `reporting.py`, `agent.py`, `toolhints.py`, `chat.py`, `ui.py`, `model_tasks.py`, `model_bench.py`, `tool_cases.py`, `tool_dataset.py`, `launcher.py`, `wizard.py`, `mcp_check.py`, `__init__.py` | anything: they are the only places that compose units |
 
 `dynamics` and `visual` are siblings and never import each other, which is why rendering the chosen keyframes
@@ -115,13 +110,12 @@ ones; no cycles):
 
 ## Tests
 
-`tests/` mirrors `src/vmd_agent/` (`inputs/ structure/ dynamics/ visual/ evidence/ bench/`) plus `surfaces/`
+`tests/` mirrors `src/vmd_agent/` (`inputs/ structure/ dynamics/ visual/ evidence/`) plus `surfaces/`
 (the server through the real MCP SDK, CLI) and `system/` (security, environment). About 700 tests, a few minutes; `pytest -rs` runs everything.
 Real data in `tests/data/`. **Nothing stands in for another program.** Tests that need a real VMD/Tachyon, ffmpeg, the MCP SDK
 (Python >= 3.10), the network or a live model are marked `requires_vmd`, `requires_ffmpeg`, `requires_mcp`,
-`requires_network`, `requires_api` and are **skipped, with the reason shown**, where that is missing: run `pytest -rs`
-to see what did not run, and read a skip as "unverified here". Live model tests also need `VMD_AGENT_LIVE_TESTS=1`
-(they spend a few cents). Full coverage needs `pip install -e ".[all]"` on Python >= 3.10 and a machine with VMD. An
+`requires_network` and are **skipped, with the reason shown**, where that is missing: run `pytest -rs`
+to see what did not run, and read a skip as "unverified here". Live model tests (`tests/live`) also need a model server and `VMD_AGENT_LIVE_LLM_MODEL`. Full coverage needs `pip install -e ".[all]"` on Python >= 3.10 and a machine with VMD. An
 independent NeRF builder validates DSSP; independent NumPy re-implementations cross-validate the analysis.
 
 ---

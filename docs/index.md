@@ -31,6 +31,5 @@ The [README](../README.md) is the way in. These pages are the detail, in the ord
 | [Architecture](reference/architecture.md) | how the code fits together |
 | [Methods](reference/methods.md) | how each measurement is computed |
 | [Security](reference/security.md) | the sandbox, Tcl, downloads, containers |
-| [Research paper](reference/RESEARCH.md) | the design, the preregistration draft, comparison with the original project |
 | [Changelog](CHANGELOG.md) | what changed in each version |
 | [Notices](NOTICE.md) | third-party software, and VMD's and MDAnalysis' licences |

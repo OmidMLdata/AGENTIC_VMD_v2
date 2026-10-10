@@ -237,61 +237,6 @@ def run_native(plan: dict, model: str, base_url: Optional[str], data_dir: str,
     return chat.main(base_url=url, model=model, roots=[data_dir], prompt=prompt)
 
 
-# --------------------------------------------------------- the benchmark in a container
-#: how VMD is supplied: no VMD (matplotlib renderer), a Linux VMD mounted from the host, or one baked into a local image
-BENCH_MODES = {"plain": "bench", "hostvmd": "bench-hostvmd", "withvmd": "bench-withvmd"}
-BENCH_ACTIONS = {"preflight": "agent-preflight", "suite": "agent-suite", "plan": "agent-plan", "run": "agent-run"}
-_MACHO = (b"\xcf\xfa\xed\xfe", b"\xce\xfa\xed\xfe", b"\xfe\xed\xfa\xcf", b"\xfe\xed\xfa\xce")
-
-
-def check_vmd_home(home: Optional[str], say: Callable = _say) -> int:
-    """Is ``home`` a VMD install a Linux container can use? 0 yes, 1 no, 2 not given. A macOS VMD is refused: it is a
-    macOS program and cannot run in a Linux container (the executable's first bytes are Mach-O's magic number)."""
-    if not home:
-        say("set VMD_HOME to your VMD install directory")
-        return 2
-    exe = next((c for c in (os.path.join(home, "bin", "vmd"), os.path.join(home, "vmd")) if os.path.isfile(c)), None)
-    if not exe:
-        say(f"no vmd launcher in {home} (looked for bin/vmd and vmd)")
-        return 1
-    with open(exe, "rb") as fh:
-        if fh.read(4) in _MACHO:
-            say(f"{exe} is a macOS binary. A Linux container cannot run it.\n"
-                "Use mode withvmd with the Linux tarball in docker/vmd-dist/, or run natively:\n"
-                "  vmd-agent bench agent-preflight --vmd <path-to-your-mac-vmd> ...")
-            return 1
-    say(f"found {exe}")
-    if P.system() != P.LINUX:
-        say(f"note: this computer is {P.system()}; the mounted VMD must still be a Linux build matching "
-            f"VMD_PLATFORM={os.environ.get('VMD_PLATFORM', 'linux/amd64')}")
-    return 0
-
-
-def docker_bench(action: str, args: Optional[List[str]] = None, mode: str = "plain", docker: str = "docker",
-                 say: Callable = _say) -> int:
-    """Run the benchmark commands inside a container with your VMD (``vmd-agent bench docker``). ``action``: check-vmd,
-    preflight, suite, plan, run or shell. ``mode`` says how VMD is supplied (``BENCH_MODES``)."""
-    if mode not in BENCH_MODES:
-        say(f"mode must be plain, hostvmd or withvmd (got '{mode}')")
-        return 2
-    if action == "check-vmd":
-        return check_vmd_home(os.environ.get("VMD_HOME"), say)
-    if action != "shell" and action not in BENCH_ACTIONS:
-        say("action must be one of: check-vmd, " + ", ".join(list(BENCH_ACTIONS) + ["shell"]))
-        return 2
-    repo = find_repo()
-    if repo is None:
-        say("Cannot find the vmd-agent folder with docker/chat.compose.yml. Run this from a clone of the repository.")
-        return 2
-    if mode == "hostvmd" and check_vmd_home(os.environ.get("VMD_HOME"), say) != 0:
-        return 1
-    service = BENCH_MODES[mode]
-    os.makedirs(os.environ.get("DATA_DIR") or os.path.join(repo, "data"), exist_ok=True)
-    cmd = [docker, "compose", "-f", os.path.join(repo, "docker", "docker-compose.yml"), "--profile", service, "run", "--rm", service]
-    cmd += ["sh"] if action == "shell" else ["bench", BENCH_ACTIONS[action]] + list(args or [])
-    return _run(cmd).returncode
-
-
 # ----------------------------------------------------------------------- main
 def stop_docker(docker: str = "docker", say: Callable = _say) -> int:
     """Stop the Docker model server and chat (``vmd-agent start --down``)."""

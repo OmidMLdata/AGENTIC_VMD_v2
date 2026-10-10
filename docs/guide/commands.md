@@ -79,7 +79,7 @@ Only if you want one of them, rather than a model run by vmd-agent, to do the th
 | `vmd-agent bench tools` | run every tool on a generated dataset whose answers are known, with the seconds each took (see [the tool test set](../benchmarks/tool-test-set.md)) | `--data-dir` · `--only` · `--skip` · `--list` · `--json` |
 | `vmd-agent bench validate TOP TRAJ` | cross-check the analysis against independent NumPy | `--sel` · `--sel2` · `--cutoff` |
 | `vmd-agent bench validate-dssp ID_OR_FILE ...` | compare the secondary-structure code with the PDB's own annotations | `--cache DIR` · `--mdtraj` |
-| `vmd-agent bench ...` | the research benchmark, also in a container with your VMD (`vmd-agent bench docker`) | see [Development](../reference/development.md#running-and-reproducing) and [Docker](docker.md#docker) |
+| `vmd-agent bench synth N --out DIR` | generate N novel structures with known properties | `--seed` · `--no-validate` |
 
 `vmd-agent --help` shows every command grouped in the order of this page.
 

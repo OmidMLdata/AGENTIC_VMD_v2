@@ -34,18 +34,20 @@ tests/             the test suite, laid out like the package
 images and lists its caveats; the legend is generated from what that renderer actually drew.
 
 
-### The research benchmark commands
+### The benchmark commands
 
 Every other command is in [Every command](../guide/using.md#ways-to-work). The benchmark ones (`vmd-agent bench <action>`; `vmd-agent bench --help`):
 
 | Action | What it does |
 |---|---|
-| `agent-suite` | generate automation tasks whose answers are known by construction |
-| `agent-preflight` | check that a run can work: VMD, key, container, selections, secrets |
-| `agent-plan` | estimate calls, tokens and cost (no model is called) |
-| `agent-run` | run scripted baselines and/or a model on a suite |
-| `agent-compare` | the paired difference between two runs, with a cluster-bootstrap interval |
-| `truth`, `run`, `synth`, `events`, `sampling`, `rating-sheet`, `rating-summary` | the grounding study and its supporting studies |
+| `tools` | run every tool on a generated dataset whose answers are known by construction ([the tool test set](../benchmarks/tool-test-set.md)) |
+| `models` | put language models in front of the tools, graded by a program ([the model benchmark](../benchmarks/model-benchmark.md)) |
+| `dataset` | write the tool test set's files and stop |
+| `validate`, `validate-dssp` | cross-check the toolkit's numbers against independent code (below) |
+| `synth` | generate novel structures with known properties |
+
+An earlier study (end-to-end automation tasks for language-model agents, a grounded-interpretation benchmark and a paper with a preregistration) is not part of the
+product any more; it is kept in the Git tag `archive/research-benchmark`.
 
 ## Contributing
 
@@ -89,8 +91,7 @@ pytest -q -rs                      # the whole suite; every skip is listed with 
 
 Tests that need something the machine lacks are skipped with the reason shown (`requires_vmd`, `requires_ffmpeg`,
 `requires_mcp`, `requires_network`, `requires_api`). **A skip means "not verified here", not "passed".** Run only the
-real-VMD tests with `pytest -m requires_vmd -rs`. Live model tests spend a few cents and need
-`VMD_AGENT_LIVE_TESTS=1` and `ANTHROPIC_API_KEY`.
+real-VMD tests with `pytest -m requires_vmd -rs`. Live model tests need a model server (see "Testing with a real model" below).
 
 ### 3. Use the toolkit
 
@@ -118,76 +119,9 @@ vmd-agent bench validate-dssp 1CRN 1MBN 2LZM 1UBQ --cache pdb_cache
 # ... and vs MDTraj's independent DSSP on local files (pip install mdtraj)
 vmd-agent bench validate-dssp my1.pdb my2.pdb --mdtraj
 
-# event-aware vs uniform keyframes on YOUR real trajectory, with injected events, plus a no-event control
-vmd-agent bench events top.pdb traj.dcd --trials 100 --frames 300 -k 9 --seed 0
-vmd-agent bench sampling --n-frames 1000 -k 9 --trials 200          # idealised AR(1) version
-
 # novel-structure generator checked against its own design (prints agreement per property)
 vmd-agent bench synth 100 --out synth --seed 1
 ```
 
 The generator is **not reproducible across machines from the seed alone** (floating-point differences between NumPy
 builds change discrete choices). Keep the generated files; `design.json` records a SHA-256 for each.
-
-### 5. Run the automation benchmark
-
-```bash
-# a. tasks with answers known by construction (use your own trajectories; one is not enough for statistics)
-vmd-agent bench agent-suite --out suite --seed 100 \
-    --base top1.pdb traj1.dcd --base top2.pdb traj2.dcd --structures real/*.pdb --synthetic-dir synth
-
-# b. prove the setup before spending anything: VMD, selection scoring, sandbox, key
-vmd-agent bench agent-preflight --suite suite --arms vmd_agent python_mdanalysis vmd_plain \
-    --allow-exec --model anthropic:<model-id>              # add --live-api for one tiny real call
-
-# c. scripted baselines: no model, no network. They check the scorers; they are not model results
-vmd-agent bench agent-run --suite suite --baselines oracle sloppy reference --out-dir out_baselines
-
-# d. estimate cost (calls no model; no prices are built in)
-vmd-agent bench agent-plan --suite suite --labels 6 --repeats 3 --price-in <USD/M tokens> --price-out <USD/M tokens>
-
-# e. a real model. python/Tcl arms run model-written code: use a container or VM
-#    open-source model (Ollama or any OpenAI-compatible server):  --model openai:granite4.1:8b --base-url http://localhost:11434/v1
-#    hosted Anthropic model (needs ANTHROPIC_API_KEY):             --model anthropic:<model-id>
-vmd-agent bench agent-run --suite suite --model anthropic:<model-id> \
-    --arms vmd_agent vmd_agent_no_verify python_mdanalysis vmd_plain --allow-exec --repeats 3 --out-dir out
-```
-
-Compare two runs (label A minus label B, repeats averaged, cluster-bootstrap interval; use `--alpha 0.0167` for the three
-confirmatory hypotheses in the preregistration):
-
-```bash
-vmd-agent bench agent-compare out/records.jsonl --a "anthropic:<id>@vmd_agent" --b "anthropic:<id>@python_mdanalysis" --metric silent_error
-```
-
-Outputs in `--out-dir`: `records.jsonl` (every run), `summary.md` and `summary.json`, `manifest.json` (versions, VMD,
-renderer, container flag, suite hash; no secrets). Every run uses a fresh copy of its task workspace, and the runner
-refuses a suite whose files changed.
-
-**In Docker with your own VMD** (VMD is never baked into an image you could publish):
-
-```bash
-export ANTHROPIC_API_KEY=...                     # a dedicated key with a spending limit
-export DATA_DIR=$PWD/data                        # your trajectories; the suite and outputs go here too
-vmd-agent bench docker preflight --mode withvmd --arms vmd_agent python_mdanalysis vmd_plain --allow-exec --model anthropic:<id>
-vmd-agent bench docker suite --mode withvmd --out /data/suite --seed 100 --base /data/top.pdb /data/traj.dcd --structures /data/real/*.pdb
-vmd-agent bench docker run --mode withvmd --suite /data/suite --out-dir /data/out --repeats 3 --allow-exec --model anthropic:<id> --arms vmd_agent python_mdanalysis
-```
-
-`--mode withvmd` builds VMD from a **Linux** tarball you place in `docker/vmd-dist/`; `--mode hostvmd` with `VMD_HOME=...` mounts a
-Linux install. A Mac's VMD.app cannot run in a Linux container (run natively instead). Details:
-[Running the benchmark with your VMD](../guide/docker.md#running-the-benchmark-with-your-vmd-and-your-key).
-
-### 6. Run the grounding component study
-
-```bash
-vmd-agent bench run real/*.pdb --synthetic-dir synth --dry-run --repeats 3 --price-in <USD/M> --price-out <USD/M>
-vmd-agent bench run real/*.pdb --synthetic-dir synth --model anthropic:<model-id> --out-dir out_grounding --repeats 3
-vmd-agent bench run real/*.pdb --model stats-reader --renderer matplotlib --out-dir out_offline   # offline control, no key
-```
-
-### 7. Before a confirmatory run
-
-Fill the `TODO` fields in [preregistration draft](RESEARCH.md#part-ii-preregistration-draft), freeze the toolkit version, generate the
-suite from data not used in development, **deposit the generated suite directory**, tag and file the plan, and only then
-run the model. The model that wrote the benchmark must not run it or analyse its results.

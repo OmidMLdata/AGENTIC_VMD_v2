@@ -191,7 +191,3 @@ The web page has a "chat tools" menu in its status bar to switch between them wi
 |---|---|---|
 | The MCP server and `vmd-agent tools` | all of them | an AI app can handle a long list |
 | `vmd-agent chat` and the web page | the ones that fit each question by default (`--tools auto`); `--tools all` for every tool | a small local model chooses better from a shorter list, and the full list takes most of its context |
-| The benchmark's arms (`vmd-agent bench agent-run`) | **their own small sets**: `vmd_agent` 10, `vmd_agent_no_verify` 9, `vmd_agent_no_keyframes` 9, `python_mdanalysis` 4, `vmd_plain` 4 | an arm is a controlled experiment: what does the toolkit add over a model that writes its own code? Each arm also gets `list_files`, `read_text_file` and `submit_answer`, which exist only inside the benchmark |
-
-The benchmark's tools are separate on purpose: they are confined to one task's folder, they have no way to draw or download, and `submit_answer` ends the task. They are the "internal" tools of the
-research benchmark, not part of the library.

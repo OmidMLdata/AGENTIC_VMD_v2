@@ -7,8 +7,8 @@ disagreement. A reviewer, or a user with a new force field or file format, can
 run it on their own trajectory to confirm the analysis agrees with first
 principles before trusting a figure.
 
-It does **not** compare against GROMACS, cpptraj or VMD themselves; see
-``docs/reference/RESEARCH.md`` (Appendix F, "Not verified") for how to do that comparison by hand.
+It does **not** compare against GROMACS or cpptraj; the equilibration job compares the RMSD with VMD's own
+(``vmd-agent workflow equilibration_check``).
 """
 from __future__ import annotations
 
