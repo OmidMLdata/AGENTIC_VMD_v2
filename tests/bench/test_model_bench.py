@@ -33,6 +33,19 @@ def _ask(prepared, tmp_path, task_id, replies, **kw):
 
 
 # ------------------------------------------------------------------------- the task list
+#: tools no task asks for by name, and why
+NOT_ASKED = {
+    "window_open": "the window tools open one by themselves; every 'window_' task starts from nothing",
+    "window_molecules": "list, show, hide, rename, delete: bookkeeping around the loading and drawing the tasks do ask for",
+    "window_view": "rotating and zooming has no answer to check except a picture; 'window_background' and 'window_picture' cover the display and the picture",
+    "window_scene": "an alternative to 'window_representation', accepted by 'window_cartoon'",
+    "window_save": "writes a state file; covered by the tool test set",
+    "run_tcl": "disabled by default; the 'tcl_disabled' task checks that a model is refused it",
+    "record_visual_interpretation": "stores a model's own reading of a picture; only meaningful inside a session, covered by 'report'",
+    "make_map": "asked by 'density'",
+}
+
+
 def test_tasks_are_well_formed():
     ids = [t.id for t in M.TASKS]
     assert len(ids) == len(set(ids)) and all(t.category in M.CATEGORIES for t in M.TASKS)
@@ -44,9 +57,9 @@ def test_tasks_are_well_formed():
 
 def test_every_tool_is_asked_for_by_some_task_or_excused():
     asked = {n for t in M.TASKS for n in t.tools}
-    missing = set(toolset.TOOLS) - asked - set(M.NOT_ASKED)
+    missing = set(toolset.TOOLS) - asked - set(NOT_ASKED)
     assert not missing, f"tools no task asks for and nothing excuses: {sorted(missing)}"
-    assert set(M.NOT_ASKED) <= set(toolset.TOOLS)
+    assert set(NOT_ASKED) <= set(toolset.TOOLS)
 
 
 def test_prompts_name_only_files_that_exist_or_are_made(prepared):

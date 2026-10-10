@@ -504,7 +504,7 @@ def test_the_working_folders_data_is_still_found_after_the_program_changes_direc
     settings.pin()
     monkeypatch.chdir(files)
     assert settings.home_dir() == os.path.realpath(project / ".vmd-agent") and settings.config_dir().startswith(os.path.realpath(project))
-    settings.unpin()
+    settings._PIN.clear()
     assert ".vmd-agent" not in settings.home_dir()                                    # without the pin the folder is lost, which is the bug
 
 

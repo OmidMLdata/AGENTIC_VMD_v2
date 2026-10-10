@@ -420,19 +420,6 @@ def _size(r: Run, name: str, want) -> Optional[str]:
 
 TASKS: List[Task] = _tasks()
 
-#: tools no task asks for by name, and why
-NOT_ASKED: Dict[str, str] = {
-    "window_open": "the window tools open one by themselves; every 'window_' task starts from nothing",
-    "window_molecules": "list, show, hide, rename, delete: bookkeeping around the loading and drawing the tasks do ask for",
-    "window_view": "rotating and zooming has no answer to check except a picture; 'window_background' and 'window_picture' cover the display and the picture",
-    "window_scene": "an alternative to 'window_representation', accepted by 'window_cartoon'",
-    "window_save": "writes a state file; covered by the tool test set",
-    "run_tcl": "disabled by default; the 'tcl_disabled' task checks that a model is refused it",
-    "record_visual_interpretation": "stores a model's own reading of a picture; only meaningful inside a session, covered by 'report'",
-    "make_map": "asked by 'density'",
-}
-
-
 #: a small, fast set (one or two tasks per category) for checking a change to the agent with a real model: ``--smoke``
 SMOKE: Sequence[str] = ("inspect_system", "stats", "claims_mixed", "rg", "rmsd_settled", "keyframes", "drift", "contacts", "secondary",
                         "structure_check", "convert", "build_solvated", "volume_info", "fit_map", "render", "scene", "probe_video",

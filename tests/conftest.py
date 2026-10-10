@@ -231,9 +231,9 @@ def _isolated_settings(tmp_path, monkeypatch):
 def _unpinned():
     """cli.main pins the working folder's .vmd-agent for the life of the process; each test starts without that."""
     from vmd_agent import settings
-    settings.unpin()
+    settings._PIN.clear()
     yield
-    settings.unpin()
+    settings._PIN.clear()
 
 
 @pytest.fixture(autouse=True)

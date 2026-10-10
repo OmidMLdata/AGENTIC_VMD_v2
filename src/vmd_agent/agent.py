@@ -260,7 +260,7 @@ def _files_in(root: Optional[str], limit: int = 3000) -> set:
     names: set = set()
     if not root or not os.path.isdir(root):
         return names
-    for dirpath, dirs, files in os.walk(root):
+    for _dirpath, dirs, files in os.walk(root):
         dirs[:] = [d for d in dirs if not d.startswith(".")]
         names.update(f.lower() for f in files)
         if len(names) > limit:

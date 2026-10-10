@@ -185,7 +185,7 @@ def build_nanotube(out_pdb: str, n: int = 6, m: int = 6, length_nm: float = 10.0
     res = S.run(body, vmd_path, timeout=600)
     if not res["ok"]:
         return {"ok": False, "error": res.get("error")}
-    atoms, radius, *mm = res["rows"]["NT"][0]
+    atoms, radius = res["rows"]["NT"][0][:2]
     import math
     expected = 0.0783 * math.sqrt(n_ * n_ + n_ * m_ + m_ * m_) / 2 * 10          # carbon nanotube radius, Angstrom
     return {"ok": True, "engine": "VMD nanotube builder", "pdb": out_pdb, "n_atoms": int(atoms),

@@ -42,10 +42,6 @@ def pin() -> None:
     _PIN[:] = [local_home(_FROM_CWD)]
 
 
-def unpin() -> None:
-    _PIN.clear()
-
-
 _FROM_CWD = object()
 
 

@@ -80,7 +80,7 @@ def _bench_models(args) -> int:
         return 1 if bad else 0
     if args.list and args.reference:
         from vmd_agent import model_oracle  # noqa: F401
-        print(model_bench.reference_text({}))
+        print(model_bench.reference_markdown() if args.markdown else model_bench.reference_text({}))
         return 0
     if args.list:
         for cat, tasks in model_tasks.by_category().items():
@@ -360,6 +360,7 @@ def build_parser():
     b.add_argument("--force", action="store_true", help="ask again even if the record is already in --out-dir")
     b.add_argument("--list", action="store_true", help="list the tasks by category, and run nothing")
     b.add_argument("--reference", action="store_true", help="with --list: also print what a correct answer says (the tools to call and the facts)")
+    b.add_argument("--markdown", action="store_true", help="with --list --reference: print it as the documentation page (docs/benchmarks/model-benchmark-tasks.md)")
     b.add_argument("--oracle", action="store_true", help="no model: do every task perfectly with the real tools and grade that, to check the benchmark itself")
     b.add_argument("--summarize", action="store_true", help="only rebuild summary.md from the records already in --out-dir")
     b = bsub.add_parser("dataset", help="write the tool test set's files (a protein, a trajectory, maps, a video) and stop")

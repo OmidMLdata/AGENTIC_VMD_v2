@@ -69,7 +69,7 @@ def _grade(task, run):
 
 def test_the_task_page_in_the_docs_is_the_page_the_code_makes():
     page = open(os.path.join(ROOT, "docs", "benchmarks", "model-benchmark-tasks.md"), encoding="utf-8").read()
-    assert page.strip() == B.reference_markdown().strip(), "docs/benchmarks/model-benchmark-tasks.md is out of date: regenerate it with model_bench.reference_markdown()"
+    assert page.strip() == B.reference_markdown().strip(), "docs/benchmarks/model-benchmark-tasks.md is out of date: regenerate it with `vmd-agent bench models --list --reference --markdown > docs/benchmarks/model-benchmark-tasks.md`"
     assert all(f"`{t.id}`" in page for t in M.TASKS)
 
 
@@ -80,3 +80,9 @@ def test_the_command_prints_the_reference_and_runs_the_oracle(tmp_path, capsys):
     assert "expected:" in out and "binding free energy" in out
     assert cli.main(["bench", "models", "--oracle", "--only", "slurm", "which_workflows", "--data-dir", str(tmp_path)]) == 0
     assert "2 passed, 0 failed" in capsys.readouterr().out
+
+
+def test_the_documentation_page_can_be_regenerated_from_the_command_line(capsys):
+    from vmd_agent import cli
+    assert cli.main(["bench", "models", "--list", "--reference", "--markdown"]) == 0
+    assert capsys.readouterr().out.strip() == B.reference_markdown().strip()
