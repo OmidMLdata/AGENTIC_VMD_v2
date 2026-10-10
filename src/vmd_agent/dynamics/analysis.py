@@ -4,17 +4,16 @@ Each analysis is independent and defensive: a failure in one returns an
 ``error`` field instead of aborting the batch. Numeric summaries are returned
 as JSON and, where useful, a PNG plot is written to the output directory.
 
-What changed from the first version
------------------------------------
+What it does
+------------
 * **Honest time axes.** Plots and summaries use the trajectory's own times when
   the format records them and the frame index otherwise, and the axis label says
-  which. Previously every plot was labelled "time (ps)" even when the x values
-  were the index of the analysed frame after striding.
+  which.
 * **Statistics, not fixed thresholds.** "Stable" and "drifting" verdicts come
   from :mod:`vmd_agent.timeseries` (autocorrelation-corrected error bars,
   Mann-Kendall trend, first-vs-second-half comparison) rather than cut-offs such
   as "std < 0.5 Å".
-* **Per-residue RMSF**, as documented (it used to plot one value per atom).
+* **Per-residue RMSF**.
 * **Angle-based H-bonds** shared with :mod:`vmd_agent.stats`.
 * **Periodic-boundary diagnostics** and an optional ``unwrap`` step.
 * A **convergence** analysis reporting block averages and a suggested

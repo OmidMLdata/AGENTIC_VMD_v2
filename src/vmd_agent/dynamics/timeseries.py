@@ -1,11 +1,8 @@
 """Statistics for trajectory time series.
 
-The original analysis module called a run "stable" when the standard deviation
-of RMSD was below 0.5 Å, or "collapsing" when Rg moved by more than 1 Å. Those
-cut-offs depend on system size and on how correlated successive frames are, so
-they are wrong for flexible loops, intrinsically disordered proteins and large
-complexes alike. This module replaces them with statistics that adapt to the
-data:
+Fixed cut-offs ("stable" when the standard deviation of RMSD is below 0.5 Å, "collapsing" when Rg moves by more than 1 Å) depend on system size and on how
+correlated successive frames are, so they are wrong for flexible loops, intrinsically disordered proteins and large complexes alike. This module uses statistics
+that adapt to the data instead:
 
 * **statistical inefficiency** ``g`` and the effective number of independent
   samples ``N_eff = N / g`` (Chodera et al., JCTC 2007), so error bars are not

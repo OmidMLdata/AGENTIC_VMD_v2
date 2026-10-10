@@ -5,15 +5,11 @@ ray tracer). They run VMD in ``-dispdev text`` mode so no X display is needed.
 When VMD cannot be located they return a structured error with guidance rather
 than raising, so an agent can fall back to the analysis path.
 
-Changes from the first version
-------------------------------
-* Scratch directories are removed when a call finishes (they used to leak about
-  5 MB of Tachyon scene data per call). Pass ``keep_work=True`` to keep them.
-* ``render_movie`` renders every frame inside **one** VMD session with one fixed
-  camera. It previously launched VMD once per frame, reloading the whole
-  trajectory each time, and reset the camera per frame so the movie jittered.
-* ``render_frames`` renders an arbitrary list of frames the same way and backs
-  the event-aware keyframe feature.
+How it works
+------------
+* Scratch directories are removed when a call finishes; pass ``keep_work=True`` to keep them.
+* ``render_movie`` renders every frame inside **one** VMD session with one fixed camera.
+* ``render_frames`` renders an arbitrary list of frames the same way and backs the event-aware keyframe feature.
 * ``run_tcl`` screens scripts through :mod:`vmd_agent.security`.
 """
 from __future__ import annotations

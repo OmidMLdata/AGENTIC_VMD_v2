@@ -89,7 +89,7 @@ outside; disulfides = residue pairs with CB atoms 3.4 to 6.2 Å apart and SG ato
 **Idealised and not physically realistic.**
 
 ## Analysis guards
-`contacts` and `distance` require `sel2` (they used to default to the selection itself, comparing it with itself).
+`contacts` and `distance` require `sel2` (a selection compared with itself says nothing).
 `analyze_trajectory` estimates the memory needed (all atoms of every kept frame as float32, doubled for the transient
 stack) and refuses above `VMD_AGENT_MAX_MEMORY_GB` (default 4), returning the `step` that would fit.
 

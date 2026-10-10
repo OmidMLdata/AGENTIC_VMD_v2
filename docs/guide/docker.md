@@ -17,7 +17,7 @@ All OS differences are in `platform_info.py` (and the few places that consume it
 tested for Linux, macOS and Windows from any OS: VMD install folders and file names (`vmd.exe` on Windows, the app bundle's
 `vmd_MACOSX*` binary on macOS), Claude Desktop's config location, the Docker platform, case-insensitive path comparison for the sandbox,
 Windows paths turned into forward slashes for Tcl, the Windows system variables a child process needs, a console that cannot show a
-character, and the version check that no longer relies on a Linux/macOS-only device file. **Only macOS has been run by the author.**
+character, and a version check that does not rely on a Linux/macOS-only device file. **Only macOS has been run by the author.**
 
 ## The all-in-one chat stack (`vmd-agent start`)
 

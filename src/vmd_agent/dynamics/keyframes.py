@@ -1,6 +1,6 @@
 """Event-aware keyframe selection for trajectories and movies.
 
-Uniform sampling (the original ``interpret_video`` behaviour) shows nine evenly
+Uniform sampling shows nine evenly
 spaced stills. An event shorter than the spacing between stills falls between
 two of them and is simply never seen: "unobserved, not absent". This module
 chooses frames from the *trajectory's own signals* instead.
