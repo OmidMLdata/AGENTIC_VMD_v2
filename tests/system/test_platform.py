@@ -321,5 +321,8 @@ def test_each_model_is_marked_for_this_computer_and_the_suggestion_follows_it():
         assert rows[models.DEFAULT_MODEL]["fit"] == default_fit and rows["qwen3.8:27b"]["fit"] == largest_fit, (ram, vram)
     assert models.fit(models.by_tag()["granite4.1:3b"], 6.0) == "tight" and models.fit(models.by_tag()["granite4.1:3b"], None) == "unknown"
     assert [a["installed"] for a in models.advise(16.0, None, ["granite4.1:8b"])][:2] == [False, True]
-    assert "suggested" in models.table(16.0, None) and "[downloaded]" in models.table(16.0, None, ["granite4.1:8b"])
+    assert "suggested for this computer" in models.table(16.0, None) and "downloaded" in models.table(16.0, None, ["granite4.1:8b"])
+    first = [l for l in models.table(16.0, None).splitlines() if l.strip()][0]
+    assert "granite4.1:8b" in first                                              # the suggestion is listed first
+    assert models.table(16.0, None).index("gemma4:12b") < models.table(16.0, None).index("qwen3.8:27b")      # then what fits or is tight, then what is too big
     assert "Apple Silicon" in models.describe_device(24.0, None, None, apple_silicon=True) and "RTX" in models.describe_device(16.0, "NVIDIA RTX 4090", 24.0)

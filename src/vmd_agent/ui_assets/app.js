@@ -76,7 +76,7 @@ function fillModel(info) {
   $("#model-state").textContent = info.state === "ready" ? `Using ${info.model} at ${info.base_url}.` : `Not working: ${info.problem}.`;
   const list = $("#model-list"); list.textContent = ""; (info.available || []).forEach(m => list.append(new Option(m, m)));
   const loc = $("#model-local"); loc.textContent = "";
-  (info.local_models || []).forEach(m => loc.append(new Option(m, m))); if (!(info.local_models || []).length) loc.append(new Option(info.private_available ? "no model downloaded yet: use Download a model below" : "no private model server yet: use Download a model below", ""));
+  (info.local_models || []).forEach(m => loc.append(new Option(m, m))); if (!(info.local_models || []).length) loc.append(new Option("no model downloaded yet: use Download a model below", ""));
   if ((info.local_models || []).includes(info.model)) loc.value = info.model;
   const fs = $("#model-found"); fs.textContent = ""; fs.append(new Option((info.found || []).length ? "choose one…" : "none found", ""));
   (info.found || []).forEach(f => fs.append(new Option(`${f.base_url}  (${f.models.length} models)`, f.base_url)));
@@ -86,11 +86,19 @@ function fillModel(info) {
 }
 const FIT = { fits: "fits this computer", tight: "tight on this computer", "too big": "too big for this computer", unknown: "" };
 function fillSuggestions(info) {
-  const sel = $("#model-pick"); sel.textContent = ""; $("#model-device").textContent = info.device ? "This computer: " + info.device + "." : "";
-  (info.suggested || []).forEach(m => { const o = new Option(`${m.tag}  ·  ${m.gb} GB  ·  ${FIT[m.fit] || m.fit}${m.recommended ? "  ·  suggested" : ""}${m.installed ? "  ·  downloaded" : ""}`, m.tag); sel.append(o); if (m.recommended && !m.installed) sel.value = m.tag; });
-  const text = () => { const m = (info.suggested || []).find(x => x.tag === sel.value); const first = info.private_available ? "" : ` and the private Ollama (about ${info.ollama_download_gb || "a few hundred MB"} GB, kept inside the vmd-agent folder)`;
-    $("#model-consent-text").textContent = m ? `Yes, download ${m.tag} (${m.gb} GB)${first} from the internet.` : "Yes, download it."; };
-  sel.onchange = text; text(); $("#model-get").open = !(info.local_models || []).length;
+  const sel = $("#model-pick"), kept = sel.value; sel.textContent = ""; $("#model-device").textContent = info.device ? "This computer: " + info.device + "." : "";
+  const rank = m => (m.recommended ? 0 : m.fit === "fits" || m.fit === "unknown" ? 1 : m.fit === "tight" ? 2 : 3);                       // the suggested one, then what fits, then what is tight, then what is too big
+  const list = (info.suggested || []).map((m, i) => [rank(m), i, m]).sort((x, y) => x[0] - y[0] || x[1] - y[1]).map(x => x[2]);
+  list.forEach(m => sel.append(new Option(`${m.tag}  ·  ${m.gb} GB  ·  ${FIT[m.fit] || m.fit}${m.recommended ? "  ·  suggested" : ""}${m.installed ? "  ·  downloaded" : ""}`, m.tag)));
+  if (list.length) sel.value = list.some(m => m.tag === kept) ? kept : list[0].tag;                                                  // keep what the person chose; otherwise the suggestion
+  const suggested = list.find(m => m.recommended);
+  const text = () => {
+    const m = list.find(x => x.tag === sel.value), first = info.private_available ? "" : ` and the private Ollama (about ${info.ollama_download_gb || "a few hundred MB"} GB, kept inside the vmd-agent folder)`;
+    $("#model-consent-text").textContent = m ? `Yes, download ${m.tag} (${m.gb} GB)${first} from the internet.` : "Yes, download it.";
+    $("#model-progress").textContent = m && (m.fit === "too big" || m.fit === "tight") ? `${m.tag} is ${m.fit === "tight" ? "tight" : "too big"} for this computer: it may be very slow or fail.` + (suggested ? ` The suggestion is ${suggested.tag}.` : "") : "";
+  };
+  sel.onchange = () => { $("#model-consent").checked = false; text(); };                                                                // consent is for the model that is showing
+  text(); $("#model-get").open = !(info.local_models || []).length;
 }
 $("#model-get-btn").onclick = async () => {
   const tag = $("#model-pick").value, box = $("#model-progress");

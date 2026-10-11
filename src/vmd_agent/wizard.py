@@ -304,30 +304,16 @@ def setup_local_model(io: IO, system_name: str, model: Optional[str] = None,
     from vmd_agent.agent import DEFAULT_URL
     from vmd_agent.llm_client import LLMError, list_models
     io.say("\n  A free, open-source model that runs on your computer, so your data never leaves it.")
-    io.say(f"  As of {models.MODELS_CHECKED} these exist in the Ollama library and can call tools. Only granite4.1:8b")
-    io.say("  and granite4.1:3b were run with this toolkit (the 3B often misreads results); licences differ.")
     if not model:
-        io.say("  Pick a size (bigger is smarter but slower and needs more memory):")
         ram, gpu_name, vram = P.memory_gb(system_name), P.nvidia_gpu(), P.nvidia_vram_gb()
-        gpu = bool(gpu_name)
         io.say("  This computer: " + models.describe_device(ram, gpu_name, vram, apple_silicon=(P.system(system_name) == P.MACOS and P.arch() == "arm64")) + ".")
-        fits = {a["tag"]: a["fit"] for a in models.advise(ram, vram)}
-        note = {"fits": "fits this computer", "tight": "tight for this computer", "too big": "too big for this computer", "unknown": ""}
-        labels = [f"{m.tag}: {m.label}, download {m.gb:.1f} GB; suits {m.suits}; {m.licence}" + (f" [{note[fits[m.tag]]}]" if note[fits[m.tag]] else "")
-                  for m in models.CATALOGUE]
-        labels.append("I know the model name I want")
-        suggested = models.recommend(ram, gpu and bool(vram is None or vram >= models.by_tag()[models.DEFAULT_MODEL].min_vram_gb))
-        if suggested is None:
-            io.say(f"  This computer has {ram} GB of memory, which is little for a model that can use tools. The smallest one below may be slow or fail;")
-            io.say("  an online service (setup option 2) or Claude (option 3) is the easier route.")
-            suggested = models.CATALOGUE[0]
-        else:
-            io.say(f"  For this computer ({f'{ram} GB of memory' if ram else 'memory not read'}{', NVIDIA graphics card' if gpu else ''}) "
-                   f"the suggestion is {suggested.tag}.")
-        default = 1 + [m.tag for m in models.CATALOGUE].index(suggested.tag)
-        pick = default if assume_yes else io.choose("  Which one?", labels, default=default)
-        model = (models.CATALOGUE[pick - 1].tag if pick <= len(models.CATALOGUE)
-                 else io.ask("  Model name (as in the Ollama library, e.g. granite4.1:8b)"))
+        rows = models.ordered(ram, vram, ollama_local.installed_models() if ollama_local.find_binary() else [])
+        if not any(a["recommended"] for a in rows):
+            io.say("  That is little for a model that can use tools: the first one below may be slow or fail. An online service (option 2) or Claude (option 3) is the easier route.")
+        io.say("  Every one of these can call tools, which vmd-agent needs. Bigger is smarter but slower and needs more memory.")
+        labels = [models.line(a).strip() for a in rows] + ["I know the model name I want"]
+        pick = 1 if assume_yes else io.choose("  Which one?", labels, default=1)
+        model = rows[pick - 1]["tag"] if pick <= len(rows) else io.ask("  Model name (as in the Ollama library, e.g. granite4.1:8b)")
     found = models.check(model)                              # the name and the tools badge first: nothing is installed or saved for a model that cannot work
     if found["exists"] is False:
         io.say(f"  The Ollama library has no model called '{model}' (it may have been renamed or misspelt). Suggested ones that exist: "

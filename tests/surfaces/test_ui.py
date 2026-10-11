@@ -290,6 +290,27 @@ def test_local_models_on_disk_are_listed_even_when_no_server_runs(tmp_path):
     assert ollama_local.installed_models(str(tmp_path / "nothing")) == []
 
 
+def test_stray_files_in_the_model_folder_do_not_break_the_list(tmp_path):
+    from vmd_agent import ollama_local
+    d = tmp_path / "manifests" / "registry.ollama.ai" / "library" / "gemma3"
+    d.mkdir(parents=True)
+    (d / "270m").write_text("{}")
+    for stray in (tmp_path / "manifests" / ".DS_Store", tmp_path / "manifests" / "registry.ollama.ai" / ".DS_Store", d.parent / "Thumbs.db", d / ".DS_Store"):
+        stray.write_text("x")
+    assert ollama_local.installed_models(str(tmp_path)) == ["gemma3:270m"]
+
+
+def test_without_a_private_ollama_the_computers_own_models_are_listed(page, monkeypatch):
+    from vmd_agent import ollama_local
+    monkeypatch.setattr(ollama_local, "find_binary", lambda root=None: None)
+    monkeypatch.setattr(ui.agent_mod, "DEFAULT_URL", page.state.base_url)            # the Ollama this person already runs
+    info = json.loads(page.req("GET", "/api/model")[1])
+    assert info["private_available"] is False and info["local_models"] == info["available"] and "m" in info["local_models"]
+    page.state.reconnect(f"http://127.0.0.1:{_closed_port()}/v1", "m", None)           # the page's own server is elsewhere and silent
+    info = json.loads(page.req("GET", "/api/model")[1])
+    assert info["state"] == "no_server" and "m" in info["local_models"]
+
+
 @pytest.fixture()
 def vmd_window(page):
     """A VMD with no window under the page (the commands are the same as for a window, so a test opens none)."""

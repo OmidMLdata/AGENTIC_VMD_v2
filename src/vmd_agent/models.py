@@ -36,13 +36,13 @@ class Model(NamedTuple):
 
 
 CATALOGUE: List[Model] = [
-    Model("granite4.1:3b", "Small and fast", 2.10, "Apache 2.0", "8 GB of memory", 8, 4),
-    Model("granite4.1:8b", "Recommended", 5.35, "Apache 2.0", "16 GB of memory, or a graphics card", 16, 8),
-    Model("gemma4:e4b", "Recommended, alternative", 6.58, "Apache 2.0", "16 GB of memory, or a graphics card", 16, 8),
-    Model("lfm2.5:8b", "Fast on a plain CPU", 5.16, "LFM Open License v1.0 (read it; it is not Apache)", "16 GB of memory", 16),
-    Model("gemma4:12b", "Larger", 8.02, "Apache 2.0", "32 GB of memory, or a good graphics card", 32, 12),
-    Model("gpt-oss:20b", "Larger", 13.79, "Apache 2.0", "32 GB of memory, or a 16 GB graphics card", 32, 16),
-    Model("qwen3.8:27b", "Largest listed", 17.74, "Apache 2.0", "48 GB of memory, or a 24 GB graphics card", 48, 24),
+    Model("granite4.1:3b", "small and fast, less reliable", 2.10, "Apache 2.0", "8 GB of memory", 8, 4),
+    Model("granite4.1:8b", "the default", 5.35, "Apache 2.0", "16 GB of memory, or a graphics card", 16, 8),
+    Model("gemma4:e4b", "an alternative", 6.58, "Apache 2.0", "16 GB of memory, or a graphics card", 16, 8),
+    Model("lfm2.5:8b", "fast on a plain CPU", 5.16, "LFM Open License v1.0 (read it; it is not Apache)", "16 GB of memory", 16),
+    Model("gemma4:12b", "larger", 8.02, "Apache 2.0", "32 GB of memory, or a good graphics card", 32, 12),
+    Model("gpt-oss:20b", "larger", 13.79, "Apache 2.0", "32 GB of memory, or a 16 GB graphics card", 32, 16),
+    Model("qwen3.8:27b", "the largest", 17.74, "Apache 2.0", "48 GB of memory, or a 24 GB graphics card", 48, 24),
 ]
 DEFAULT_MODEL = "granite4.1:8b"
 
@@ -87,7 +87,7 @@ def describe_device(ram_gb: Optional[float], gpu: Optional[str], vram_gb: Option
     if gpu:
         bits.append(f"{gpu}" + (f" with {vram_gb:g} GB" if vram_gb else ""))
     elif apple_silicon:
-        bits.append("Apple Silicon (the memory is shared with the graphics, so it all counts)")
+        bits.append("Apple Silicon (memory shared with the graphics)")
     else:
         bits.append("no NVIDIA graphics card")
     return ", ".join(bits)
@@ -151,14 +151,38 @@ def check(tag: str, timeout: float = 15.0, registry: str = REGISTRY) -> Dict[str
     return out
 
 
+_FIT_RANK = {"fits": 1, "unknown": 1, "tight": 2, "too big": 3}
+
+
+def ordered(ram_gb: Optional[float] = None, vram_gb: Optional[float] = None, installed: Optional[List[str]] = None) -> List[Dict[str, object]]:
+    """The suggested models in the order to show them: the one suggested for this computer first, then what fits, then what is tight, then what is too big."""
+    rows = advise(ram_gb, vram_gb, installed)
+    return sorted(rows, key=lambda a: (0 if a["recommended"] else _FIT_RANK.get(str(a["fit"]), 1)))
+
+
+def note(a: Dict[str, object], known_computer: bool = True) -> str:
+    """The short, plain remark after a model's name and size: suggested, what it is, how it suits this computer, licence, downloaded."""
+    bits = []
+    if a["recommended"]:
+        bits.append("suggested for this computer")
+    bits.append(str(a["label"]))
+    if known_computer and a["fit"] in ("tight", "too big"):
+        bits.append(f"{a['fit']} for this computer")
+    if "Apache" not in str(a["licence"]):
+        bits.append("licence: " + str(a["licence"]).split(" (")[0] + ", not Apache: read it")
+    if a["installed"]:
+        bits.append("downloaded")
+    return ", ".join(bits)
+
+
+def line(a: Dict[str, object], known_computer: bool = True) -> str:
+    return f"{a['tag']:<15} {a['gb']:>5.1f} GB   {note(a, known_computer)}"
+
+
 def table(ram_gb: Optional[float] = None, vram_gb: Optional[float] = None, installed: Optional[List[str]] = None) -> str:
-    """The catalogue as plain text; with the computer's memory it also says how each model suits it and which are downloaded."""
-    rows = []
-    for a in advise(ram_gb, vram_gb, installed):
-        mark = ("  <- suggested" if a["recommended"] else "") + ("  [downloaded]" if a["installed"] else "")
-        suit = f"  {str(a['fit']):<8}" if ram_gb is not None or vram_gb is not None else ""
-        rows.append(f"{a['tag']:<16} {a['gb']:>6.2f} GB{suit}  {a['licence']:<46} {a['label']}: {a['suits']}{mark}")
-    head = f"As of {MODELS_CHECKED} (checked against the Ollama registry):"
-    if ram_gb is not None or vram_gb is not None:
-        head += "  (the third column is how each suits this computer)"
-    return head + "\n" + "\n".join(rows)
+    """The suggested models as plain text, best first. With the computer's memory it says how each suits it and which are downloaded."""
+    known = ram_gb is not None or vram_gb is not None
+    rows = ["  " + line(a, known) for a in ordered(ram_gb, vram_gb, installed)]
+    return ("\n".join(rows) + "\n\nEvery one of these can call tools, which vmd-agent needs. Names and sizes were checked against the Ollama library on "
+            f"{MODELS_CHECKED}; `vmd-agent models --check` asks it again.")
+

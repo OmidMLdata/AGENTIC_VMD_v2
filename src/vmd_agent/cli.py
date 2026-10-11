@@ -458,7 +458,8 @@ def main(argv=None):
             ram, gpu, vram = P.memory_gb(), P.nvidia_gpu(), P.nvidia_vram_gb()
             print("This computer: " + models.describe_device(ram, gpu, vram, apple_silicon=(P.system() == P.MACOS and P.arch() == "arm64")) + ".")
             pick = models.recommend(ram, bool(gpu))
-            print("Suggested: " + (f"{pick.tag} ({pick.gb:.1f} GB)" if pick else "none of these fit; an online service or Claude (vmd-agent setup) is easier") + "\n")
+            print(("Suggested: " + pick.tag) if pick else "None of these fits this computer well: an online service or Claude (vmd-agent setup) is the easier route.")
+            print()
             print(models.table(ram, vram, ollama_local.installed_models()))
             print("\nDownload one:  vmd-agent models --install " + (pick.tag if pick else "MODEL"))
             if args.check:

@@ -31,7 +31,7 @@ from typing import Callable, Dict, List, Optional
 from vmd_agent import platform_info as P
 from vmd_agent import settings
 
-RELEASE_API = "https://api.github.com/repos/ollama/ollama/releases/latest"
+RELEASES_API = "https://api.github.com/repos/ollama/ollama/releases?per_page=6"
 DEFAULT_PORT = 11435                 # not 11434, so it never meets a system-wide Ollama
 #: Ollama's own default context is 4096 tokens, which the tool list alone nearly fills; the model then silently loses its
 #: instructions and tools. 16384 tokens costs about 2 GB more memory for an 8B model.
@@ -147,25 +147,42 @@ def _direct_release(name: str) -> Dict[str, object]:
     return {"tag": None, "url": url, "size": 0, "sha256": sha}
 
 
+def _checksum_of(rel: dict, assets: dict, name: str) -> Optional[str]:
+    """The SHA-256 of release file ``name``, from GitHub's own record of the file (its ``digest``) or, failing that, the release's ``sha256sum.txt``."""
+    digest = str(assets[name].get("digest") or "")
+    if digest.startswith("sha256:") and re.fullmatch(r"[0-9a-f]{64}", digest[7:]):
+        return digest[7:]
+    if "sha256sum.txt" in assets:
+        try:
+            return checksum_for(_get(assets["sha256sum.txt"]["browser_download_url"]).decode(), name)
+        except (urllib.error.URLError, OSError, ValueError):
+            return None
+    return None
+
+
 def latest_release(name: str) -> Dict[str, object]:
-    """``{"tag", "url", "size", "sha256"}`` for archive ``name`` in Ollama's latest release. If GitHub's API cannot be used, the plain download address is used; if the file was
-    renamed, the closest one of the same kind is used."""
+    """``{"tag", "url", "size", "sha256"}`` for archive ``name`` in Ollama's newest release that has it **with a checksum**. A release that is still being published, or that lacks the
+    checksum, is passed over for the one before it. If GitHub's API cannot be used, the plain download address is used; a renamed file is matched to the closest one of the same kind."""
     try:
-        rel = json.loads(_get(RELEASE_API).decode())
+        listing = json.loads(_get(RELEASES_API).decode())
+        releases = [r for r in listing if isinstance(r, dict) and not r.get("draft") and not r.get("prerelease")]
     except (urllib.error.URLError, OSError, ValueError):
         return _direct_release(name)
-    assets = {a["name"]: a for a in rel.get("assets", [])}
-    if name not in assets:
-        alt = closest_asset(name, list(assets))
-        if alt is None:
-            raise RuntimeError(f"Ollama's latest release ({rel.get('tag_name')}) has no file for this computer (looked for {name}); install Ollama from https://ollama.com/download "
-                               "and run `vmd-agent setup` again")
-        name = alt
-    sha = None
-    if "sha256sum.txt" in assets:
-        sha = checksum_for(_get(assets["sha256sum.txt"]["browser_download_url"]).decode(), name)
-    return {"tag": rel.get("tag_name"), "url": assets[name]["browser_download_url"],
-            "size": assets[name].get("size", 0), "sha256": sha}
+    if not releases:
+        return _direct_release(name)
+    skipped: List[str] = []
+    for rel in releases[:6]:
+        assets = {a["name"]: a for a in rel.get("assets", []) if isinstance(a, dict) and "name" in a}
+        pick = name if name in assets else closest_asset(name, list(assets))
+        if pick is None:
+            skipped.append(f"{rel.get('tag_name')}: no file for this computer")
+            continue
+        sha = _checksum_of(rel, assets, pick)
+        if sha:
+            return {"tag": rel.get("tag_name"), "url": assets[pick]["browser_download_url"], "size": assets[pick].get("size", 0), "sha256": sha}
+        skipped.append(f"{rel.get('tag_name')}: no checksum")
+    raise RuntimeError("none of Ollama's recent releases has a verifiable download for this computer (" + "; ".join(skipped[:3]) + "). "
+                       "Install Ollama yourself from https://ollama.com/download, then run `vmd-agent setup` again: it will use that one")
 
 
 def download(u: str, dest: str, progress: Optional[Callable[[int], None]] = None) -> None:
@@ -255,17 +272,17 @@ def installed_models(root: Optional[str] = None) -> List[str]:
     """The models downloaded into the private folder, read from the files themselves (the server need not be running): ``name:tag``."""
     base = os.path.join(root or models_dir(), "manifests")
     found: List[str] = []
-    if not os.path.isdir(base):
-        return found
-    for host in sorted(os.listdir(base)):
-        for ns in sorted(os.listdir(os.path.join(base, host))):
-            nsdir = os.path.join(base, host, ns)
-            if not os.path.isdir(nsdir):
-                continue
-            for name in sorted(os.listdir(nsdir)):
-                ndir = os.path.join(nsdir, name)
-                if os.path.isdir(ndir):
-                    found += [(f"{name}:{tag}" if ns == "library" else f"{ns}/{name}:{tag}") for tag in sorted(os.listdir(ndir)) if not tag.startswith(".")]
+
+    def folders(path: str) -> List[str]:                      # stray files (.DS_Store, Thumbs.db) are not registries, namespaces or models
+        try:
+            return sorted(n for n in os.listdir(path) if not n.startswith(".") and os.path.isdir(os.path.join(path, n)))
+        except OSError:
+            return []
+    for host in folders(base):
+        for ns in folders(os.path.join(base, host)):
+            for name in folders(os.path.join(base, host, ns)):
+                ndir = os.path.join(base, host, ns, name)
+                found += [(f"{name}:{tag}" if ns == "library" else f"{ns}/{name}:{tag}") for tag in sorted(os.listdir(ndir)) if not tag.startswith(".")]
     return found
 
 

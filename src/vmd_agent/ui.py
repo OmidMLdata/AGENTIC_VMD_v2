@@ -156,12 +156,17 @@ class State:
         info = {"base_url": self.base_url, "model": self.model, "has_key": bool(self.api_key), "available": [], "state": "ready", "problem": None,
                 "private_available": private, "is_private": self.base_url == ollama_local.url(),
                 "local_models": ollama_local.installed_models() if private else [], "local_url": ollama_local.url(), "found": []}
-        info.update(self.device_advice(info["local_models"]))
         try:
             info["available"] = list_models(self.base_url, self.api_key, timeout=timeout)
         except LLMError as e:
             info.update(state="no_server", problem=str(e), found=self.discover())
+            if not private:
+                info["local_models"] = next((f["models"] for f in info["found"] if f["base_url"].rstrip("/") == agent_mod.DEFAULT_URL.rstrip("/")), [])
+            info.update(self.device_advice(info["local_models"]))
             return info
+        if not private:                                           # no private Ollama: "on this computer" means the Ollama the user already runs
+            info["local_models"] = info["available"] if self.base_url.rstrip("/") == agent_mod.DEFAULT_URL.rstrip("/") else self._system_models()
+        info.update(self.device_advice(info["local_models"]))
         if info["available"] and self.model not in info["available"]:
             info.update(state="no_model", problem=f"the server has no model called '{self.model}'")
         return info
@@ -176,6 +181,15 @@ class State:
             ollama_gb = 0.0
         return {"device": models.describe_device(ram, gpu, vram, apple_silicon=(P.system() == P.MACOS and P.arch() == "arm64")),
                 "suggested": models.advise(ram, vram, installed), "ollama_download_gb": ollama_gb}
+
+    @staticmethod
+    def _system_models() -> list:
+        """The models of an Ollama the user already runs on this computer (empty when none answers)."""
+        from vmd_agent.llm_client import LLMError, list_models
+        try:
+            return list_models(agent_mod.DEFAULT_URL, None, timeout=0.8)
+        except LLMError:
+            return []
 
     def discover(self) -> list:
         """Other model servers that answer on this computer (the private Ollama, a system Ollama, llama.cpp, LM Studio, vLLM), with their models."""
