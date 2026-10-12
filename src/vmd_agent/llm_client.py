@@ -191,6 +191,8 @@ def chat_completion(base_url: str, model: str, messages: Sequence[dict],
     if max_tokens:
         payload["max_tokens"] = max_tokens
     url = base_url.rstrip("/") + "/chat/completions"
+    if _is_anthropic(url):
+        payload.pop("temperature", None)                    # newer Claude models reject temperature
     if on_token is not None:                                # stream: show the answer as it is written
         payload["stream"] = True
         payload["stream_options"] = {"include_usage": True}
