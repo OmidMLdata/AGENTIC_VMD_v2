@@ -35,6 +35,7 @@ dependencies = [
     "matplotlib>=3.6",
     "pillow>=9",
     "imageio-ffmpeg>=0.4.9",
+    "truststore>=0.9; python_version >= '3.10'",
 ]
 
 [project.optional-dependencies]

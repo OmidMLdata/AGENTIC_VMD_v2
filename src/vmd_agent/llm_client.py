@@ -13,10 +13,17 @@ from __future__ import annotations
 import json
 import re
 import urllib.error
+import urllib.parse
 import urllib.request
 from typing import Callable, Dict, List, Optional, Sequence
 
 import numpy as np
+
+try:  # trust the operating system's certificates (fixes CERTIFICATE_VERIFY_FAILED on Macs)
+    import truststore
+    truststore.inject_into_ssl()
+except Exception:
+    pass
 
 
 class LLMError(RuntimeError):
@@ -66,13 +73,25 @@ def render_result(obj, cap: int = 6000) -> str:
 
 
 # ------------------------------------------------------------------ requests
+def _is_anthropic(url: str) -> bool:
+    return urllib.parse.urlparse(url).hostname == "api.anthropic.com"
+
+
+def _headers(url: str, api_key: Optional[str]) -> Dict[str, str]:
+    """Request headers; Claude's API also needs anthropic-version for /v1/models."""
+    headers = {"Content-Type": "application/json"}
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+    if _is_anthropic(url):
+        headers["anthropic-version"] = "2023-06-01"
+    return headers
+
+
 def _request(url: str, payload: Optional[dict], api_key: Optional[str],
              timeout: float) -> dict:
     data = None if payload is None else json.dumps(
         payload, default=json_default).encode()
-    headers = {"Content-Type": "application/json"}
-    if api_key:
-        headers["Authorization"] = f"Bearer {api_key}"
+    headers = _headers(url, api_key)
     try:
         req = urllib.request.Request(url, data=data, headers=headers,
                                      method="POST" if payload is not None else "GET")
@@ -104,9 +123,7 @@ def _stream_request(url: str, payload: dict, api_key: Optional[str], timeout: fl
     """POST with ``stream: true`` and rebuild the ordinary (non-streaming) reply from the events, calling
     ``on_token(text)`` for every piece of the answer as it arrives."""
     data = json.dumps(payload, default=json_default).encode()
-    headers = {"Content-Type": "application/json"}
-    if api_key:
-        headers["Authorization"] = f"Bearer {api_key}"
+    headers = _headers(url, api_key)
     req = urllib.request.Request(url, data=data, headers=headers, method="POST")
     content: List[str] = []
     calls: Dict[int, dict] = {}
@@ -184,7 +201,10 @@ def chat_completion(base_url: str, model: str, messages: Sequence[dict],
 def list_models(base_url: str, api_key: Optional[str] = None,
                 timeout: float = 15.0) -> List[str]:
     """Ids of the models the server offers (``GET /models``)."""
-    d = _request(base_url.rstrip("/") + "/models", None, api_key, timeout)
+    url = base_url.rstrip("/") + "/models"
+    if _is_anthropic(url):
+        url += "?limit=1000"
+    d = _request(url, None, api_key, timeout)
     items = d.get("data") if isinstance(d, dict) else None
     return [str(m.get("id")) for m in (items or []) if isinstance(m, dict)]
 
