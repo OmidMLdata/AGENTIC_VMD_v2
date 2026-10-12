@@ -30,6 +30,12 @@ Design contract
 
 __version__ = "1.0.0"
 
+try:  # trust the operating system's certificates before anything opens a connection (fixes CERTIFICATE_VERIFY_FAILED on Macs)
+    import truststore
+    truststore.inject_into_ssl()
+except Exception:
+    pass
+
 from vmd_agent.inputs.inspection import inspect_files
 from vmd_agent.structure.detect import detect_system
 from vmd_agent.visual.recipes import generate_visualization_recipe
