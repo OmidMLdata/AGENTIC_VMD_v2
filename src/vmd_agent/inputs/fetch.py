@@ -330,6 +330,10 @@ def fetch_structure(identifier: str, out_dir: str = ".",
 
 
 # --------------------------------------------------------------- search
+#: how many of the hits get a title (one small request each)
+TITLED_HITS = 5
+
+
 def search_pdb(query: str, limit: int = 10, timeout: int = 30) -> dict:
     """Full-text search of the PDB; returns candidate IDs for a name/keyword."""
     payload = {
@@ -349,7 +353,11 @@ def search_pdb(query: str, limit: int = 10, timeout: int = 30) -> dict:
         return {"ok": False, "error": f"search failed: {e}", "query": query}
     ids = [i.get("identifier") for i in j.get("result_set", [])
            if i.get("identifier")]
+    hits = []
+    for ident in ids[:min(limit, TITLED_HITS)]:       # a bare ID says nothing: give the title, method and resolution of the first few
+        meta = fetch_metadata(ident, timeout=min(timeout, 10))
+        hits.append({"id": ident, **{k: meta[k] for k in ("title", "experimental_method", "resolution_A") if k in meta}})
     return {"ok": bool(ids), "query": query, "n_hits": j.get("total_count"),
-            "ids": ids[:limit],
-            "note": "Pass one of these IDs to fetch_structure / "
-                    "fetch_and_visualize."}
+            "ids": ids[:limit], "hits": hits,
+            "note": "Choose the hit whose title fits the request and pass its ID to fetch_structure."
+                    if ids else "Nothing found: try another name for the molecule (its main protein, or a synonym)."}

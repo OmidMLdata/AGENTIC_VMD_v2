@@ -46,7 +46,9 @@ GROUPS: Dict[str, Tuple[Tuple[str, ...], str]] = {
     "records": (("verify_provenance", "assemble_report", "record_visual_interpretation"),
                 r"\b(provenance|checksums?|hash\w*|sha-?256|re-?check\w*|integrity|unchanged|tamper\w*|report|write up|session folder|recorded)\b"),
     "network": (("search_pdb", "fetch_structure"),
-                r"\b(download\w*|fetch\w*|grab\w*|pull\w* .{0,30}from|search the pdb|find (pdb )?entries|pdb entr\w+|from (the )?(pdb|rcsb|protein data bank)|alphafold|uniprot|rcsb)\b|\b[1-9][A-Za-z0-9]{3}\b(?=[ ,.?]|$)"),
+                r"\b(download\w*|fetch\w*|grab\w*|pull\w* .{0,30}from|search\w*|look (it |them |this |that )?up|find (pdb )?entries|pdb entr\w+|pdb ids?|"
+                r"from (the )?(pdb|rcsb|protein data bank)|(?<!\.)pdb\b|protein data bank|alphafold|uniprot|rcsb|web|websites?|internet|online|browse\w*|google|"
+                r"databases?|databank|accession)\b|\b[1-9][A-Za-z0-9]{3}\b(?=[ ,.?]|$)"),
     "window": (("window_open", "window_load", "window_molecules", "window_representation", "window_display", "window_view", "window_animate",
                 "window_query", "window_snapshot", "window_scene", "window_visualize", "window_movie", "window_save"),
                r"\b(my vmd|the vmd window|vmd window|in vmd|open vmd|open it in|on screen|in the window|show (me|it|them)|highlight|hide|zoom\w*|"
@@ -60,15 +62,30 @@ _COMPILED = {g: re.compile(p, re.I) for g, (_, p) in GROUPS.items()}
 FALLBACK_GROUPS: Tuple[str, ...] = ("environment", "trajectory", "interactions", "checks", "render")
 
 
+#: a molecule named in words ("whey protein", "hemoglobin") ...
+_MOLECULE = re.compile(r"\b(proteins?|enzymes?|receptors?|antibod(y|ies)|hormones?|toxins?|kinases?|channels?|transporters?|peptides?|"
+                       r"h(a)?emoglobin|myoglobin|insulin|lysozyme|ubiquitin|whey|casein|collagen|albumin|spike|virus\w*|dna|rna|ribosome|"
+                       r"structure of|molecule of)\b", re.I)
+#: ... with no file named: then the structure probably has to be found in the PDB or AlphaFold first
+_FILE_NAMED = re.compile(r"\.[A-Za-z0-9]{2,6}\b")
+
+
 def matched_groups(question: str) -> List[str]:
     """The groups whose wording the question uses, in the order of GROUPS."""
     return [g for g, rx in _COMPILED.items() if rx.search(question)]
+
+
+def names_a_molecule_without_a_file(question: str) -> bool:
+    """A molecule named in words and no file: the structure may first have to be found in the PDB or AlphaFold."""
+    return bool(_MOLECULE.search(question)) and not _FILE_NAMED.search(question)
 
 
 def select(question: str, available: Sequence[str]) -> List[str]:
     """The tool names to offer for ``question``: the base set plus the tools of every group the question asks for, only those in ``available``,
     in the order of ``available`` (stable, so the model sees the same list for the same kind of question)."""
     groups = matched_groups(question) or list(FALLBACK_GROUPS)
+    if "network" not in groups and names_a_molecule_without_a_file(question):
+        groups.append("network")                         # so the model can find and download it instead of asking for a file
     want = set(BASE)
     for g in groups:
         want.update(GROUPS[g][0])

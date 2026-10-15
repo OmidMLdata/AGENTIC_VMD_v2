@@ -159,3 +159,17 @@ def test_search_pdb_against_the_real_search_api():
     r = F.search_pdb("hemoglobin", limit=5)
     assert r["ok"] and 0 < len(r["ids"]) <= 5
     assert all(len(i) == 4 for i in r["ids"])
+
+
+def test_search_pdb_gives_titles_so_the_model_can_choose(monkeypatch):
+    import json
+    from vmd_agent.inputs import fetch as F
+    def fake_get(url, timeout=60, max_bytes=None):
+        if "search.rcsb.org" in url:
+            return json.dumps({"total_count": 2, "result_set": [{"identifier": "1BEB"}, {"identifier": "1BSY"}]}).encode()
+        ident = url.rstrip("/").rsplit("/", 1)[-1].upper()
+        return json.dumps({"struct": {"title": f"BETA-LACTOGLOBULIN {ident}"}, "exptl": [{"method": "X-RAY DIFFRACTION"}]}).encode()
+    monkeypatch.setattr(F, "_http_get", fake_get)
+    r = F.search_pdb("whey protein")
+    assert r["ok"] and r["ids"] == ["1BEB", "1BSY"]
+    assert r["hits"][0] == {"id": "1BEB", "title": "BETA-LACTOGLOBULIN 1BEB", "experimental_method": "X-RAY DIFFRACTION"}

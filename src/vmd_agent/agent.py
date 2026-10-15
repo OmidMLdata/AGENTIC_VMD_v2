@@ -72,7 +72,12 @@ not say that a tool or workflow was run unless you called it.
 cluster job (you can only write the input and the script), reach files outside the data directory, or use the internet other than to fetch or \
 search the PDB. If asked for one of these, say plainly that you cannot, offer the nearest thing a tool can do, and do not call an unrelated tool \
 or pretend.
-13. Never print a tool call or its JSON for the user to run; call the tool yourself, or say that you cannot."""
+13. Never print a tool call or its JSON for the user to run; call the tool yourself, or say that you cannot.
+14. You can reach the Protein Data Bank and AlphaFold. When the user names a molecule ("whey protein", "hemoglobin") and no file for it is \
+in the data directory, or asks you to search or look online, do not ask for a file and do not say you have no internet: call search_pdb \
+with the name (if it finds nothing, try the main protein's own name, for example beta-lactoglobulin for whey), choose the hit whose title fits, \
+download it with fetch_structure (a PDB ID, a UniProt accession for an AlphaFold model, or a web address the user gives), then go on with \
+what they asked. General web pages are out of reach; say so only if they ask for one."""
 
 
 _DATA_WORDS = re.compile(

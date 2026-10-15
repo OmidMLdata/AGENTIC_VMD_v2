@@ -194,3 +194,13 @@ def test_each_question_is_routed_afresh(tmp_path, monkeypatch):
         srv.shutdown()
     assert "fetch_structure" in _tool_names(requests[0]) and "build_membrane" not in _tool_names(requests[0])
     assert "build_membrane" in _tool_names(requests[1]) and "fetch_structure" not in _tool_names(requests[1])
+
+
+def test_a_molecule_or_the_web_named_without_a_file_offers_the_network_tools():
+    from vmd_agent import routing, toolset
+    for q in ["visualize whey protein", "search and find it through web", "find the whey pdb data from web",
+              "get hemoglobin structure online", "look it up in the protein data bank"]:
+        assert "search_pdb" in routing.select(q, list(toolset.ALL)), q
+        assert "fetch_structure" in routing.select(q, list(toolset.ALL)), q
+    for q in ["What is in protein.pdb?", "Has my run settled? Use run.psf and run.dcd."]:     # a named file: no network
+        assert "search_pdb" not in routing.select(q, list(toolset.ALL)), q

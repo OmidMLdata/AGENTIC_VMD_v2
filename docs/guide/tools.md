@@ -177,6 +177,8 @@ the private Ollama keeps a 16,384-token context. So the chat and the web page of
 * The router ([`routing.py`](../../src/vmd_agent/routing.py)) reads the question's wording and the kinds of files it names, adds the tools of each group it mentions (trajectory, interactions, checks,
   files, build, maps, render, video, records, network, ...) to a small base set (look at files, describe a system, check a statement, run a whole job), and so usually offers well under half of the tools.
   A question that matches nothing gets a wider set, never an empty menu.
+  A question that names a molecule but no file ("visualize whey protein"), or asks to search or look online, also gets `search_pdb` and `fetch_structure`, so the
+  model finds and downloads the structure instead of asking for a file.
 * **It is keyword matching, so it misses.** Questions worded differently from what its vocabulary expects can reach the model without the tool that would answer them (the tests keep two sets of such
   paraphrases). That is why `offer_tools` exists: a model that needs a tool it was not given asks for its group, and a model that calls a real tool it was
   not offered is allowed it (the agent says so). If your model does not use `offer_tools`, `--tools all` is the safe choice.
