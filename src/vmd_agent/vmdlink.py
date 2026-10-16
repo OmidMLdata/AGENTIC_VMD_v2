@@ -24,6 +24,7 @@ import time
 from typing import Any, Dict, List, Optional, Sequence
 
 from vmd_agent import security, settings
+from vmd_agent.vmdkit import forgiving
 from vmd_agent.environment import find_vmd, vmd_runtime_env
 
 BRIDGE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "vmdkit", "live_bridge.tcl")
@@ -289,14 +290,19 @@ def _choice(value: Any, allowed: Sequence[str], what: str) -> str:
     return str(value)
 
 
+def _truthy(value: Any) -> bool:
+    return value in (True, 1) or str(value).strip().lower() in ("on", "true", "1", "yes", "y", "enable", "enabled", "show")
+
+
 def _color(value: Any) -> str:
+    value = forgiving.color(value, COLORS)
     if isinstance(value, str) and re.fullmatch(r"ColorID \d{1,4}", value):
         return value
     return _choice(value, COLORS, "color (or 'ColorID <n>')")
 
 
 def _selection(text: Any) -> str:
-    t = security.tcl_selection(str(text))
+    t = security.tcl_selection(str(forgiving.selection(text)))
     if not t.strip():
         raise security.InvalidInput("the selection is empty")
     return t
@@ -360,21 +366,21 @@ class Window:
 
     def add_rep(self, molecule: int, selection: str = "all", style: str = "NewCartoon", color: str = "Name", material: str = "Opaque",
                 params: Optional[Sequence[Any]] = None) -> dict:
-        return self.link.call("rep_add", _int(molecule, "molecule"), _selection(selection), _choice(style, STYLES, "style"), _color(color),
-                              _choice(material, MATERIALS, "material"), *_params(params))
+        return self.link.call("rep_add", _int(molecule, "molecule"), _selection(selection), _choice(forgiving.style(style, STYLES), STYLES, "style"),
+                              _color(color), _choice(forgiving.material(material, MATERIALS), MATERIALS, "material"), *_params(params))
 
     def modify_rep(self, molecule: int, rep: int, key: str, value: Any, params: Optional[Sequence[Any]] = None) -> dict:
         key = _choice(key, ("selection", "style", "color", "material", "show"), "what to change")
         if key == "selection":
             value = _selection(value)
         elif key == "style":
-            value = _choice(value, STYLES, "style")
+            value = _choice(forgiving.style(value, STYLES), STYLES, "style")
         elif key == "color":
             value = _color(value)
         elif key == "material":
-            value = _choice(value, MATERIALS, "material")
+            value = _choice(forgiving.material(value, MATERIALS), MATERIALS, "material")
         else:
-            value = "on" if value in (True, "on", "true", "1", 1) else "off"
+            value = "on" if _truthy(value) else "off"
         return self.link.call("rep_modify", _int(molecule, "molecule"), _int(rep, "representation"), key, value, *(_params(params) if key == "style" else []))
 
     def delete_rep(self, molecule: int, rep: int) -> dict:
@@ -386,10 +392,11 @@ class Window:
         if allowed is None:
             raise security.InvalidInput("display setting must be one of: " + ", ".join(DISPLAY))
         if allowed == "on/off":
-            value = "on" if value in (True, "on", "true", "1", 1) else "off"
+            value = "on" if _truthy(value) else "off"
         elif allowed == "number":
             value = repr(_num(value, setting))
         else:
+            value = forgiving.background(value, allowed) if setting == "background" else forgiving.choice(value, allowed)
             value = _choice(value, allowed, setting)
         return self.link.call("display", setting, value)
 

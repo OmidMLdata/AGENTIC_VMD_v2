@@ -25,6 +25,7 @@ from typing import Dict, List, Optional
 from vmd_agent import progress, security
 from vmd_agent.environment import find_tachyon, find_vmd
 from vmd_agent.visual import render as R
+from vmd_agent.vmdkit import forgiving
 from vmd_agent.vmdkit import script as S
 
 STYLES = ("Lines", "Bonds", "DynamicBonds", "HBonds", "Points", "VDW", "CPK", "Licorice", "Beads", "Tube", "Trace",
@@ -40,6 +41,7 @@ _ROT = {"x", "y", "z"}
 
 
 def _color(c: str) -> str:
+    c = forgiving.color(c, COLORS)
     if c in COLORS:
         return c
     if isinstance(c, str) and c.startswith("ColorID ") and c[8:].isdigit() and int(c[8:]) < 1057:
@@ -58,8 +60,9 @@ def validate(spec: dict) -> dict:
     out = {"reps": [], "isosurfaces": []}
     for r in reps:
         out["reps"].append({
-            "selection": S.sel(r.get("selection", "all")), "style": S.choice(r.get("style", "NewCartoon"), STYLES, "style"),
-            "color": _color(r.get("color", "Name")), "material": S.choice(r.get("material", "Opaque"), MATERIALS, "material"),
+            "selection": S.sel(forgiving.selection(r.get("selection") or "all")),
+            "style": S.choice(forgiving.style(r.get("style") or "NewCartoon", STYLES), STYLES, "style"),
+            "color": _color(r.get("color") or "Name"), "material": S.choice(forgiving.material(r.get("material") or "Opaque", MATERIALS), MATERIALS, "material"),
             "params": [S.num(x, "param") for x in (r.get("params") or [])][:8]})
     for i in isos:
         out["isosurfaces"].append({
@@ -67,7 +70,7 @@ def validate(spec: dict) -> dict:
             "color": _color(i.get("color", "ColorID 3")), "style": S.choice(i.get("style", "solid"), tuple(ISO_STYLES), "iso style"),
             "material": S.choice(i.get("material", "Transparent"), MATERIALS, "material")})
     bg = spec.get("background", "white")
-    out["background"] = S.choice(bg, ("white", "black"), "background")
+    out["background"] = S.choice(forgiving.background(bg, ("white", "black")), ("white", "black"), "background")
     out["frame"] = S.whole(spec.get("frame", 0), "frame")
     out["rotate"] = []
     for ax, deg in spec.get("rotate") or []:
@@ -75,7 +78,7 @@ def validate(spec: dict) -> dict:
     out["zoom"] = S.num(spec.get("zoom", 1.0), "zoom")
     if out["zoom"] <= 0:
         raise security.InvalidInput("zoom must be positive")
-    out["projection"] = S.choice(spec.get("projection", "Orthographic"), ("Orthographic", "Perspective"), "projection")
+    out["projection"] = S.choice(forgiving.projection(spec.get("projection") or "Orthographic"), ("Orthographic", "Perspective"), "projection")
     for k in ("axes", "depthcue", "shadows", "ambient_occlusion"):
         out[k] = bool(spec.get(k, False))
     return out

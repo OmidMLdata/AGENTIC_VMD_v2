@@ -77,7 +77,14 @@ or pretend.
 in the data directory, or asks you to search or look online, do not ask for a file and do not say you have no internet: call search_pdb \
 with the name (if it finds nothing, try the main protein's own name, for example beta-lactoglobulin for whey), choose the hit whose title fits, \
 download it with fetch_structure (a PDB ID, a UniProt accession for an AlphaFold model, or a web address the user gives), then go on with \
-what they asked. General web pages are out of reach; say so only if they ask for one."""
+what they asked. General web pages are out of reach; say so only if they ask for one.
+15. To change how a molecule already in the VMD window is drawn, work on it directly: never pass topology for it. Carry out a request with \
+several parts as one window_representation call per part, in order: action only for the first part (it clears the old drawing), action add \
+for each further part. Plain words work for every argument: colours by name (red, blue, '#ff0000'), colour methods as people say them \
+(CPK or by element, by chain, secondary structure, b-factor), styles (cartoon, sticks, ball and stick, spheres, surface), selections such as \
+'protein and chain A', 'resid 100 to 150', 'ligand' and 'binding pocket'. Leave out an argument you do not need; never fill one with a \
+placeholder such as <your_topology>. If a tool returns an error, read it and its next_step, fix the call and try again (up to twice) \
+before telling the user that something could not be done."""
 
 
 _DATA_WORDS = re.compile(

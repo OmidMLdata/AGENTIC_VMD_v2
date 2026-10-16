@@ -18,14 +18,46 @@ _NO_WINDOW = "no VMD window is open: use window_open (or window_load, which open
 
 
 def _live(fn: Callable) -> Callable:
-    """Turn a refused or failed window command into a plain result instead of an exception."""
+    """Turn a refused or failed window command into a plain result instead of an exception, with what the window holds, so the next call can be right."""
     @functools.wraps(fn)
     def wrapper(*a, **k):
         try:
             return fn(*a, **k)
-        except vmdlink.LinkError as e:
-            return {"ok": False, "error": str(e)}
+        except (vmdlink.LinkError, security.InvalidInput) as e:
+            out = {"ok": False, "error": str(e), "next_step": _fix_hint()}
+            try:
+                link = vmdlink.attach()
+                if link is not None:
+                    out["window_holds"] = _brief(vmdlink.Window(link))
+            except Exception:
+                pass
+            return out
     return wrapper
+
+
+def _fix_hint() -> str:
+    from vmd_agent.toolset import FIX_HINT
+    return FIX_HINT + " window_holds lists the molecules already in the VMD window: to work on one, leave topology out (it acts on the top one) or pass its id as molecule."
+
+
+def _loaded(win: vmdlink.Window, name: Optional[str]) -> Optional[dict]:
+    """The molecule in the window that ``name`` means: its file, or its name with or without the extension, in any case."""
+    if not name:
+        return None
+    from vmd_agent import window_present as W
+    try:
+        held = W._molecule_holding(win, _p(name))
+        if held:
+            return held
+    except Exception:
+        pass
+    want = os.path.basename(str(name)).lower()
+    stem = os.path.splitext(want)[0]
+    for m in win.molecules():
+        have = str(m.get("name", "")).lower()
+        if want == have or stem == os.path.splitext(have)[0]:
+            return m
+    return None
 
 
 def _window(open_if_needed: bool = False, vmd_path: Optional[str] = None) -> vmdlink.Window:
@@ -132,7 +164,10 @@ def window_representation(action: str = "list", molecule: Optional[int] = None, 
     color, material, shown), delete (`rep`), or only (delete all of them and draw just this one: the usual "show it as ..."). selection is
     VMD's own language ('protein', 'resname LIG', 'within 5 of resname LIG', 'name CA'). style: NewCartoon, Licorice, CPK, VDW, Lines, Tube,
     QuickSurf, Surf, MSMS, Beads, Isosurface (params: isovalue 0 0 0 1 1) ... color: Name (by element), ResType (acidic, basic, polar, nonpolar), Structure (BY SECONDARY STRUCTURE: helix, sheet, coil), Chain,
-    ResName, Element, Beta, ... or 'ColorID 3'. params are the style's numbers (for example Licorice: bond radius, resolution)."""
+    ResName, Element, Beta, ... or 'ColorID 3'. params are the style's numbers (for example Licorice: bond radius, resolution).
+    Plain words are understood too: colours by name ('red', '#ff0000'), 'CPK', 'by chain', 'secondary structure'; styles 'cartoon', 'sticks',
+    'ball and stick', 'spheres', 'surface'; selections 'chain A', 'resid 100 to 150', 'ligand', 'binding pocket' (protein within 5 A of a ligand).
+    For a request with several parts, call this once per part: only for the first, add for the rest."""
     win = _window()
     mid = _top(win, molecule)
     if action == "list":
@@ -142,8 +177,12 @@ def window_representation(action: str = "list", molecule: Optional[int] = None, 
             win.delete_rep(mid, i)
     if action in ("add", "only"):
         r = win.add_rep(mid, selection or "all", style or "NewCartoon", color or "Name", material or "Opaque", params)
-        return {"ok": True, "molecule": mid, "representation": r["index"], "representations": win.reps(mid),
-                "summary": f"Molecule {mid} now draws {selection or 'all'} as {style or 'NewCartoon'}, colored by {color or 'Name'}."}
+        reps = win.reps(mid)
+        got = next((x for x in reps if int(x.get("index", -1)) == int(r["index"])), {})      # what VMD itself now holds, not the words asked with
+        drawn = (f"{got.get('selection', selection or 'all')} as {str(got.get('style', style or 'NewCartoon')).split()[0]}, "
+                 f"colored by {got.get('color', color or 'Name')}")
+        return {"ok": True, "molecule": mid, "representation": r["index"], "representations": reps,
+                "summary": f"Molecule {mid} now draws {drawn}."}
     if rep is None:
         raise security.InvalidInput(f"{action} needs the representation number (rep); window_representation with action list shows them")
     if action == "delete":
@@ -260,6 +299,10 @@ def window_snapshot(out_png: str = "window.png", quality: str = "fast") -> dict:
 def apply_scene(win: vmdlink.Window, scene_spec: dict, topology: Optional[str] = None, trajectory: Optional[str] = None) -> dict:
     """Set up a scene (the description render_image takes) in the VMD window: load, representations, isosurfaces, display and view."""
     spec = scene.validate(scene_spec)
+    held = _loaded(win, topology)
+    if held and not trajectory:                                          # already in the window: redraw it instead of loading a copy
+        topology = None
+        win.top(int(held["id"]))
     if topology:
         top = _p(topology)
         r = win.new_molecule(top)
@@ -313,10 +356,17 @@ def window_visualize(topology: Optional[str] = None, trajectory: Optional[str] =
     molecule. focus: overview, fold, interactions, surface, pocket, performance. representation forces one style (for example QuickSurf). Returns what
     was drawn, why, and a legend of what each colour and shape means."""
     from vmd_agent import window_present as W
+    from vmd_agent.vmdkit import forgiving
+    representation = forgiving.style(representation, vmdlink.STYLES) if representation else None
+    color_method = forgiving.color(color_method, vmdlink.COLORS) if color_method else None
+    background = forgiving.background(background, vmdlink.BACKGROUNDS) if background else background
     win = _window(open_if_needed=True)
+    held = _loaded(win, topology)
+    if held and not trajectory:                                          # already in the window: draw it, do not load it again
+        topology = None
+        win.top(int(held["id"]))
     if topology:
-        held = W._molecule_holding(win, topology)
-        mid = int(held["id"]) if held else int(W.load(win, topology, trajectory)["id"])
+        mid = int(W.load(win, topology, trajectory)["id"])
         top_path, trj_path = topology, trajectory
     else:
         mid = _top(win, None)

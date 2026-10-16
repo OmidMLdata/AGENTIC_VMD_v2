@@ -50,6 +50,12 @@ Pictures, movies and scenes.
 
 ### Control your VMD window
 
+Plain words work for every drawing argument, in these tools and in render_image: colours by name or hex code (`red` becomes `ColorID 1`),
+colouring methods as people say them (`CPK`, `by chain`, `secondary structure`), styles (`cartoon`, `sticks`, `ball and stick`, `surface`)
+and selections (`chainA` becomes `chain A`, `residues 100-150` becomes `resid 100 to 150`, and `ligand` and `binding pocket` are understood).
+An optional argument filled with a placeholder such as `<your_topology>` is left out, a molecule already in the window is reused rather than
+loaded again, and a refused argument comes back with what to fix and what the window holds, so the model can correct its call.
+
 Drive the VMD you can see: what it loads, draws, shows and answers.
 
 | Tool | What it does | Needs |

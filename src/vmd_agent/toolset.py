@@ -41,16 +41,33 @@ TOOLS: Dict[str, Callable] = {}
 _IMAGE_EXT = {".png", ".jpg", ".jpeg", ".gif", ".bmp", ".tif", ".tiff"}
 
 
+#: what a model is told after a refused argument, so it corrects the call instead of giving up or asking the user for a file
+FIX_HINT = ("Correct the argument this error names and call the tool again (an optional argument you do not need can simply be left out). "
+            "Do not ask the user for a file that is already loaded or in their files, and do not give up after one refusal.")
+
+
+def _drop_placeholders(fn: Callable, kwargs: dict) -> dict:
+    """Leave out an optional argument a model filled with a stand-in ('<your_topology>', 'None', 'path/to/file.pdb', ''), so its default applies."""
+    import inspect
+    from vmd_agent.vmdkit.forgiving import is_placeholder
+    try:
+        params = inspect.signature(fn).parameters
+    except (TypeError, ValueError):
+        return kwargs
+    return {k: v for k, v in kwargs.items()
+            if not (is_placeholder(v) and k in params and params[k].default is not inspect.Parameter.empty)}
+
+
 def guard(fn: Callable) -> Callable:
     """Turn policy violations into structured results instead of exceptions."""
     @functools.wraps(fn)
     def wrapper(*a, **k):
         try:
-            return fn(*a, **k)
+            return fn(*a, **_drop_placeholders(fn, k))
         except security.SecurityError as e:
             return {"ok": False, "blocked": True, "error": str(e)}
         except security.InvalidInput as e:
-            return {"ok": False, "blocked": False, "error": str(e)}
+            return {"ok": False, "blocked": False, "error": str(e), "next_step": FIX_HINT}
     return wrapper
 
 

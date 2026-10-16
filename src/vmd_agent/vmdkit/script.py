@@ -126,7 +126,8 @@ def no_vmd() -> dict:
 
 def sel(text: str) -> str:
     """A selection safe to put inside Tcl braces."""
-    t = security.tcl_selection(text)
+    from vmd_agent.vmdkit.forgiving import selection as _understood
+    t = security.tcl_selection(_understood(text))
     if not t.strip():
         raise security.InvalidInput("empty selection")
     return t
