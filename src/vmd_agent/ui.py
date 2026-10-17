@@ -226,7 +226,7 @@ class State:
         env = probe_environment()
         mi = self.model_info()
         from vmd_agent import claude_code
-        label = ("Claude Code" + ("" if self.model in ("", claude_code.DEFAULT) else f" ({self.model})")) if claude_code.is_claude_code(self.base_url) else self.model
+        label = ("Claude Code" + ("" if self.model in ("", claude_code.DEFAULT) else f" ({claude_code.label(self.model)})")) if claude_code.is_claude_code(self.base_url) else self.model
         return {"version": __version__, "data_dir": self.root, "model": label, "server": self.base_url,
                 "model_ready": mi["state"] == "ready", "model_state": mi["state"], "model_problem": mi["problem"], "model_available": mi["available"],
                 "local_models": mi["local_models"], "found_servers": mi["found"],
@@ -310,6 +310,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
         elif url.path == "/api/status":
             self._json(self.state.status())
         elif url.path == "/api/model":
+            if parse_qs(url.query).get("refresh"):                    # Check: look for Claude Code again now, not from memory
+                from vmd_agent import claude_code
+                claude_code.find(refresh=True)
             self._json(self.state.model_info())
         elif url.path == "/api/tools":
             self._json(toolform.catalogue())
@@ -487,6 +490,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if payload.get("claude_code"):                                # Claude Code on this computer: no address, no key
             from vmd_agent import claude_code
             model = model or claude_code.DEFAULT
+            if "claude_path" in payload:                              # where Claude Code is, when it is not found by itself ("" clears it)
+                given = str(payload.get("claude_path") or "").strip()
+                settings.save(claude_path=given or None)
+                claude_code.find(refresh=True)
             self.state.reconnect(claude_code.URL, model, None)
             if payload.get("remember"):
                 settings.save(llm_url=claude_code.URL, llm_model=model, llm_key=None)

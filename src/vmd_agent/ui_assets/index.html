@@ -152,7 +152,10 @@
     <label class="opt"><input type="radio" name="msrc" value="claude"> Claude Code on this computer: uses your Claude Code sign-in (a Claude subscription or its own API key), no key needed here</label>
   </fieldset>
   <div id="model-claude-box" hidden><label for="model-claude">Claude model</label>
-    <select id="model-claude"><option value="default">Claude Code's default</option><option value="sonnet">Sonnet</option><option value="opus">Opus</option><option value="haiku">Haiku</option></select>
+    <select id="model-claude"></select>
+    <label for="model-claude-path">Where Claude Code is (leave empty: vmd-agent finds it)</label>
+    <input id="model-claude-path" type="text" spellcheck="false" autocomplete="off" placeholder="for example /Users/you/.local/bin/claude">
+    <p class="note" id="model-claude-found"></p>
     <p class="note" id="model-claude-note"></p></div>
   <div id="model-local-box"><label for="model-local">Models downloaded on this computer</label><select id="model-local"></select>
     <details id="model-get"><summary>Download a model</summary>

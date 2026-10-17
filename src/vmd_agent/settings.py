@@ -30,7 +30,7 @@ ENV_HOME = "VMD_AGENT_HOME"
 ENV_INSTALL = "VMD_AGENT_INSTALL"              # set by the installer's launcher: the folder holding the program itself
 LOCAL = ".vmd-agent"                           # the folder a working folder keeps its own data in
 KEYS = ("data_dir", "vmd_path", "llm_url", "llm_model", "llm_key", "setup_done",
-        "ollama_mode", "ollama_port", "vmd_page_offered")
+        "ollama_mode", "ollama_port", "vmd_page_offered", "claude_path")
 
 
 _PIN: list = []                                  # [folder or None] once pinned

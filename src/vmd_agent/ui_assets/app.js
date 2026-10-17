@@ -75,7 +75,19 @@ async function startLocal() {
 function fillModel(info) {
   const cc = info.backend === "claude-code";
   $("#model-state").textContent = info.state !== "ready" ? `Not working: ${info.problem}.`
-    : cc ? `Using Claude Code ${info.claude_version || ""}${info.model && info.model !== "default" ? ", model " + info.model : ""}.` : `Using ${info.model} at ${info.base_url}.`;
+    : cc ? `Using Claude Code ${info.claude_version || ""}${info.model && info.model !== "default" ? ", model " + ((info.claude_models || []).find(m => m.id === info.model) || { label: info.model }).label : ""}.` : `Using ${info.model} at ${info.base_url}.`;
+  const csel = $("#model-claude"), keep = csel.value || info.model;
+  if (info.claude_models) {
+    csel.textContent = "";
+    info.claude_models.forEach(m => csel.append(new Option(m.id === "default" ? m.label : `${m.label}  ·  ${m.note}`, m.id)));
+    if (keep && ![...csel.options].some(o => o.value === keep)) csel.append(new Option(keep, keep));                  // a name saved earlier, such as "opus"
+    csel.value = keep || "default";
+  }
+  if (cc || info.claude_models) {
+    $("#model-claude-found").textContent = info.claude_path ? `Found Claude Code ${info.claude_version || ""} at ${info.claude_path}.` + (info.claude_path_note ? " " + info.claude_path_note + "." : "")
+      : (info.claude_searched || []).length ? "Looked at: " + info.claude_searched.join(", ") + "." : "";
+    if (document.activeElement !== $("#model-claude-path")) $("#model-claude-path").value = info.claude_path_setting || "";
+  }
   $("#model-claude-note").textContent = "Each question runs Claude Code in the background with vmd-agent's tools only (its own shell, file and web tools are switched off), " +
     "working in your files folder and in this VMD window. Its usage counts toward your Claude plan or API account. " +
     "If it is not signed in yet, run claude once in a terminal and sign in.";
@@ -130,16 +142,16 @@ async function openModel() {
   const cc = info.backend === "claude-code";
   $$('input[name="msrc"]').forEach(r => { r.checked = r.value === (cc ? "claude" : local ? "local" : "other"); });
   $("#model-url").value = local || cc ? "" : info.base_url; $("#model-key").value = ""; $("#model-name").value = cc ? "" : info.model; $("#model-msg").textContent = "";
-  if (cc) $("#model-claude").value = ["default", "sonnet", "opus", "haiku"].includes(info.model) ? info.model : "default";
+  if (cc) $("#model-claude").value = info.model || "default";
   fillModel(info); showModelSource(); $("#modeldlg").showModal();
 }
 $$('input[name="msrc"]').forEach(r => r.onchange = showModelSource);
 $("#model-close").onclick = () => $("#modeldlg").close();
-$("#model-check").onclick = async () => { fillModel(await getJSON("/api/model")); loadStatus(); };
+$("#model-check").onclick = async () => { $("#model-msg").textContent = "Checking…"; fillModel(await getJSON("/api/model?refresh=1")); $("#model-msg").textContent = ""; loadStatus(); };
 $("#model-start").onclick = async () => { $("#model-msg").textContent = "Starting…"; const r = await (await api("/api/model/start", {})).json(); $("#model-msg").textContent = r.error || ""; fillModel(r); loadStatus(); };
 $("#model-use").onclick = async () => {
   if (modelSource() === "claude") {
-    const r = await api("/api/model/use", { claude_code: true, model: $("#model-claude").value, remember: true }), j = await r.json();
+    const r = await api("/api/model/use", { claude_code: true, model: $("#model-claude").value, claude_path: $("#model-claude-path").value.trim(), remember: true }), j = await r.json();
     if (!r.ok) { $("#model-msg").textContent = j.error; return; }
     fillModel(j); $("#model-msg").textContent = j.state === "ready" ? "Saved. The chat now asks Claude Code (a new conversation)." : "Saved, but " + j.problem + ".";
     $("#log").textContent = ""; $("#welcome").classList.remove("gone"); loadStatus(); return;

@@ -60,8 +60,14 @@ def claude(tmp_path, monkeypatch):
     monkeypatch.setenv("PATH", str(bindir) + os.pathsep + os.environ.get("PATH", ""))
     monkeypatch.setenv("FAKE_LOG", str(log))
     monkeypatch.setenv("VMD_AGENT_ALLOWED_ROOTS", str(data))
-    C._help_cache.clear()
+    _fresh_search()
     return {"exe": str(exe), "data": str(data), "log": log}
+
+
+def _fresh_search():
+    C._help_cache.clear()
+    C._checked.clear()
+    C._found.update(path=None, when=0.0, searched=[])
 
 
 def _calls(log):
@@ -120,7 +126,7 @@ def test_no_claude_code_says_how_to_install_it(monkeypatch, tmp_path):
     monkeypatch.setattr(C, "find", lambda: None)
     i = C.info("default")
     assert i["state"] == "no_server" and "claude.com/claude-code" in i["problem"]
-    with pytest.raises(LLMError, match="not installed"):
+    with pytest.raises(LLMError, match="cannot find Claude Code"):
         C.Session(root=str(tmp_path)).ask("hi")
 
 
@@ -134,11 +140,11 @@ def test_the_page_uses_claude_code_when_it_is_chosen(claude, monkeypatch):
     monkeypatch.setattr(settings, "save", lambda **k: None)
     srv = ui.make_server(claude["data"], 0, base_url="http://127.0.0.1:9/v1", model="x")
     st = srv.state
-    st.reconnect(C.URL, "opus", None)
-    assert isinstance(st.session, C.Session) and st.session.model == "opus"
+    st.reconnect(C.URL, "claude-opus-5-5", None)
+    assert isinstance(st.session, C.Session) and st.session.model == "claude-opus-5-5"
     info = st.model_info()
     assert info["backend"] == "claude-code" and info["state"] == "ready" and info["claude_version"].startswith("9.9.9")
-    assert st.status()["model"] == "Claude Code (opus)"
+    assert st.status()["model"] == "Claude Code (Claude Opus 5.5)"
     srv.server_close()
 
 
@@ -148,8 +154,90 @@ def test_a_real_claude_code_connects_to_the_tools_and_has_none_of_its_own(tmp_pa
     monkeypatch.setenv("VMD_AGENT_ALLOWED_ROOTS", str(tmp_path))
     cfg = tmp_path / "mcp.json"
     cfg.write_text(json.dumps(C.mcp_config(str(tmp_path))))
-    r = subprocess.run(C.command(C.find(), str(cfg), C.DEFAULT, None, "test"), input="hi", capture_output=True, text=True, cwd=tmp_path, timeout=240)
+    _fresh_search()
+    r = subprocess.run(C.command(C.find(refresh=True), str(cfg), C.DEFAULT, None, "test"), input="hi", capture_output=True, text=True, cwd=tmp_path, timeout=240)
     init = json.loads(r.stdout.splitlines()[0])
     assert {"name": "vmd-agent", "status": "connected"}.items() <= next(s for s in init["mcp_servers"] if s["name"] == "vmd-agent").items()
     assert [t for t in init["tools"] if not t.startswith("mcp__")] == []
     assert sum(t.startswith("mcp__vmd-agent__") for t in init["tools"]) >= 50
+
+
+# ------------------------------------------------------------------ finding Claude Code
+def _program(path, says="9.9.9 (Claude Code)"):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, "w") as fh:
+        fh.write(f"#!/bin/sh\necho '{says}'\n")
+    os.chmod(path, 0o755)
+    return path
+
+
+@pytest.fixture
+def nowhere(tmp_path, monkeypatch):
+    """A home folder with no Claude Code, a PATH with none, and a login shell that knows none."""
+    from vmd_agent import settings
+    home = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("PATH", "/bin")
+    monkeypatch.setenv("SHELL", _program(str(tmp_path / "sh" / "fakeshell"), says=""))
+    monkeypatch.delenv(C.ENV_PATH, raising=False)
+    saved = {}
+    monkeypatch.setattr(settings, "get", lambda k, d=None: saved.get(k, d))
+    monkeypatch.setattr(settings, "save", lambda **k: saved.update({a: b for a, b in k.items() if b is not None}))
+    monkeypatch.setattr(C, "_candidates", lambda real=C._candidates: [p for p in real() if p.startswith(str(home))])  # not this machine's own
+    _fresh_search()
+    yield {"home": str(home), "settings": saved}
+    _fresh_search()
+
+
+@pytest.mark.skipif(os.name == "nt", reason="shell scripts stand in for programs")
+def test_claude_code_installed_with_npm_under_nvm_or_conda_is_found(nowhere):
+    for where in (".nvm/versions/node/v22.3.0/bin/claude", "miniconda3/envs/tools/bin/claude"):
+        exe = _program(os.path.join(nowhere["home"], where))
+        _fresh_search()
+        assert C.find() == exe and C.info(C.DEFAULT)["state"] == "ready" and C.info(C.DEFAULT)["claude_version"] == "9.9.9"
+        os.remove(exe)
+        assert C.find() != exe                                                                  # gone: not remembered
+
+
+@pytest.mark.skipif(os.name == "nt", reason="shell scripts stand in for programs")
+def test_the_claude_desktop_apps_own_copy_is_found(nowhere):
+    exe = _program(os.path.join(nowhere["home"], "Library", "Application Support", "Claude", "claude-code", "2.1.0", "claude"))
+    _program(os.path.join(nowhere["home"], "Library", "Application Support", "Claude", "Claude"), says="not it")   # the app, not Claude Code
+    assert C.find() == exe
+
+
+@pytest.mark.skipif(os.name == "nt", reason="shell scripts stand in for programs")
+def test_a_program_called_claude_that_is_not_claude_code_is_never_used(nowhere):
+    _program(os.path.join(nowhere["home"], ".local", "bin", "claude"), says="Claude desktop 1.0")
+    assert C.find() is None
+    i = C.info(C.DEFAULT)
+    assert i["state"] == "no_server" and "which claude" in i["problem"] and any(".local/bin/claude" in p for p in i["claude_searched"])
+
+
+@pytest.mark.skipif(os.name == "nt", reason="shell scripts stand in for programs")
+def test_the_terminals_own_path_is_asked(nowhere, tmp_path, monkeypatch):
+    exe = _program(str(tmp_path / "odd place" / "claude"))
+    monkeypatch.setenv("SHELL", _program(str(tmp_path / "sh2" / "zsh"), says=f"welcome banner\n{exe}"))
+    assert C.find() == exe
+
+
+@pytest.mark.skipif(os.name == "nt", reason="shell scripts stand in for programs")
+def test_a_location_typed_in_the_model_window_is_used_and_a_wrong_one_is_named(nowhere, tmp_path):
+    from vmd_agent import settings
+    exe = _program(str(tmp_path / "mine" / "claude"))
+    settings.save(claude_path=exe)
+    _fresh_search()
+    assert C.find() == exe and C.info(C.DEFAULT)["state"] == "ready"
+    wrong = _program(str(tmp_path / "wrong" / "claude"), says="hello")
+    settings.save(claude_path=wrong)
+    _fresh_search()
+    i = C.info(C.DEFAULT)
+    assert i["state"] == "no_server" and "is not Claude Code" in i["problem"]
+
+
+def test_the_models_are_offered_with_their_versions():
+    ids = [m["id"] for m in C.MODELS]
+    assert ids[0] == C.DEFAULT and {"claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5", "claude-fable-5-1"} <= set(ids)
+    assert all(any(ch.isdigit() for ch in m["label"]) for m in C.MODELS[1:])                       # "Claude Opus 5.5", not "Opus"
+    assert C.command("/x/claude", "/c.json", "claude-opus-5-5", None, "s")[-2:] == ["--model", "claude-opus-5-5"]

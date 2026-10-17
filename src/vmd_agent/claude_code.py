@@ -28,8 +28,21 @@ from vmd_agent.llm_client import LLMError
 URL = "claude-code:"
 #: what the model field holds when Claude Code should use its own default model
 DEFAULT = "default"
-#: the models Claude Code knows by a short name; anything else is passed on as it is (a full model name works too)
-ALIASES = [DEFAULT, "sonnet", "opus", "haiku"]
+#: the Claude models to choose from, newest generation, by their full names (Claude Code takes these as they are); the short names
+#: of earlier versions of vmd-agent ("sonnet", "opus", "haiku") still work and mean the newest of each
+MODELS = [
+    {"id": DEFAULT, "label": "Claude Code's default", "note": "whatever Claude Code itself uses"},
+    {"id": "claude-fable-5-1", "label": "Claude Fable 5.1", "note": "the most capable"},
+    {"id": "claude-opus-5-5", "label": "Claude Opus 5.5", "note": "for complex work"},
+    {"id": "claude-sonnet-5-5", "label": "Claude Sonnet 5.5", "note": "fast and capable, a good everyday choice"},
+    {"id": "claude-haiku-5-5", "label": "Claude Haiku 5.5", "note": "the fastest"},
+]
+ALIASES = [m["id"] for m in MODELS] + ["sonnet", "opus", "haiku", "fable"]
+
+
+def label(model: Optional[str]) -> str:
+    """How a person reads the model: 'Claude Sonnet 5.5', not 'claude-sonnet-5-5'."""
+    return next((m["label"] for m in MODELS if m["id"] == (model or DEFAULT)), str(model))
 SERVER = "vmd-agent"
 PREFIX = f"mcp__{SERVER}__"
 #: Claude Code's own tools, switched off when this version cannot be told "no built-in tools" (--tools "")
@@ -47,23 +60,129 @@ def is_claude_code(base_url: Optional[str]) -> bool:
     return str(base_url or "").strip().lower().rstrip("/") == URL.rstrip("/")
 
 
-def find() -> Optional[str]:
-    """The ``claude`` program: on the PATH, or where its installers put it (a page started from a launcher may not have the user's PATH)."""
-    found = shutil.which("claude")
-    if found:
-        return found
+#: where a person can say where Claude Code is, when vmd-agent cannot find it (also a setting, "claude_path", set in the Model window)
+ENV_PATH = "VMD_AGENT_CLAUDE"
+_found: Dict[str, object] = {"path": None, "when": 0.0, "searched": []}
+_checked: Dict[str, Optional[str]] = {}
+
+
+def claude_version_of(path: str) -> Optional[str]:
+    """The version of the Claude Code at ``path``, or None if that is not Claude Code (asked with --version, so another program called
+    "claude", such as the Claude desktop app itself, is never mistaken for it)."""
+    try:
+        key = f"{path}|{os.path.getmtime(path)}"
+    except OSError:
+        return None
+    if key not in _checked:
+        try:
+            out = _run([path, "--version"], timeout=20.0).strip()
+        except (OSError, subprocess.SubprocessError, ValueError):
+            out = ""
+        line = out.splitlines()[0] if out else ""
+        _checked[key] = line.replace("(Claude Code)", "").strip() if "claude code" in out.lower() else None
+    return _checked[key]
+
+
+def _executable(p: str) -> bool:
+    return os.path.isfile(p) and os.access(p, os.X_OK)
+
+
+def _candidates() -> List[str]:
+    """Every place an installer puts ``claude``: the PATH, the native installer, npm (also under nvm, fnm, volta, asdf, pnpm, yarn and
+    conda), and Homebrew."""
+    import glob
     home = os.path.expanduser("~")
     names = ("claude.exe", "claude.cmd") if os.name == "nt" else ("claude",)
+    out: List[str] = []
+    which = shutil.which("claude")
+    if which:
+        out.append(which)
     dirs = [os.path.join(home, ".claude", "local"), os.path.join(home, ".local", "bin"), os.path.join(home, ".npm-global", "bin"),
-            os.path.join(home, ".bun", "bin"), os.path.join(home, ".volta", "bin"), "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin"]
+            os.path.join(home, ".npm", "bin"), os.path.join(home, ".bun", "bin"), os.path.join(home, ".volta", "bin"),
+            os.path.join(home, ".asdf", "shims"), os.path.join(home, "Library", "pnpm"), os.path.join(home, ".local", "share", "pnpm"),
+            os.path.join(home, ".yarn", "bin"), os.path.join(home, ".config", "yarn", "global", "node_modules", ".bin"),
+            "/opt/homebrew/bin", "/usr/local/bin", "/usr/bin"]
+    patterns = [os.path.join(home, ".nvm", "versions", "node", "*", "bin"),
+                os.path.join(home, ".local", "share", "fnm", "node-versions", "*", "installation", "bin"),
+                os.path.join(home, "Library", "Application Support", "fnm", "node-versions", "*", "installation", "bin"),
+                os.path.join(home, ".fnm", "node-versions", "*", "installation", "bin")]
+    for conda in ("anaconda3", "miniconda3", "miniforge3", "mambaforge", "micromamba"):
+        for base in (os.path.join(home, conda), os.path.join("/opt", conda), os.path.join(home, "opt", conda)):
+            dirs.append(os.path.join(base, "bin"))
+            patterns.append(os.path.join(base, "envs", "*", "bin"))
     if os.name == "nt":
         dirs += [os.path.join(os.environ.get("APPDATA", ""), "npm"), os.path.join(os.environ.get("LOCALAPPDATA", ""), "Programs", "claude")]
+    for pat in patterns:
+        dirs += sorted(glob.glob(pat), reverse=True)                                  # the newest node first
     for d in dirs:
         for n in names:
-            p = os.path.join(d, n)
-            if os.path.isfile(p) and os.access(p, os.X_OK):
-                return p
+            out.append(os.path.join(d, n))
+    return out
+
+
+def _from_login_shell() -> Optional[str]:
+    """Where the person's own terminal finds ``claude`` (its PATH may be set in .zshrc or .bashrc, which a page started otherwise misses)."""
+    if os.name == "nt":
+        return None
+    shell = os.environ.get("SHELL") or ("/bin/zsh" if sys.platform == "darwin" else "/bin/bash")
+    try:
+        r = subprocess.run([shell, "-lic", "command -v claude"], capture_output=True, text=True, timeout=15, stdin=subprocess.DEVNULL)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    for line in reversed((r.stdout or "").splitlines()):
+        line = line.strip()
+        if line.startswith("/") and _executable(line):
+            return line
     return None
+
+
+def _desktop_app_copies() -> List[str]:
+    """Copies of Claude Code that the Claude desktop app keeps for its Code tab (a file named exactly ``claude``, a few folders down)."""
+    home = os.path.expanduser("~")
+    roots = [os.path.join(home, "Library", "Application Support", "Claude"), os.path.join(home, ".config", "Claude")]
+    if os.name == "nt":
+        roots.append(os.path.join(os.environ.get("APPDATA", ""), "Claude"))
+    found: List[str] = []
+    for root in roots:
+        if not os.path.isdir(root):
+            continue
+        base = root.count(os.sep)
+        for d, subdirs, files in os.walk(root):
+            if d.count(os.sep) - base >= 5:
+                subdirs[:] = []
+            subdirs[:] = [x for x in subdirs if x not in ("Cache", "Code Cache", "GPUCache", "IndexedDB", "Local Storage", "logs", "blob_storage")]
+            for f in files:
+                if f in ("claude", "claude.exe"):                                      # exact name: the app itself is "Claude"
+                    found.append(os.path.join(d, f))
+    return sorted(found, key=lambda p: os.path.getmtime(p) if os.path.exists(p) else 0, reverse=True)
+
+
+def find(refresh: bool = False) -> Optional[str]:
+    """The Claude Code program: where the person said it is, else wherever an installer or the Claude desktop app put it, confirmed by asking
+    it for its version. Remembered for a while, since the page asks often."""
+    from vmd_agent import settings
+    now = time.time()
+    remembered = _found["path"]
+    if (not refresh and _found["when"] and now - float(_found["when"]) < (300 if remembered else 20)
+            and (remembered is None or _executable(str(remembered)))):          # moved or uninstalled since: look again
+        return remembered                                                           # type: ignore[return-value]
+    searched: List[str] = []
+    configured = os.environ.get(ENV_PATH) or settings.get("claude_path")
+    stages = [lambda: [os.path.expanduser(str(configured))] if configured else [], _candidates,
+              lambda: [p for p in [_from_login_shell()] if p], _desktop_app_copies]
+    path = None
+    for stage in stages:
+        for cand in dict.fromkeys(stage()):
+            if not _executable(cand):
+                continue
+            searched.append(cand)
+            if claude_version_of(cand):
+                path = cand
+                break
+        if path:
+            break
+    _found.update(path=path, when=now, searched=searched)
+    return path
 
 
 def _run(cmd: List[str], timeout: float = 20.0) -> str:
@@ -72,11 +191,7 @@ def _run(cmd: List[str], timeout: float = 20.0) -> str:
 
 
 def version(path: str) -> Optional[str]:
-    try:
-        out = _run([path, "--version"]).strip()
-    except (OSError, subprocess.SubprocessError):
-        return None
-    return out.splitlines()[0].replace("(Claude Code)", "").strip() if out else None          # "2.1.302 (Claude Code)" -> "2.1.302"
+    return claude_version_of(path)
 
 
 def _help(path: str) -> str:
@@ -88,8 +203,9 @@ def _help(path: str) -> str:
     return _help_cache[path]
 
 
-HOW_TO_INSTALL = ("Claude Code is not installed on this computer (or not where vmd-agent can find it). Install it from "
-                  "https://claude.com/claude-code, run `claude` once in a terminal to sign in, then choose it here again")
+HOW_TO_INSTALL = ("vmd-agent cannot find Claude Code, the command-line program (the Claude app and claude.ai are not it). In a terminal, "
+                  "run `which claude`: if it prints a path, put that path under 'Where Claude Code is' in this window; if it prints nothing, "
+                  "install Claude Code from https://claude.com/claude-code, run `claude` once to sign in, and press Check")
 HOW_TO_SIGN_IN = ("Claude Code is not signed in. Open a terminal, run `claude`, and sign in with your Claude account "
                   "(or set it up with an API key); then ask again here")
 
@@ -97,11 +213,18 @@ HOW_TO_SIGN_IN = ("Claude Code is not signed in. Open a terminal, run `claude`, 
 def info(model: str) -> dict:
     """What the Model window shows for Claude Code: whether the program is there, its version, and the models it can be asked for.
     Signing in is checked by the first question, not here: checking it costs a request each time the page looks."""
+    from vmd_agent import settings
     path = find()
     out = {"backend": "claude-code", "base_url": URL, "model": model or DEFAULT, "has_key": False, "available": list(ALIASES),
-           "claude_path": path, "claude_version": None, "state": "ready", "problem": None}
+           "claude_models": MODELS, "claude_path": path, "claude_path_setting": settings.get("claude_path") or "",
+           "claude_version": None, "state": "ready", "problem": None}
+    given = out["claude_path_setting"]
+    if given and path != os.path.expanduser(given):
+        out["claude_path_note"] = (f"'{given}' is not Claude Code (asked for its version, it did not answer as Claude Code)"
+                                   + (f"; using {path} instead" if path else ""))
     if not path:
-        out.update(state="no_server", problem=HOW_TO_INSTALL)
+        out.update(state="no_server", problem=out.get("claude_path_note") or HOW_TO_INSTALL,
+                   claude_searched=list(_found["searched"])[:12])   # type: ignore[arg-type]
         return out
     out["claude_version"] = version(path)
     if not out["claude_version"]:
