@@ -238,9 +238,9 @@ def build_parser():
     sp.add_argument("--home", choices=["here", "user"],
                     help="where vmd-agent keeps its own data (settings, VMD window link, local model): here = a .vmd-agent folder "
                          "in the current folder; user = one folder for your account (default: you are asked)")
-    sp.add_argument("--use", choices=["local", "online", "app", "skip"],
-                    help="local = free model on this computer; online = an online model service; "
-                         "app = Claude Desktop/Code; skip")
+    sp.add_argument("--use", choices=["local", "claude", "online", "app", "skip"],
+                    help="local = free model on this computer; claude = your Claude account (through Claude Code, no API key); "
+                         "online = an online model service with an API key; app = Claude Desktop/Code does the thinking; skip")
     sp.add_argument("--model", help="the local model to use (default: you are asked)")
     sub.add_parser("menu", help="the friendly menu (also what plain `vmd-agent` opens)")
 
@@ -391,8 +391,7 @@ def main(argv=None):
             from vmd_agent import wizard
             return wizard.setup(assume_yes=args.yes, check_only=args.check,
                                 data_dir=args.data_dir, vmd=args.vmd, model=args.model, home=args.home,
-                                model_choice={"local": 1, "online": 2, "app": 3,
-                                              "skip": 4}.get(args.use))
+                                model_choice=(wizard.CHOICES.index(args.use) + 1) if args.use else None)
         if args.cmd == "ui":
             from vmd_agent import ui
             return ui.main(args.data_dir, args.port, not args.no_browser, args.base_url, args.model, args.api_key, args.tools, not args.no_vmd)

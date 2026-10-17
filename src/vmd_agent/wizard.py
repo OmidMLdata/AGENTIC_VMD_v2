@@ -397,6 +397,58 @@ def setup_online_model(io: IO, url: Optional[str] = None, model: Optional[str] =
     return True
 
 
+def _claude_sign_in(path: str) -> int:
+    """Claude Code's own sign-in, in this terminal: it opens the browser at Claude's sign-in page and, if asked, takes the code here."""
+    return subprocess.run([path, "auth", "login", "--claudeai"]).returncode
+
+
+def setup_claude_account(io: IO, assume_yes: bool = False, model: Optional[str] = None) -> bool:
+    """Talk to Claude with the person's own Claude account: Claude Code (installed here if missing, after asking) signs in with that
+    account in the browser, and vmd-agent's chat asks Claude through it. No web address and no API key."""
+    from vmd_agent import claude_code as C
+    io.say("\n  You will talk to Claude with your own Claude account. vmd-agent does this through Claude Code, Anthropic's program,")
+    io.say("  which signs in with your account in the browser: your password goes only to Claude, never to vmd-agent.")
+    io.say("  It needs a paid Claude plan (Pro, Max, Team or Enterprise); the free plan does not include it. No API key is needed.")
+    path = C.find(refresh=True)
+    if path:
+        io.say(f"  Found Claude Code {C.claude_version_of(path) or ''} at {path}.")
+    elif os.name == "nt":
+        io.say("  Claude Code is not on this computer. Install it from https://claude.com/claude-code, then run vmd-agent setup again.")
+        return False
+    elif assume_yes or io.confirm(f"  Claude Code is not on this computer. Install it now with Anthropic's own installer? ({C.INSTALLER})", True):
+        path = C.install(lambda line: io.say("    " + line))
+        if not path:
+            io.say("  Claude Code was not installed. You can install it later from https://claude.com/claude-code.")
+            return False
+    else:
+        io.say("  Then install it later from https://claude.com/claude-code and choose it again (here, or Model in the web page).")
+        return False
+    auth = C.auth_status(path, refresh=True)
+    if auth is not None and not auth["signed_in"]:
+        if assume_yes:
+            io.say("  Not signed in yet: sign in later with Model in the web page ('Sign in with your Claude account').")
+        elif io.confirm("  Sign in to your Claude account now? Your browser opens Claude's sign-in page (email or Google); "
+                        "if that page shows a code, paste it here", True):
+            _claude_sign_in(path)
+            auth = C.auth_status(path, refresh=True)
+    signed_in = auth is None or bool(auth["signed_in"])
+    if auth and auth["signed_in"]:
+        io.say("  Signed in to Claude" + (f" ({auth['plan']})" if auth.get("plan") else "") + (f" as {auth['email']}" if auth.get("email") else "") + ".")
+    elif auth is not None:
+        io.say("  Not signed in. Sign in later with Model in the web page ('Sign in with your Claude account'), or run `claude` in a terminal.")
+    ids = [m["id"] for m in C.MODELS]
+    if model:
+        chosen = model
+    elif assume_yes:
+        chosen = C.DEFAULT
+    else:
+        n = io.choose("  Which Claude model?", [m["label"] if m["id"] == C.DEFAULT else f"{m['label']}  ({m['note']})" for m in C.MODELS], default=1)
+        chosen = ids[n - 1]
+    settings.save(llm_url=C.URL, llm_model=chosen, llm_key=None)
+    io.say("  Saved: the chat will ask Claude through Claude Code" + (" (Claude Code's default model)." if chosen == C.DEFAULT else f" ({C.label(chosen)})."))
+    return signed_in
+
+
 def setup_ai_app(io: IO, data_dir: str, assume_yes: bool = False,
                  system_name: Optional[str] = None) -> bool:
     """Let Claude Desktop / Claude Code (any MCP client) be the assistant: they do the thinking, vmd-agent supplies the tools."""
@@ -427,23 +479,33 @@ def setup_ai_app(io: IO, data_dir: str, assume_yes: bool = False,
 
 # ---------------------------------------------------------------- the whole setup
 def _saved_online_service() -> Optional[str]:
-    """The address of an online (not on this computer) model service the user has already saved, if any."""
+    """The address of an online model service (a web address, not on this computer) the user has already saved, if any."""
     url = settings.get("llm_url")
-    if url and not re.match(r"https?://(localhost|127\.0\.0\.1|\[::1\])", url):
+    if url and re.match(r"https?://", url) and not re.match(r"https?://(localhost|127\.0\.0\.1|\[::1\])", url):
         return url
     return None
 
 
+#: the choices of who answers, in the order setup lists them (setup --use takes the names)
+CHOICES = ("local", "claude", "online", "app", "skip")
+
+
 def assistant_choices() -> tuple:
-    """The choices for who answers, and the one to offer first: the free local model, unless the user already has an online service saved.
-    Claude Code or Desktop is an alternative to a model here, never an extra step on top of one."""
+    """The choices for who answers, and the one to offer first: what was chosen before, else the free local model.
+    Claude Code or Desktop as the app is an alternative to a model here, never an extra step on top of one."""
+    from vmd_agent import claude_code as C
     online = _saved_online_service()
-    found = shutil.which("claude") is not None or bool(P.claude_desktop_config_path() and os.path.isdir(os.path.dirname(P.claude_desktop_config_path())))
+    claude_saved = C.is_claude_code(settings.get("llm_url"))
+    claude_here = C.find() is not None
+    found = claude_here or bool(P.claude_desktop_config_path() and os.path.isdir(os.path.dirname(P.claude_desktop_config_path())))
     labels = ["A free open-source model on this computer (recommended: works offline, nothing leaves your computer)",
-              "An online model service" + (f" (you already saved one: {online})" if online else " (you need its web address, a model name and usually an API key)"),
-              "Claude Code or Claude Desktop does the thinking instead; vmd-agent only supplies the tools" + (" (found on this computer)" if found else ""),
+              "Your Claude account, online: sign in with your email or Google in the browser, no API key (needs a paid Claude plan; uses Claude Code"
+              + (", found on this computer" if claude_here else ", which setup can install") + ")" + (" (your current choice)" if claude_saved else ""),
+              "An online model service with an API key" + (f" (you already saved one: {online})" if online else " (you need its web address, a model name and the key)"),
+              "Claude Code or Claude Desktop does the thinking instead, in that app; vmd-agent only supplies the tools" + (" (found on this computer)" if found else ""),
               "Skip for now (the commands still work without a chat)"]
-    return labels, (2 if online else 1)
+    default = CHOICES.index("claude") + 1 if claude_saved else CHOICES.index("online") + 1 if online else 1
+    return labels, default
 
 
 def setup(io: Optional[IO] = None, assume_yes: bool = False, check_only: bool = False,
@@ -468,15 +530,18 @@ def setup(io: Optional[IO] = None, assume_yes: bool = False, check_only: bool = 
     io.say("\nStep 3 of 4: Who will you talk to?")
     labels, default = assistant_choices()
     pick = model_choice or (default if assume_yes else io.choose("  Choose one", labels, default=default))
+    chosen = CHOICES[pick - 1] if 1 <= pick <= len(CHOICES) else "skip"
     ready = False
-    if pick == 1:
+    if chosen == "local":
         ready = setup_local_model(io, sysname, model, assume_yes)
-    elif pick == 2:
+    elif chosen == "claude":
+        ready = setup_claude_account(io, assume_yes, model)
+    elif chosen == "online":
         ready = setup_online_model(io)
         if not ready and (assume_yes or io.confirm("  No online service was set up. Use the free model on this computer instead?", True)):
-            pick = 1
+            chosen = "local"
             ready = setup_local_model(io, sysname, model, assume_yes)
-    elif pick == 3:
+    elif chosen == "app":
         ready = setup_ai_app(io, folder, assume_yes, sysname)
     else:
         io.say("  Skipped.")
@@ -485,8 +550,10 @@ def setup(io: Optional[IO] = None, assume_yes: bool = False, check_only: bool = 
     settings.save(setup_done=True)
     io.say(f"  Your choices are saved ({settings.path()}).")
     io.say("\nAll set. From now on just type:   vmd-agent        (or  vmd-agent ui  for the web page)")
-    if pick in (1, 2) and not ready:
+    if chosen in ("local", "online") and not ready:
         io.say("(The chat needs the model above to be ready first. To get it later: vmd-agent models --install, or Model in the web page. Everything else works already.)")
+    elif chosen == "claude" and not ready:
+        io.say("(The chat needs Claude Code installed and signed in first: Model in the web page does both. Everything else works already.)")
     if not assume_yes and io.confirm("\nOpen the web page now? (your files, the chat and whole jobs, in your browser; Ctrl+C in this window stops it)", True):
         from vmd_agent import cli
         cli.main(["ui"])

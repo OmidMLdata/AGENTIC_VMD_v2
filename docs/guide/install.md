@@ -59,9 +59,10 @@ prove it works), Ollama, Docker, and Claude Code. From that:
 | Choice | What it is | Good to know |
 |---|---|---|
 | **1. A free model on this computer** (recommended) | An open-source model run by a free program called Ollama. Works offline; your data never leaves the computer. | It asks before every download. It keeps a **private copy of Ollama inside the vmd-agent folder** (about 0.2 GB on a Mac, 1.4 to 1.6 GB on Linux and Windows), checked against Ollama's published checksum, plus the model (2 to 18 GB). If you already have Ollama it uses that instead. Downloads happen once. |
-| **2. An online model service** | Any service with the common "OpenAI-compatible" chat interface: you give a web address, a model name and your key. | The key is saved in a file only you can read. |
-| **3. Claude Code or Claude Desktop instead** | They do the thinking, and vmd-agent only supplies the tools ([details](mcp.md#use-it-from-an-mcp-client)). | It edits that app's settings file only after you say yes, and keeps a backup. vmd-agent's own chat and web page still need a model of their own. |
-| **4. Skip** | No chat. | Every other command still works. |
+| **2. Your Claude account, online** | Claude answers, with your own Claude account: you sign in with your email or Google in the browser, and give no web address and no API key. vmd-agent asks Claude through Claude Code, Anthropic's program, which setup installs (after asking) if it is missing ([details](mcp.md#claude-code-as-the-assistant-inside-the-web-page)). | Needs a paid Claude plan (Pro, Max, Team or Enterprise). Your password is typed on Claude's sign-in page, never into vmd-agent. You can also do all of this later with **Model** in the web page. |
+| **3. An online model service with an API key** | Any service with the common "OpenAI-compatible" chat interface: you give a web address, a model name and your key. | The key is saved in a file only you can read. |
+| **4. Claude Code or Claude Desktop instead** | They do the thinking, and vmd-agent only supplies the tools ([details](mcp.md#use-it-from-an-mcp-client)). | It edits that app's settings file only after you say yes, and keeps a backup. vmd-agent's own chat and web page still need a model of their own. |
+| **5. Skip** | No chat. | Every other command still works. |
 
 **Said no to a download? You can change your mind at any time.** Run `vmd-agent models --install`, or open **Model** in the web page and choose **Download a model**. Both name the size and ask first.
 

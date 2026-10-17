@@ -111,7 +111,7 @@ def test_the_chat_picks_up_the_saved_model_without_flags(capsys, monkeypatch):
 def test_setup_with_defaults_creates_the_folder_and_remembers_everything(tmp_path):
     io_ = Typed()
     folder = tmp_path / "my files"
-    rc = wizard.setup(io_, assume_yes=True, data_dir=str(folder), model_choice=4)
+    rc = wizard.setup(io_, assume_yes=True, data_dir=str(folder), model_choice=5)
     assert rc == 0 and folder.is_dir()
     s = settings.load()
     assert s["data_dir"] == str(folder) and s["setup_done"] is True
@@ -120,7 +120,7 @@ def test_setup_with_defaults_creates_the_folder_and_remembers_everything(tmp_pat
 
 def test_setup_explains_the_steps_in_plain_words(tmp_path):
     io_ = Typed()
-    wizard.setup(io_, assume_yes=True, data_dir=str(tmp_path), model_choice=4)
+    wizard.setup(io_, assume_yes=True, data_dir=str(tmp_path), model_choice=5)
     for phrase in ("Step 1 of 4", "Step 2 of 4", "Step 3 of 4", "Step 4 of 4",
                    "installs nothing without asking", "can only see that folder"):
         assert phrase in io_.text, phrase
@@ -293,17 +293,18 @@ def test_claude_code_is_an_alternative_to_a_model_not_an_extra_step(monkeypatch)
     """If a model runs here, nothing is registered with Claude Code unasked; Claude is one of the choices of who answers, and the menu has no step for it."""
     assert not hasattr(wizard, "offer_claude_code")
     assert not any("Claude" in item for item in wizard.MENU)
-    monkeypatch.setattr(wizard.shutil, "which", lambda name: "/x/claude" if name == "claude" else None)
+    from vmd_agent import claude_code
+    monkeypatch.setattr(claude_code, "find", lambda refresh=False: "/x/claude")
     labels, default = wizard.assistant_choices()
-    assert default == 1 and "recommended" in labels[0] and "found on this computer" in labels[2] and "instead" in labels[2]
+    assert default == 1 and "recommended" in labels[0] and "found on this computer" in labels[3] and "instead" in labels[3]
 
 
 def test_the_free_local_model_is_offered_first_unless_an_online_service_is_already_saved():
     labels, default = wizard.assistant_choices()
-    assert default == 1 and "need its web address" in labels[1]
+    assert default == 1 and "need its web address" in labels[2] and "API key" in labels[2]
     settings.save(llm_url="https://api.example.com/v1", llm_model="m")
     labels, default = wizard.assistant_choices()
-    assert default == 2 and "api.example.com" in labels[1]
+    assert default == 3 and "api.example.com" in labels[2]
     settings.save(llm_url="http://localhost:11434/v1")                           # a server on this computer is not an online service
     assert wizard.assistant_choices()[1] == 1
 
@@ -358,7 +359,7 @@ def test_setup_can_keep_its_data_in_this_folder_and_carries_earlier_choices_over
     settings.save(vmd_path="/some/vmd")
     monkeypatch.setattr(wizard, "step_vmd", lambda *a, **k: None)        # whether this computer has a VMD must not matter here
     io_ = Typed()
-    wizard.setup(io_, assume_yes=True, home="here", data_dir=str(work), model_choice=4)
+    wizard.setup(io_, assume_yes=True, home="here", data_dir=str(work), model_choice=5)
     assert (work / ".vmd-agent" / "config" / "settings.json").is_file()
     s = settings.load()
     assert s["vmd_path"] == "/some/vmd" and s["data_dir"] == str(work)
@@ -659,3 +660,68 @@ def test_when_no_recent_release_can_be_verified_the_message_says_what_to_do_inst
     with pytest.raises(RuntimeError, match="https://ollama.com/download") as e:
         ollama_local.latest_release("ollama-darwin.tgz")
     assert "no checksum" in str(e.value) and "run `vmd-agent setup` again" in str(e.value)
+
+
+
+# ---------------------------------------------------------------- your Claude account, online (through Claude Code)
+def test_five_choices_and_a_saved_claude_account_is_not_taken_for_a_web_address(monkeypatch):
+    """The saved 'claude-code:' was once offered as 'an online model service you already saved', which then asked for an address and a key."""
+    from vmd_agent import claude_code
+    monkeypatch.setattr(claude_code, "find", lambda refresh=False: None)
+    labels, default = wizard.assistant_choices()
+    assert len(labels) == 5 and wizard.CHOICES == ("local", "claude", "online", "app", "skip")
+    assert "Your Claude account" in labels[1] and "no API key" in labels[1] and "API key" in labels[2] and labels[4].startswith("Skip")
+    settings.save(llm_url=claude_code.URL, llm_model="claude-sonnet-5-5")
+    labels, default = wizard.assistant_choices()
+    assert default == 2 and "your current choice" in labels[1] and "claude-code" not in labels[2]
+
+
+def _claude(monkeypatch, found="/x/claude", signed_in=True, installs="/home/u/.local/bin/claude"):
+    from vmd_agent import claude_code
+    state = {"found": found, "signed_in": signed_in, "installed": False, "signed": False}
+    monkeypatch.setattr(claude_code, "find", lambda refresh=False: state["found"])
+    monkeypatch.setattr(claude_code, "claude_version_of", lambda p: "9.9.9")
+
+    def install(emit):
+        emit("installing")
+        state.update(installed=True, found=installs)
+        return installs
+    monkeypatch.setattr(claude_code, "install", install)
+    monkeypatch.setattr(claude_code, "auth_status", lambda path=None, refresh=False: {"signed_in": state["signed_in"], "method": "claude.ai",
+                                                                                      "email": "o@example.com" if state["signed_in"] else None, "plan": "pro"})
+
+    def sign_in(path):
+        state.update(signed=True, signed_in=True)
+        return 0
+    monkeypatch.setattr(wizard, "_claude_sign_in", sign_in)
+    return state
+
+
+def test_claude_account_signed_in_asks_only_for_the_model(monkeypatch):
+    _claude(monkeypatch)
+    io_ = Typed(["3"])                                                      # the third model in the list
+    assert wizard.setup_claude_account(io_) is True
+    from vmd_agent import claude_code
+    assert settings.get("llm_url") == claude_code.URL and settings.get("llm_model") == claude_code.MODELS[2]["id"] and not settings.get("llm_key")
+    assert "web address" not in io_.text and "API key (leave" not in io_.text and "Signed in to Claude (pro) as o@example.com" in io_.text
+
+
+def test_claude_account_installs_claude_code_and_signs_in_when_asked(monkeypatch):
+    state = _claude(monkeypatch, found=None, signed_in=False)
+    io_ = Typed(["y", "y", ""])                                             # install: yes; sign in: yes; model: the default
+    assert wizard.setup_claude_account(io_) is True
+    assert state["installed"] and state["signed"] and "    installing" in io_.text and "password goes only to Claude" in io_.text
+    assert "Claude Code's default model" in io_.text
+
+
+def test_claude_account_without_claude_code_and_no_install_saves_nothing(monkeypatch):
+    _claude(monkeypatch, found=None)
+    io_ = Typed(["n"])
+    assert wizard.setup_claude_account(io_) is False and not settings.get("llm_url")
+
+
+def test_setup_with_the_claude_account_choice(monkeypatch, tmp_path):
+    _claude(monkeypatch)
+    from vmd_agent import claude_code
+    rc = wizard.setup(Typed(), assume_yes=True, data_dir=str(tmp_path), model_choice=wizard.CHOICES.index("claude") + 1)
+    assert rc == 0 and settings.get("llm_url") == claude_code.URL and settings.get("llm_model") == claude_code.DEFAULT
