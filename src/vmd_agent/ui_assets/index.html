@@ -156,6 +156,20 @@
     <label for="model-claude-path">Where Claude Code is (leave empty: vmd-agent finds it)</label>
     <input id="model-claude-path" type="text" spellcheck="false" autocomplete="off" placeholder="for example /Users/you/.local/bin/claude">
     <p class="note" id="model-claude-found"></p>
+    <p class="note" id="claude-auth" role="status"></p>
+    <div id="claude-install-box" hidden>
+      <label class="opt"><input type="checkbox" id="claude-install-consent"> Yes, install Claude Code with Anthropic's own installer
+        (<code>curl -fsSL https://claude.ai/install.sh | bash</code>, about 100 MB, kept in your home folder)</label>
+      <div class="dlgbtns"><button class="btn" id="claude-install-btn" type="button">Install Claude Code</button></div></div>
+    <div id="claude-signin-box" hidden>
+      <div class="dlgbtns"><button class="btn" id="claude-signin" type="button">Sign in with your Claude account</button></div>
+      <div id="claude-signin-wait" hidden>
+        <p class="note">Your browser opens Claude's own sign-in page: sign in there with your email or Google (your password goes to Claude, not to vmd-agent).
+          If no page opened, <a id="claude-signin-link" href="#" target="_blank" rel="noopener">open the sign-in page</a>.</p>
+        <label for="claude-code-in">If the page shows a code, paste it here</label>
+        <input id="claude-code-in" type="text" spellcheck="false" autocomplete="off">
+        <div class="dlgbtns"><button class="btn" id="claude-code-send" type="button">Send the code</button></div></div></div>
+    <p class="note" id="claude-msg" role="status"></p>
     <p class="note" id="model-claude-note"></p></div>
   <div id="model-local-box"><label for="model-local">Models downloaded on this computer</label><select id="model-local"></select>
     <details id="model-get"><summary>Download a model</summary>

@@ -76,21 +76,10 @@ function fillModel(info) {
   const cc = info.backend === "claude-code";
   $("#model-state").textContent = info.state !== "ready" ? `Not working: ${info.problem}.`
     : cc ? `Using Claude Code ${info.claude_version || ""}${info.model && info.model !== "default" ? ", model " + ((info.claude_models || []).find(m => m.id === info.model) || { label: info.model }).label : ""}.` : `Using ${info.model} at ${info.base_url}.`;
-  const csel = $("#model-claude"), keep = csel.value || info.model;
-  if (info.claude_models) {
-    csel.textContent = "";
-    info.claude_models.forEach(m => csel.append(new Option(m.id === "default" ? m.label : `${m.label}  ·  ${m.note}`, m.id)));
-    if (keep && ![...csel.options].some(o => o.value === keep)) csel.append(new Option(keep, keep));                  // a name saved earlier, such as "opus"
-    csel.value = keep || "default";
-  }
-  if (cc || info.claude_models) {
-    $("#model-claude-found").textContent = info.claude_path ? `Found Claude Code ${info.claude_version || ""} at ${info.claude_path}.` + (info.claude_path_note ? " " + info.claude_path_note + "." : "")
-      : (info.claude_searched || []).length ? "Looked at: " + info.claude_searched.join(", ") + "." : "";
-    if (document.activeElement !== $("#model-claude-path")) $("#model-claude-path").value = info.claude_path_setting || "";
-  }
+  if (cc) fillClaude(info);
   $("#model-claude-note").textContent = "Each question runs Claude Code in the background with vmd-agent's tools only (its own shell, file and web tools are switched off), " +
-    "working in your files folder and in this VMD window. Its usage counts toward your Claude plan or API account. " +
-    "If it is not signed in yet, run claude once in a terminal and sign in.";
+    "working in your files folder and in this VMD window. It needs a paid Claude plan (Pro, Max, Team or Enterprise) or a Console account, " +
+    "and its use counts toward that plan.";
   const list = $("#model-list"); list.textContent = ""; (info.available || []).forEach(m => list.append(new Option(m, m)));
   const loc = $("#model-local"); loc.textContent = "";
   (info.local_models || []).forEach(m => loc.append(new Option(m, m))); if (!(info.local_models || []).length) loc.append(new Option("no model downloaded yet: use Download a model below", ""));
@@ -135,8 +124,72 @@ $("#model-get-btn").onclick = async () => {
     }
   } catch (e) { box.textContent = "✗ " + e.message; } finally { $("#model-get-btn").disabled = false; }
 };
+// Claude Code: which model, where it is, and whether it is signed in to a Claude account
+function fillClaude(ci) {
+  const csel = $("#model-claude"), keep = csel.value || (ci.model || "default");
+  if (ci.claude_models) {
+    csel.textContent = "";
+    ci.claude_models.forEach(m => csel.append(new Option(m.id === "default" ? m.label : `${m.label}  ·  ${m.note}`, m.id)));
+    if (keep && ![...csel.options].some(o => o.value === keep)) csel.append(new Option(keep, keep));                  // a name saved earlier, such as "opus"
+    csel.value = keep || "default";
+  }
+  $("#model-claude-found").textContent = ci.claude_path ? `Found Claude Code ${ci.claude_version || ""} at ${ci.claude_path}.` + (ci.claude_path_note ? " " + ci.claude_path_note + "." : "")
+    : (ci.claude_searched || []).length ? "Not found. Looked at: " + ci.claude_searched.join(", ") + "." : "Claude Code is not installed on this computer yet.";
+  if (document.activeElement !== $("#model-claude-path")) $("#model-claude-path").value = ci.claude_path_setting || "";
+  const a = ci.auth, signedIn = !!(a && a.signed_in);
+  $("#claude-auth").textContent = !ci.claude_path ? "" : signedIn ? "Signed in to Claude" + (a.plan ? ` (${a.plan})` : "") + (a.email ? ` as ${a.email}` : "") + "."
+    : a ? "Not signed in to a Claude account yet." : "";
+  $("#claude-install-box").hidden = !!ci.claude_path;
+  $("#claude-signin-box").hidden = !ci.claude_path || signedIn;
+}
+async function refreshClaude(again) {
+  const r = await getJSON("/api/claude" + (again ? "?refresh=1" : "")); fillClaude(r.claude); return r;
+}
+let claudeWatch = null;
+async function watchSignIn() {
+  clearTimeout(claudeWatch);
+  const r = await refreshClaude(false);
+  if (r.url) { $("#claude-signin-link").href = r.url; }
+  if (r.auth && r.auth.signed_in) { $("#claude-signin-wait").hidden = true; $("#claude-msg").textContent = "Signed in. Press Use this model."; return; }
+  if (!r.running) { $("#claude-msg").textContent = r.output ? "The sign-in ended without signing in: " + r.output.split("\n").pop() : "The sign-in ended. Try again."; $("#claude-signin-wait").hidden = true; return; }
+  claudeWatch = setTimeout(watchSignIn, 2500);
+}
+$("#claude-signin").onclick = async () => {
+  $("#claude-msg").textContent = "Opening Claude's sign-in page…";
+  const r = await api("/api/claude/login", {}), j = await r.json();
+  if (!r.ok) { $("#claude-msg").textContent = j.error; return; }
+  $("#claude-signin-wait").hidden = false; $("#claude-msg").textContent = "Waiting for you to sign in in the browser…";
+  if (j.url) $("#claude-signin-link").href = j.url;
+  watchSignIn();
+};
+$("#claude-code-send").onclick = async () => {
+  const code = $("#claude-code-in").value.trim(); if (!code) return;
+  const r = await api("/api/claude/code", { code }), j = await r.json();
+  if (!r.ok) { $("#claude-msg").textContent = j.error; return; }
+  $("#claude-code-in").value = ""; watchSignIn();
+};
+$("#claude-install-btn").onclick = async () => {
+  const box = $("#claude-msg");
+  if (!$("#claude-install-consent").checked) { box.textContent = "Tick the box first: it says what will be installed."; return; }
+  $("#claude-install-btn").disabled = true; box.textContent = "Installing…";
+  try {
+    const r = await api("/api/claude/install", { consent: true });
+    if (!r.ok) { box.textContent = (await r.json()).error; return; }
+    const reader = r.body.getReader(), dec = new TextDecoder(); let buf = "";
+    for (;;) {
+      const { value, done } = await reader.read(); if (done) break;
+      buf += dec.decode(value, { stream: true }); const parts = buf.split("\n\n"); buf = parts.pop();
+      for (const p of parts) { const ev = JSON.parse(p.replace(/^data: /, ""));
+        if (ev.type === "progress") box.textContent = ev.text; else if (ev.type === "error") box.textContent = "✗ " + ev.text;
+        else if (ev.type === "done") { box.textContent = "Installed. Now sign in with your Claude account."; await refreshClaude(true); } }
+    }
+  } catch (e) { box.textContent = "✗ " + e.message; } finally { $("#claude-install-btn").disabled = false; }
+};
 function modelSource() { return $('input[name="msrc"]:checked').value; }
-function showModelSource() { const src = modelSource(); $("#model-other").hidden = src !== "other"; $("#model-local-box").hidden = src !== "local"; $("#model-claude-box").hidden = src !== "claude"; }
+function showModelSource() {
+  const src = modelSource(); $("#model-other").hidden = src !== "other"; $("#model-local-box").hidden = src !== "local"; $("#model-claude-box").hidden = src !== "claude";
+  if (src === "claude") refreshClaude(false);
+}
 async function openModel() {
   const info = await getJSON("/api/model"), local = info.is_private || (!info.has_key && /^https?:\/\/(localhost|127\.0\.0\.1)/.test(info.base_url) && info.private_available);
   const cc = info.backend === "claude-code";
@@ -147,7 +200,11 @@ async function openModel() {
 }
 $$('input[name="msrc"]').forEach(r => r.onchange = showModelSource);
 $("#model-close").onclick = () => $("#modeldlg").close();
-$("#model-check").onclick = async () => { $("#model-msg").textContent = "Checking…"; fillModel(await getJSON("/api/model?refresh=1")); $("#model-msg").textContent = ""; loadStatus(); };
+$("#model-check").onclick = async () => {
+  $("#model-msg").textContent = "Checking…";
+  if (modelSource() === "claude") await refreshClaude(true);
+  fillModel(await getJSON("/api/model?refresh=1")); $("#model-msg").textContent = ""; loadStatus();
+};
 $("#model-start").onclick = async () => { $("#model-msg").textContent = "Starting…"; const r = await (await api("/api/model/start", {})).json(); $("#model-msg").textContent = r.error || ""; fillModel(r); loadStatus(); };
 $("#model-use").onclick = async () => {
   if (modelSource() === "claude") {

@@ -241,3 +241,123 @@ def test_the_models_are_offered_with_their_versions():
     assert ids[0] == C.DEFAULT and {"claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5", "claude-fable-5-1"} <= set(ids)
     assert all(any(ch.isdigit() for ch in m["label"]) for m in C.MODELS[1:])                       # "Claude Opus 5.5", not "Opus"
     assert C.command("/x/claude", "/c.json", "claude-opus-5-5", None, "s")[-2:] == ["--model", "claude-opus-5-5"]
+
+
+# ------------------------------------------------------------------ signing in with a Claude account, from the page
+SIGNIN = r'''#!{python}
+import json, os, sys, time
+args, marker = sys.argv[1:], os.environ["FAKE_MARKER"]
+if args == ["--version"]:
+    print("9.9.9 (Claude Code)"); sys.exit(0)
+if args[:2] == ["auth", "status"]:
+    on = os.path.exists(marker)
+    print(json.dumps({"loggedIn": on, "authMethod": "claude.ai" if on else "none", "email": "omid@example.com" if on else None,
+                      "subscriptionType": "pro" if on else None})); sys.exit(0)
+if args[:2] == ["auth", "login"]:
+    assert args[2] == "--claudeai"
+    print("Opening browser to sign in…", flush=True)
+    print("If the browser didn't open, visit: https://claude.com/cai/oauth/authorize?code=true&client_id=x", flush=True)
+    if os.environ.get("FAKE_AUTO"):                       # the browser handed the sign-in back by itself
+        time.sleep(1); open(marker, "w").close(); print("Login successful."); sys.exit(0)
+    print("Paste code here if prompted > ", flush=True)
+    code = sys.stdin.readline().strip()
+    if code == "GOOD-CODE":
+        open(marker, "w").close(); print("Login successful."); sys.exit(0)
+    print("Invalid code"); sys.exit(1)
+sys.exit(2)
+'''
+
+
+@pytest.fixture
+def signin(tmp_path, monkeypatch):
+    if os.name == "nt":
+        pytest.skip("a shell-less script stands in for Claude Code")
+    exe = tmp_path / "bin" / "claude"
+    exe.parent.mkdir()
+    exe.write_text(SIGNIN.replace("{python}", sys.executable))
+    exe.chmod(0o755)
+    monkeypatch.setenv("PATH", str(exe.parent) + os.pathsep + "/bin")
+    monkeypatch.setenv("FAKE_MARKER", str(tmp_path / "signed-in"))
+    monkeypatch.delenv("FAKE_AUTO", raising=False)
+    monkeypatch.setattr(C, "_candidates", lambda: [str(exe)])
+    _fresh_search()
+    C._auth.update(key=None, when=0.0, value=None)
+    C._login["current"] = None
+    yield {"exe": str(exe), "marker": tmp_path / "signed-in", "data": tmp_path}
+    if C._login["current"]:
+        C._login["current"].stop()
+    C._login["current"] = None
+
+
+def _wait_signed_in(seconds=10.0):
+    end = __import__("time").time() + seconds
+    while __import__("time").time() < end:
+        st = C.login_state()
+        if st["auth"] and st["auth"]["signed_in"]:
+            return st
+        __import__("time").sleep(0.3)
+    return C.login_state()
+
+
+def test_not_signed_in_is_said_before_anything_is_asked(signin):
+    i = C.info(C.DEFAULT)
+    assert i["state"] == "no_server" and "Sign in with your Claude account" in i["problem"] and i["auth"] == {
+        "signed_in": False, "method": "none", "email": None, "plan": None}
+
+
+def test_signing_in_with_a_code_from_the_sign_in_page(signin):
+    st = C.start_login()
+    assert st["running"] and st["url"].startswith("https://claude.com/") and st["asks_for_code"]
+    with pytest.raises(ValueError):
+        C.send_login_code("two\nlines")                                                        # one line only, never a second command
+    C.send_login_code("GOOD-CODE")
+    st = _wait_signed_in()
+    assert st["auth"]["signed_in"] and st["auth"]["email"] == "omid@example.com" and st["auth"]["plan"] == "pro"
+    C._found.update(when=0.0)
+    C._auth.update(when=0.0)
+    assert C.info(C.DEFAULT)["state"] == "ready"
+
+
+def test_a_wrong_code_ends_the_sign_in_and_says_so(signin):
+    C.start_login()
+    C.send_login_code("WRONG")
+    __import__("time").sleep(1.0)
+    st = C.login_state()
+    assert not st["running"] and not st["auth"]["signed_in"] and "Invalid code" in st["output"]
+
+
+def test_signing_in_completes_by_itself_when_the_browser_hands_it_back(signin, monkeypatch):
+    monkeypatch.setenv("FAKE_AUTO", "1")
+    C.start_login()
+    assert _wait_signed_in()["auth"]["signed_in"]
+
+
+def test_the_page_signs_in_through_its_own_buttons(signin, monkeypatch):
+    import http.client
+    import threading
+    from vmd_agent import ui
+    srv = ui.make_server(str(signin["data"]), 0, base_url="http://127.0.0.1:9/v1", model="x")
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+
+    def req(method, path, obj=None):
+        c = http.client.HTTPConnection("127.0.0.1", srv.server_address[1], timeout=30)
+        c.request(method, path, body=None if obj is None else json.dumps(obj),
+                  headers={"Host": f"127.0.0.1:{srv.server_address[1]}", "Cookie": f"vmd_ui={srv.state.token}", "Content-Type": "application/json"})
+        r = c.getresponse()
+        raw = r.read() or b"{}"
+        if raw.startswith(b"data: "):                                                           # a streamed job: its events
+            return r.status, [json.loads(x[6:]) for x in raw.decode().split("\n\n") if x.startswith("data: ")]
+        return r.status, json.loads(raw)
+    try:
+        status, body = req("GET", "/api/claude?refresh=1")
+        assert status == 200 and body["claude"]["claude_path"] == signin["exe"] and body["claude"]["auth"]["signed_in"] is False
+        status, body = req("POST", "/api/claude/login", {})
+        assert status == 200 and body["url"].startswith("https://claude.com/")
+        status, body = req("POST", "/api/claude/code", {"code": "GOOD-CODE"})
+        assert status == 200
+        assert _wait_signed_in()["auth"]["signed_in"]
+        status, events = req("POST", "/api/claude/install", {})                                 # no consent: nothing is run
+        assert status == 200 and events[0]["type"] == "error" and "go-ahead" in events[0]["text"]
+    finally:
+        srv.shutdown()
+        srv.server_close()

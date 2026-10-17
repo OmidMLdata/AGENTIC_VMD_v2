@@ -132,10 +132,17 @@ background (`claude -p`), with vmd-agent's tools as its only tools: Claude Code'
 the tools are sandboxed to your files folder, and they drive the same VMD window as the page. The chat shows each tool call with its
 seconds and pictures, as with any model, and later questions continue the same Claude Code conversation (**New** starts another).
 
-What it needs:
+What it needs, all of which the Model window can do for you:
 
-* Claude Code installed (from <https://claude.com/claude-code>), and signed in once: run `claude` in a terminal and sign in with your Claude
-  account, or set it up with an API key. Its usage counts toward that plan or account; the page needs no key of its own.
+* **Claude Code installed.** If it is not, tick the box under **Install Claude Code** and press the button: it runs Anthropic's own
+  installer (`curl -fsSL https://claude.ai/install.sh | bash`, macOS and Linux; on Windows, install it from <https://claude.com/claude-code>).
+  vmd-agent finds Claude Code wherever it was installed (the native installer, npm also under nvm or conda, Homebrew, the Claude desktop
+  app's own copy); if not, put its path under **Where Claude Code is** (`which claude` in a terminal prints it).
+* **Signed in to a Claude account.** Press **Sign in with your Claude account**: your browser opens Claude's own sign-in page, where you
+  sign in with your email or Google. Your password is typed on Claude's page, never into vmd-agent. If that page shows a code, paste it
+  into the box under the button. Claude Code keeps the sign-in, so this is needed once.
+* **A paid Claude plan** (Pro, Max, Team or Enterprise) or a Console account: the free claude.ai plan does not include Claude Code. Its use
+  counts toward that plan; the page needs no key of its own.
 * Nothing else: vmd-agent writes the MCP configuration for each question itself, so `vmd-agent mcp-config` is not needed for this.
 
 The terminal chat does the same after the choice is saved (or with `vmd-agent chat --base-url claude-code:`).

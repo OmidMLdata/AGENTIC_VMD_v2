@@ -309,6 +309,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
             self._window_snapshot(parse_qs(url.query).get("q", ["fast"])[0])
         elif url.path == "/api/status":
             self._json(self.state.status())
+        elif url.path == "/api/claude":                                 # Claude Code: found? signed in? signing in now?
+            from vmd_agent import claude_code
+            if parse_qs(url.query).get("refresh"):
+                claude_code.find(refresh=True)
+                claude_code.auth_status(refresh=True)
+            model = self.state.model if claude_code.is_claude_code(self.state.base_url) else claude_code.DEFAULT
+            self._json({**claude_code.login_state(), "claude": claude_code.info(model)})
         elif url.path == "/api/model":
             if parse_qs(url.query).get("refresh"):                    # Check: look for Claude Code again now, not from memory
                 from vmd_agent import claude_code
@@ -391,6 +398,12 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 return self._model_start()
             if url.path == "/api/model/use":
                 return self._model_use(payload)
+            if url.path == "/api/claude/login":
+                return self._claude_login(payload)
+            if url.path == "/api/claude/code":
+                return self._claude_code(payload)
+            if url.path == "/api/claude/install":
+                return self._stream(lambda emit: self._claude_install(payload, emit))
             if url.path == "/api/reset":
                 self.state.session.reset()
                 return self._json({"ok": True})
@@ -517,6 +530,29 @@ class Handler(http.server.BaseHTTPRequestHandler):
                 saved["ollama_mode"] = mode
             settings.save(**saved)
         self._json(self.state.model_info())
+
+    # ---- Claude Code: sign in with a Claude account, or install it, from the page
+    def _claude_login(self, payload: dict) -> None:
+        """Start Claude Code's own sign-in: the person's browser opens Claude's sign-in page (the password is typed there, not here)."""
+        from vmd_agent import claude_code
+        try:
+            self._json(claude_code.start_login(console=bool(payload.get("console"))))
+        except claude_code.LLMError as e:
+            self._json({"error": str(e)}, 409)
+
+    def _claude_code(self, payload: dict) -> None:
+        """The code the sign-in page shows, when the browser could not hand the sign-in back by itself."""
+        from vmd_agent import claude_code
+        self._json(claude_code.send_login_code(str(payload.get("code") or "")))
+
+    def _claude_install(self, payload: dict, emit: Callable[[dict], None]) -> None:
+        """Install Claude Code with Anthropic's own installer, only with ``consent`` (the page names what will be run)."""
+        from vmd_agent import claude_code
+        if not payload.get("consent"):
+            return emit({"type": "error", "text": "installing needs your go-ahead: tick the box first"})
+        path = claude_code.install(lambda line: emit({"type": "progress", "text": line}))
+        emit({"type": "done" if path else "error", "text": "" if path else "Claude Code was not installed (see the lines above)",
+              "info": self.state.model_info()})
 
     def _upload(self, name: str) -> None:
         name = os.path.basename(unquote(name)).strip().lstrip(".")

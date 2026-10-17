@@ -206,8 +206,8 @@ def _help(path: str) -> str:
 HOW_TO_INSTALL = ("vmd-agent cannot find Claude Code, the command-line program (the Claude app and claude.ai are not it). In a terminal, "
                   "run `which claude`: if it prints a path, put that path under 'Where Claude Code is' in this window; if it prints nothing, "
                   "install Claude Code from https://claude.com/claude-code, run `claude` once to sign in, and press Check")
-HOW_TO_SIGN_IN = ("Claude Code is not signed in. Open a terminal, run `claude`, and sign in with your Claude account "
-                  "(or set it up with an API key); then ask again here")
+HOW_TO_SIGN_IN = ("Claude Code is not signed in to a Claude account: in Extensions, Model, choose Claude Code and press "
+                  "'Sign in with your Claude account' (or run `claude` once in a terminal)")
 
 
 def info(model: str) -> dict:
@@ -229,6 +229,10 @@ def info(model: str) -> dict:
     out["claude_version"] = version(path)
     if not out["claude_version"]:
         out.update(state="no_server", problem=f"Claude Code was found at {path} but did not start (try `claude --version` in a terminal)")
+        return out
+    out["auth"] = auth_status(path)
+    if out["auth"] is not None and not out["auth"]["signed_in"]:                    # None: this version cannot say; the first question will
+        out.update(state="no_server", problem=HOW_TO_SIGN_IN)
     return out
 
 
@@ -425,3 +429,131 @@ def check() -> Optional[List[str]]:
     """None if Claude Code is there; otherwise what to do (for the terminal chat)."""
     i = info(DEFAULT)
     return None if i["state"] == "ready" else [f"vmd-agent chat: {i['problem']}."]
+
+
+# ------------------------------------------------------------------ signing in and installing, from the page
+#: Anthropic's own installer for Claude Code (macOS, Linux, WSL); it puts `claude` in ~/.local/bin, where find() looks
+INSTALLER = "curl -fsSL https://claude.ai/install.sh | bash"
+_auth: Dict[str, object] = {"key": None, "when": 0.0, "value": None}
+
+
+def auth_status(path: Optional[str] = None, refresh: bool = False) -> Optional[dict]:
+    """Whether Claude Code is signed in (``claude auth status --json``): {signed_in, method, email, plan}; None when this version cannot
+    say. Remembered for half a minute, since the page asks often."""
+    path = path or find()
+    if not path:
+        return None
+    now = time.time()
+    if not refresh and _auth["key"] == path and now - float(_auth["when"]) < 30:
+        return _auth["value"]                                                       # type: ignore[return-value]
+    value = None
+    try:
+        r = subprocess.run([path, "auth", "status", "--json"], capture_output=True, text=True, timeout=20, stdin=subprocess.DEVNULL)
+        text = (r.stdout or "").strip()
+        data = json.loads(text[text.index("{"):]) if "{" in text else None
+    except (OSError, subprocess.SubprocessError, ValueError):
+        data = None
+    if isinstance(data, dict) and "loggedIn" in data:
+        account = data.get("account") if isinstance(data.get("account"), dict) else {}
+        value = {"signed_in": bool(data.get("loggedIn")), "method": data.get("authMethod"),
+                 "email": data.get("email") or data.get("emailAddress") or account.get("email") or account.get("emailAddress"),
+                 "plan": data.get("subscriptionType") or data.get("subscription") or data.get("plan")}
+    _auth.update(key=path, when=now, value=value)
+    return value
+
+
+class Login:
+    """``claude auth login --claudeai``, started from the page: it opens the person's browser at Claude's own sign-in page (email, Google,
+    or SSO; the password is typed there, never here). If the browser cannot hand the result back, the sign-in page shows a code, which
+    the person pastes into the page and :meth:`send_code` passes on."""
+
+    LONGEST = 900.0
+
+    def __init__(self, path: str, console: bool = False):
+        cmd = [path, "auth", "login", "--console" if console else "--claudeai"]
+        self.proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                                     encoding="utf-8", errors="replace", bufsize=1)
+        self.started = time.time()
+        self.lines: List[str] = []
+        self.url: Optional[str] = None
+        threading.Thread(target=self._read, daemon=True).start()
+        timer = threading.Timer(self.LONGEST, self.stop)
+        timer.daemon = True
+        timer.start()
+
+    def _read(self) -> None:
+        import re
+        for line in self.proc.stdout:                                               # type: ignore[union-attr]
+            line = line.rstrip()
+            self.lines.append(line)
+            m = re.search(r"https://\S+", line)
+            if m and not self.url:
+                self.url = m.group(0)
+
+    def send_code(self, code: str) -> None:
+        code = str(code).strip()
+        if not code or len(code) > 400 or any(c in code for c in "\r\n\0"):
+            raise ValueError("paste the code from the sign-in page (one line)")
+        if self.proc.poll() is not None:
+            raise ValueError("the sign-in has already ended; start it again")
+        self.proc.stdin.write(code + "\n")                                          # type: ignore[union-attr]
+        self.proc.stdin.flush()                                                     # type: ignore[union-attr]
+
+    def stop(self) -> None:
+        if self.proc.poll() is None:
+            self.proc.kill()
+
+    def state(self) -> dict:
+        code = self.proc.poll()
+        tail = [x for x in self.lines if x.strip()][-6:]
+        return {"running": code is None, "exit_code": code, "url": self.url, "asks_for_code": any("code" in x.lower() for x in self.lines),
+                "output": "\n".join(tail)[-1200:], "seconds": round(time.time() - self.started, 1)}
+
+
+_login: Dict[str, Optional[Login]] = {"current": None}
+
+
+def start_login(console: bool = False) -> dict:
+    """Start signing in (stopping one already under way)."""
+    path = find(refresh=True)
+    if not path:
+        raise LLMError(HOW_TO_INSTALL)
+    if _login["current"]:
+        _login["current"].stop()
+    _login["current"] = Login(path, console=console)
+    time.sleep(1.5)                                                                 # long enough for it to print the sign-in address
+    return login_state()
+
+
+def send_login_code(code: str) -> dict:
+    if not _login["current"]:
+        raise ValueError("start signing in first")
+    _login["current"].send_code(code)
+    time.sleep(2.0)
+    return login_state()
+
+
+def login_state() -> dict:
+    """Where signing in stands, and whether Claude Code is now signed in."""
+    cur = _login["current"]
+    st = cur.state() if cur else {"running": False, "exit_code": None, "url": None, "asks_for_code": False, "output": "", "seconds": 0}
+    auth = auth_status(refresh=cur is not None)                                     # while signing in, ask afresh each time
+    return {**st, "auth": auth}
+
+
+def install(emit: Callable[[str], None]) -> Optional[str]:
+    """Install Claude Code with Anthropic's own installer (macOS, Linux; on Windows, say how). Returns where it is now, or None."""
+    if os.name == "nt":
+        emit("On Windows, install Claude Code from https://claude.com/claude-code (the page has the PowerShell command), then press Check.")
+        return None
+    emit(f"Running Anthropic's installer: {INSTALLER}")
+    proc = subprocess.Popen(["/bin/bash", "-c", INSTALLER], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
+                            text=True, encoding="utf-8", errors="replace", bufsize=1)
+    for line in proc.stdout:                                                        # type: ignore[union-attr]
+        if line.strip():
+            emit(line.rstrip()[:300])
+    proc.wait(timeout=900)
+    _found.update(path=None, when=0.0)
+    path = find(refresh=True)
+    emit(f"Claude Code {claude_version_of(path)} is installed at {path}." if path else "The installer finished, but Claude Code was not found afterwards.")
+    return path
