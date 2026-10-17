@@ -174,8 +174,9 @@ def test_tool_wrapper_converts_both_policy_exception_types(server):
         raise SecurityError("not allowed")
 
     try:
+        from vmd_agent.toolset import FIX_HINT
         assert call(server, "raises_invalid") == {
-            "ok": False, "blocked": False, "error": "bad value"}
+            "ok": False, "blocked": False, "error": "bad value", "next_step": FIX_HINT}
         assert call(server, "raises_blocked") == {
             "ok": False, "blocked": True, "error": "not allowed"}
     finally:

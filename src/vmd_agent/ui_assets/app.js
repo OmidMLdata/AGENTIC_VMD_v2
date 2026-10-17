@@ -56,7 +56,7 @@ async function loadStatus() {
 function renderBanner(s) {
   const box = $("#banner"); box.textContent = "";
   if (s.model_ready) return;
-  const b = el("div", "banner"), why = s.model_state === "no_model" ? `The server answers but has no model called "${s.model}".` : `No model server answers at ${s.server}.`;
+  const b = el("div", "banner"), why = s.model_state === "no_model" ? `The server answers but has no model called "${s.model}".` : s.server === "claude-code:" ? (s.model_problem || "Claude Code is not ready") + "." : `No model server answers at ${s.server}.`;
   b.append(el("div", null, "The chat has no model to talk to. " + why + " The files, the tools, the whole jobs and the VMD window work without one."));
   if ((s.local_models || []).length && s.model_state === "no_server") b.append(el("div", null, `${s.local_models.length} models are downloaded on this computer (${s.local_models.join(", ")}): start the local server and pick one.`));
   if ((s.found_servers || []).length) b.append(el("div", null, "A model server does answer at " + s.found_servers.map(f => f.base_url).join(", ") + ": choose it under Choose a model…"));
@@ -73,7 +73,12 @@ async function startLocal() {
 }
 // the Model dialog: the same choice as in setup (a free local model, or another server)
 function fillModel(info) {
-  $("#model-state").textContent = info.state === "ready" ? `Using ${info.model} at ${info.base_url}.` : `Not working: ${info.problem}.`;
+  const cc = info.backend === "claude-code";
+  $("#model-state").textContent = info.state !== "ready" ? `Not working: ${info.problem}.`
+    : cc ? `Using Claude Code ${info.claude_version || ""}${info.model && info.model !== "default" ? ", model " + info.model : ""}.` : `Using ${info.model} at ${info.base_url}.`;
+  $("#model-claude-note").textContent = "Each question runs Claude Code in the background with vmd-agent's tools only (its own shell, file and web tools are switched off), " +
+    "working in your files folder and in this VMD window. Its usage counts toward your Claude plan or API account. " +
+    "If it is not signed in yet, run claude once in a terminal and sign in.";
   const list = $("#model-list"); list.textContent = ""; (info.available || []).forEach(m => list.append(new Option(m, m)));
   const loc = $("#model-local"); loc.textContent = "";
   (info.local_models || []).forEach(m => loc.append(new Option(m, m))); if (!(info.local_models || []).length) loc.append(new Option("no model downloaded yet: use Download a model below", ""));
@@ -119,11 +124,13 @@ $("#model-get-btn").onclick = async () => {
   } catch (e) { box.textContent = "✗ " + e.message; } finally { $("#model-get-btn").disabled = false; }
 };
 function modelSource() { return $('input[name="msrc"]:checked').value; }
-function showModelSource() { const local = modelSource() === "local"; $("#model-other").hidden = local; $("#model-local-box").hidden = !local; }
+function showModelSource() { const src = modelSource(); $("#model-other").hidden = src !== "other"; $("#model-local-box").hidden = src !== "local"; $("#model-claude-box").hidden = src !== "claude"; }
 async function openModel() {
   const info = await getJSON("/api/model"), local = info.is_private || (!info.has_key && /^https?:\/\/(localhost|127\.0\.0\.1)/.test(info.base_url) && info.private_available);
-  $$('input[name="msrc"]').forEach(r => { r.checked = r.value === (local ? "local" : "other"); });
-  $("#model-url").value = local ? "" : info.base_url; $("#model-key").value = ""; $("#model-name").value = info.model; $("#model-msg").textContent = "";
+  const cc = info.backend === "claude-code";
+  $$('input[name="msrc"]').forEach(r => { r.checked = r.value === (cc ? "claude" : local ? "local" : "other"); });
+  $("#model-url").value = local || cc ? "" : info.base_url; $("#model-key").value = ""; $("#model-name").value = cc ? "" : info.model; $("#model-msg").textContent = "";
+  if (cc) $("#model-claude").value = ["default", "sonnet", "opus", "haiku"].includes(info.model) ? info.model : "default";
   fillModel(info); showModelSource(); $("#modeldlg").showModal();
 }
 $$('input[name="msrc"]').forEach(r => r.onchange = showModelSource);
@@ -131,6 +138,12 @@ $("#model-close").onclick = () => $("#modeldlg").close();
 $("#model-check").onclick = async () => { fillModel(await getJSON("/api/model")); loadStatus(); };
 $("#model-start").onclick = async () => { $("#model-msg").textContent = "Starting…"; const r = await (await api("/api/model/start", {})).json(); $("#model-msg").textContent = r.error || ""; fillModel(r); loadStatus(); };
 $("#model-use").onclick = async () => {
+  if (modelSource() === "claude") {
+    const r = await api("/api/model/use", { claude_code: true, model: $("#model-claude").value, remember: true }), j = await r.json();
+    if (!r.ok) { $("#model-msg").textContent = j.error; return; }
+    fillModel(j); $("#model-msg").textContent = j.state === "ready" ? "Saved. The chat now asks Claude Code (a new conversation)." : "Saved, but " + j.problem + ".";
+    $("#log").textContent = ""; $("#welcome").classList.remove("gone"); loadStatus(); return;
+  }
   const local = modelSource() === "local", body = { model: local ? $("#model-local").value : $("#model-name").value.trim(), remember: true, local };
   if (local && !body.model) { $("#model-msg").textContent = "No model is downloaded yet: open Download a model below."; $("#model-get").open = true; return; }
   if (!local) { body.base_url = $("#model-url").value.trim(); if ($("#model-key").value) body.api_key = $("#model-key").value; }

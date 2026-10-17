@@ -149,7 +149,11 @@
   <fieldset><legend>Where the model runs</legend>
     <label class="opt"><input type="radio" name="msrc" value="local"> A free model on this computer (the private Ollama that setup installs)</label>
     <label class="opt"><input type="radio" name="msrc" value="other"> Another server: an online service you have access to, or your own Ollama, LM Studio, vLLM</label>
+    <label class="opt"><input type="radio" name="msrc" value="claude"> Claude Code on this computer: uses your Claude Code sign-in (a Claude subscription or its own API key), no key needed here</label>
   </fieldset>
+  <div id="model-claude-box" hidden><label for="model-claude">Claude model</label>
+    <select id="model-claude"><option value="default">Claude Code's default</option><option value="sonnet">Sonnet</option><option value="opus">Opus</option><option value="haiku">Haiku</option></select>
+    <p class="note" id="model-claude-note"></p></div>
   <div id="model-local-box"><label for="model-local">Models downloaded on this computer</label><select id="model-local"></select>
     <details id="model-get"><summary>Download a model</summary>
       <p class="note" id="model-device"></p>
@@ -162,7 +166,7 @@
     <label for="model-key">API key (leave empty if it needs none)</label><input id="model-key" type="password" autocomplete="off">
     <label for="model-name">Model name</label><input id="model-name" type="text" list="model-list" spellcheck="false" autocomplete="off"><datalist id="model-list"></datalist></div>
   <p class="note" id="model-msg" role="status"></p>
-  <p class="note">To use Claude Code or Claude Desktop as the assistant instead of a model here, run <code>vmd-agent mcp-config</code> in a terminal.</p>
+  <p class="note">To use vmd-agent's tools from inside the Claude Desktop app instead, run <code>vmd-agent mcp-config</code> in a terminal.</p>
   <div class="dlgbtns"><button class="btn" id="model-start" type="button">Start local server</button><button class="btn" id="model-check" type="button">Check</button><span class="grow"></span>
     <button class="btn" id="model-use" type="button">Use this model</button><button class="btn" id="model-close" type="button">Close</button></div>
 </div></dialog>

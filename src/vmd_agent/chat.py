@@ -35,14 +35,22 @@ def main(base_url: Optional[str] = None, model: Optional[str] = None,
             os.path.realpath(r) for r in roots)
     rts = ensure_roots()
 
-    problem = check_connection(base_url, model, api_key) if check_model else None
+    from vmd_agent import claude_code
+    use_claude = claude_code.is_claude_code(base_url)
+    if use_claude:
+        problem = claude_code.check() if check_model else None
+    else:
+        problem = check_connection(base_url, model, api_key) if check_model else None
     if problem:
         for line in problem:
             say(line)
         return 2
 
-    session = Agent(base_url, model, api_key, max_turns, temperature,
-                          echo=say, tools=tools)
+    if use_claude:                                                    # Claude Code on this computer, with vmd-agent's tools
+        session = claude_code.Session(model, root=rts[0] if rts else None, echo=say)
+    else:
+        session = Agent(base_url, model, api_key, max_turns, temperature,
+                        echo=say, tools=tools)
 
     def answer(question: str, lead: str = "") -> None:
         """Ask and show the answer: piece by piece as it is written when streaming, else all at once."""

@@ -124,3 +124,18 @@ Inside the container the data directory is `/data` and the sandbox is already se
 | movies or video tools fail | `vmd-agent tool probe_environment` shows whether ffmpeg was found (the bundled copy normally is); check that the server runs in the environment where vmd-agent was installed. |
 
 57 tools, in eleven groups ([the library](tools.md)): `probe_environment` · `inspect_files` · `detect_system` · `structure_stats` · `search_pdb` · `fetch_structure` · `visualize_and_interpret` · `render_image` · `render_movie` · `annotate_image` · `view_image` · `generate_visualization_recipe` · `list_representations` · `color_key` · `export_session` · `run_tcl` · `window_open` · `window_load` · `window_molecules` · `window_representation` · `window_display` · `window_view` · `window_animate` · `window_query` · `window_snapshot` · `window_scene` · `window_visualize` · `window_movie` · `window_save` · `analyze_trajectory` · `measure_with_vmd` · `select_keyframes` · `periodic_box` · `find_interactions` · `secondary_structure` · `backbone_torsions` · `check_structure` · `align_structures` · `convert_trajectory` · `write_structure` · `make_map` · `inspect_map` · `combine_maps` · `fit_to_map` · `build_system` · `mutate_residue` · `merge_structures` · `build_membrane` · `build_nanotube` · `prepare_namd` · `write_slurm_script` · `probe_video` · `interpret_video` · `verify_claims` · `record_visual_interpretation` · `assemble_report` · `verify_provenance`. Plus `run_workflow` (with no name it lists the workflows).
+## Claude Code as the assistant inside the web page
+
+The web page's chat can use Claude Code itself instead of a model server. In **Extensions, Model**, choose **Claude Code on this computer**,
+pick a Claude model (or keep Claude Code's default) and press **Use this model**. Each question is then handed to Claude Code in the
+background (`claude -p`), with vmd-agent's tools as its only tools: Claude Code's own shell, file-editing and web tools are switched off,
+the tools are sandboxed to your files folder, and they drive the same VMD window as the page. The chat shows each tool call with its
+seconds and pictures, as with any model, and later questions continue the same Claude Code conversation (**New** starts another).
+
+What it needs:
+
+* Claude Code installed (from <https://claude.com/claude-code>), and signed in once: run `claude` in a terminal and sign in with your Claude
+  account, or set it up with an API key. Its usage counts toward that plan or account; the page needs no key of its own.
+* Nothing else: vmd-agent writes the MCP configuration for each question itself, so `vmd-agent mcp-config` is not needed for this.
+
+The terminal chat does the same after the choice is saved (or with `vmd-agent chat --base-url claude-code:`).

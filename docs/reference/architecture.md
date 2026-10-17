@@ -41,6 +41,7 @@ src/vmd_agent/
   routing.py      which tools to offer a model for a question (and `offer_tools`, the way to ask for more)
   argfix.py       puts a model's unambiguous argument mistakes right, and says so
   toolhints.py    what a parameter means and its allowed values, for the model only
+  claude_code.py  Claude Code on this computer as the chat's assistant (claude -p, with these tools over MCP)
   chat.py         `vmd-agent chat`: the terminal front end of the agent
   ui.py           `vmd-agent ui`: the web page, a front end of the agent and of the whole jobs
   model_tasks.py  the model benchmark's tasks and graders;  model_bench.py runs them through the agent
@@ -89,7 +90,7 @@ ones; no cycles):
 | `evidence` | `inputs`, `structure`, `dynamics`, `environment`, `security` |
 | `vmdkit` | `inputs`, `structure`, `visual`, `environment`, `security`, `progress` |
 | `bench` | `structure`, `evidence`, `inputs` (it makes test structures; nothing imports it except the tool test set) |
-| `auto.py`, `cli.py`, `server.py`, `toolset.py`, `vmd_tools.py`, `vmd_cli.py`, `workflows.py`, `reporting.py`, `agent.py`, `toolhints.py`, `chat.py`, `ui.py`, `model_tasks.py`, `model_bench.py`, `tool_cases.py`, `tool_dataset.py`, `launcher.py`, `wizard.py`, `mcp_check.py`, `__init__.py` | anything: they are the only places that compose units |
+| `auto.py`, `cli.py`, `server.py`, `toolset.py`, `vmd_tools.py`, `vmd_cli.py`, `workflows.py`, `reporting.py`, `agent.py`, `toolhints.py`, `chat.py`, `claude_code.py`, `ui.py`, `model_tasks.py`, `model_bench.py`, `tool_cases.py`, `tool_dataset.py`, `launcher.py`, `wizard.py`, `mcp_check.py`, `__init__.py` | anything: they are the only places that compose units |
 
 `dynamics` and `visual` are siblings and never import each other, which is why rendering the chosen keyframes
 (`auto.select_keyframes`) and the renderer inventory (`auto.probe_environment`) live in `auto.py`.

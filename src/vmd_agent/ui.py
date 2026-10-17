@@ -135,24 +135,36 @@ class State:
         self.auto_vmd = auto_vmd                     # whether the page opens a VMD window by itself when it loads
         self.token = secrets.token_urlsafe(24)
         self.busy = threading.Lock()
-        self.session = agent_mod.Agent(base_url, model, api_key, tools=tools, echo=lambda m: None)
+        self.session = self._new_session()
         self.window_lock = threading.Lock()          # one picture of the VMD window at a time
+
+    def _new_session(self):
+        """The chat: with Claude Code on this computer, or with a model server."""
+        from vmd_agent import claude_code
+        if claude_code.is_claude_code(self.base_url):
+            return claude_code.Session(self.model, root=self.root)
+        return agent_mod.Agent(self.base_url, self.model, self.api_key, tools=self.tools, echo=lambda m: None)
 
     def set_tools(self, profile: str) -> None:
         self.tools = profile
-        self.session = agent_mod.Agent(self.base_url, self.model, self.api_key, tools=profile, echo=lambda m: None)
+        self.session = self._new_session()
 
     def reconnect(self, base_url: str, model: str, api_key: Optional[str]) -> None:
         """Point the chat at another model or server (a new conversation: the old one was with the old model)."""
         self.base_url, self.model, self.api_key = base_url, model, api_key
-        self.session = agent_mod.Agent(base_url, model, api_key, tools=self.tools, echo=lambda m: None)
+        self.session = self._new_session()
 
     def model_info(self, timeout: float = 4.0) -> dict:
         """What the page needs to say about the model: where it is, whether it answers, which models the server has, and what can be done about it.
         ``state`` is ``ready``, ``no_server`` (nothing answers at the address) or ``no_model`` (the server answers but does not have that model)."""
-        from vmd_agent import ollama_local
+        from vmd_agent import claude_code, ollama_local
         from vmd_agent.llm_client import LLMError, list_models
         private = ollama_local.find_binary() is not None
+        if claude_code.is_claude_code(self.base_url):
+            info = {**claude_code.info(self.model), "private_available": private, "is_private": False,
+                    "local_models": ollama_local.installed_models() if private else [], "local_url": ollama_local.url(), "found": []}
+            info.update(self.device_advice(info["local_models"]))
+            return info
         info = {"base_url": self.base_url, "model": self.model, "has_key": bool(self.api_key), "available": [], "state": "ready", "problem": None,
                 "private_available": private, "is_private": self.base_url == ollama_local.url(),
                 "local_models": ollama_local.installed_models() if private else [], "local_url": ollama_local.url(), "found": []}
@@ -213,7 +225,9 @@ class State:
         from vmd_agent.environment import probe_environment
         env = probe_environment()
         mi = self.model_info()
-        return {"version": __version__, "data_dir": self.root, "model": self.model, "server": self.base_url,
+        from vmd_agent import claude_code
+        label = ("Claude Code" + ("" if self.model in ("", claude_code.DEFAULT) else f" ({self.model})")) if claude_code.is_claude_code(self.base_url) else self.model
+        return {"version": __version__, "data_dir": self.root, "model": label, "server": self.base_url,
                 "model_ready": mi["state"] == "ready", "model_state": mi["state"], "model_problem": mi["problem"], "model_available": mi["available"],
                 "local_models": mi["local_models"], "found_servers": mi["found"],
                 "private_available": mi["private_available"], "is_private": mi["is_private"],
@@ -470,6 +484,13 @@ class Handler(http.server.BaseHTTPRequestHandler):
         if self.state.busy.locked():
             return self._json({"error": "another job is still running; wait for it to finish"}, 409)
         model = str(payload.get("model") or "").strip()
+        if payload.get("claude_code"):                                # Claude Code on this computer: no address, no key
+            from vmd_agent import claude_code
+            model = model or claude_code.DEFAULT
+            self.state.reconnect(claude_code.URL, model, None)
+            if payload.get("remember"):
+                settings.save(llm_url=claude_code.URL, llm_model=model, llm_key=None)
+            return self._json(self.state.model_info())
         if not model:
             return self._json({"error": "name the model"}, 400)
         if payload.get("local"):
