@@ -65,6 +65,19 @@ vmd-agent bench tools                              # every tool on generated dat
 
 More: [the model benchmark](../benchmarks/model-benchmark.md) and [the tool test set](../benchmarks/tool-test-set.md).
 
+## Claude
+
+Claude can answer instead of a free model. Choose it in setup (step 3) or with **Model** in the web page. The models offered are
+Claude Fable 5.1 (the most capable), Claude Opus 5.5 (complex work), Claude Sonnet 5.5 (a good everyday choice) and Claude Haiku 5.5 (the fastest).
+
+* **With your Claude account** (setup choice 2; in the web page, *Claude Code on this computer*). No address and no key: the Model window
+  installs Claude Code (Anthropic's program) if it is missing and signs you in with your email or Google in the browser. It needs a paid
+  Claude plan (Pro, Max, Team or Enterprise), and its use counts toward that plan. Each question runs Claude Code in the background with
+  vmd-agent's tools only. [Details](mcp.md#claude-code-as-the-assistant-inside-the-web-page).
+* **With an API key** (setup choice 3; in the web page, *Another server*). Address `https://api.anthropic.com/v1`, a key from the Claude
+  Console that is **scoped to a workspace** (an unscoped key is refused), and a model name such as `claude-sonnet-5-5`. vmd-agent sends
+  what Claude's API needs (its version header, and no temperature for the newer models).
+
 ### How the chat keeps a model honest
 
 Language models guess; these checks stop a guess from passing as a measurement.
