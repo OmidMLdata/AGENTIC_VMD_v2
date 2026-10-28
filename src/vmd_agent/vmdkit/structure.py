@@ -11,6 +11,25 @@ from vmd_agent.vmdkit import script as S
 HELIX, STRAND = set("HGI"), set("EB")
 
 
+#: what VMD prints when it could not run STRIDE; it then gives every residue "C" and carries on, so the script still "succeeds"
+STRIDE_FAILED = ("Call to Stride program failed", "unable to write input file for Stride")
+
+
+def stride_failed(log: str) -> Optional[str]:
+    """Why VMD's secondary structure cannot be trusted, or None. When STRIDE does not run, VMD reports every residue as coil
+    without raising an error, which would read as a real (and wrong) result. VMD writes STRIDE's input file in /var/tmp
+    whatever TMPDIR says, so a sandbox that forbids writing there is enough to cause it."""
+    text = log or ""
+    if not any(m in text for m in STRIDE_FAILED):
+        return None
+    where = next((ln.strip() for ln in text.splitlines() if "Unable to open input file" in ln), "")
+    return ("VMD could not run STRIDE, so it has no secondary structure (it would have reported every residue as coil). "
+            + (f"VMD said: {where} " if where else "")
+            + "VMD writes STRIDE's input file in /var/tmp: check that this folder is writable for the program running VMD "
+              "(a sandbox may forbid it) and that STRIDE_BIN points to a working stride. The built-in DSSP "
+              "(secondary structure without VMD) does not need STRIDE.")
+
+
 def secondary_structure(topology: str, trajectory: Optional[str] = None, selection: str = "protein",
                         first: int = 0, last: int = -1, step: int = 1,
                         vmd_path: Optional[str] = None) -> dict:
@@ -28,6 +47,9 @@ def secondary_structure(topology: str, trajectory: Optional[str] = None, selecti
     res = S.run(body, vmd_path)
     if not res["ok"]:
         return {"ok": False, "error": res.get("error"), "log": res.get("log", "")[-400:]}
+    failed = stride_failed(res.get("log", ""))
+    if failed:
+        return {"ok": False, "error": failed, "log": res.get("log", "")[-400:]}
     rows = res["rows"]
     resid = [int(x) for x in rows["RES"][0]]
     names = rows["NAME"][0]
