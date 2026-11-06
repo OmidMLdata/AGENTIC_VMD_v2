@@ -128,6 +128,8 @@ def measure(topology: str, trajectory: Optional[str] = None, kind: str = "rgyr",
     info = rows.get("INFO", [[]])[0]
     out = {"ok": True, "kind": kind, "selection": s1, "n_atoms": int(info[1]), "n_frames_loaded": int(info[3]),
            "engine": "VMD measure"}
+    if kind in ("rgyr", "center", "rmsd", "rmsf", "distance", "cluster"):
+        out["weighting"] = "mass" if mass_weighted else "none"       # VMD's own default is unweighted: say which was used
     if kind in ("rmsf",):
         atoms = [{"index": int(r[0]), "resname": r[1], "resid": int(r[2]), "name": r[3], "rmsf": float(r[4])}
                  for r in rows.get("A", [])]

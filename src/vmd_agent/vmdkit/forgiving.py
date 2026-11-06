@@ -194,10 +194,23 @@ def selection(value: Any) -> Any:
 
 
 # ------------------------------------------------------------------------------------------------ file arguments
-_PLACEHOLDER = re.compile(r"(?i)^\s*(<[^>]*>|\{[^}]*\}|\[[^\]]*\]|none|null|nil|n/?a|undefined|optional|\.|-|your[_ ]\w+.*|path/to/.*|"
-                          r"(topology|trajectory|structure|file|filename|map|map_file)(\.\w+)?)\s*$")
+_PLACEHOLDER = re.compile(r"(?i)^\s*(<[^>]*>|\{[^}]*\}|\[[^\]]*\]|none|null|nil|n/?a|undefined|optional|\.|-|your[_ ]\w+.*|path/to/.*)\s*$")
+#: words a model writes instead of a file name ('topology', 'structure.pdb'). They are placeholders only where a file is expected:
+#: 'Structure' is also VMD's own colouring method (by secondary structure), and must reach VMD when it is given as a colour.
+_FILE_WORD = re.compile(r"(?i)^\s*(topology|trajectory|structure|file|filename|map|map_file)(\.\w+)?\s*$")
+_FILE_PARAM = re.compile(r"(?i)(^|_)(topology|trajectory|file|files|path|dir|pdb|psf|dcd|xtc|mp4|png|map|video|spec)($|_)|^out_")
 
 
-def is_placeholder(value: Any) -> bool:
-    """A value a model put in place of 'not given': '', '<your_topology>', 'None', 'path/to/file.pdb', 'topology', ..."""
-    return isinstance(value, str) and (not value.strip() or bool(_PLACEHOLDER.match(value)))
+def is_file_parameter(name: Optional[str]) -> bool:
+    """Whether a tool parameter of this name takes a file or folder (topology, trajectory, map_file, out_png, session_dir ...)."""
+    return bool(name) and bool(_FILE_PARAM.search(str(name)))
+
+
+def is_placeholder(value: Any, param: Optional[str] = None) -> bool:
+    """A value a model put in place of 'not given': '', '<your_topology>', 'None', 'path/to/file.pdb', and, for a parameter that takes
+    a file (or when no parameter is named), a bare word such as 'topology' or 'structure'."""
+    if not isinstance(value, str):
+        return False
+    if not value.strip() or _PLACEHOLDER.match(value):
+        return True
+    return bool(_FILE_WORD.match(value)) and (param is None or is_file_parameter(param))

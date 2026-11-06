@@ -18,19 +18,36 @@ def _which(name: str) -> Optional[str]:
     return shutil.which(name)
 
 
-def find_ffmpeg() -> Optional[str]:
-    """ffmpeg: one on the PATH if there is one, otherwise the copy that comes with the
-    ``imageio-ffmpeg`` package (a dependency of vmd-agent, so it lives inside the same private
-    environment and nothing has to be installed system-wide). ``None`` only if neither exists."""
-    found = _which("ffmpeg")
-    if found:
-        return found
+_H264: dict = {}
+
+
+def _encodes_h264(exe: str) -> bool:
+    """Whether this ffmpeg has the libx264 encoder the movies are written with (a stripped-down build, such as the one conda
+    installs, often has not, and then every .mp4 fails with "Unknown encoder 'libx264'")."""
+    if exe not in _H264:
+        try:
+            out = subprocess.run([exe, "-hide_banner", "-encoders"], capture_output=True, text=True, timeout=30).stdout
+        except (OSError, subprocess.SubprocessError, ValueError):
+            out = ""
+        _H264[exe] = " libx264 " in out
+    return _H264[exe]
+
+
+def _bundled_ffmpeg() -> Optional[str]:
     try:
         import imageio_ffmpeg
         exe = imageio_ffmpeg.get_ffmpeg_exe()
         return exe if exe and os.path.isfile(exe) else None
     except Exception:
         return None
+
+
+def find_ffmpeg() -> Optional[str]:
+    """ffmpeg: the first of the one on the PATH and the copy that comes with the ``imageio-ffmpeg`` package (a dependency of
+    vmd-agent, so nothing has to be installed system-wide) that can encode H.264; if neither can, whichever exists (it still reads
+    videos). ``None`` only if neither exists."""
+    found = [exe for exe in (_which("ffmpeg"), _bundled_ffmpeg()) if exe]
+    return next((exe for exe in found if _encodes_h264(exe)), found[0] if found else None)
 
 
 def find_vmd(hint: Optional[str] = None) -> Optional[str]:

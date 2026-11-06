@@ -55,7 +55,7 @@ def _drop_placeholders(fn: Callable, kwargs: dict) -> dict:
     except (TypeError, ValueError):
         return kwargs
     return {k: v for k, v in kwargs.items()
-            if not (is_placeholder(v) and k in params and params[k].default is not inspect.Parameter.empty)}
+            if not (is_placeholder(v, k) and k in params and params[k].default is not inspect.Parameter.empty)}
 
 
 def guard(fn: Callable) -> Callable:
