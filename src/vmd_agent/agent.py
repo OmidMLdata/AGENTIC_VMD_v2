@@ -98,18 +98,33 @@ _DATA_WORDS = re.compile(
 _NUM = re.compile(r"(?<![\w.])-?(?:\d{1,3}(?:[ ,\u202f\u00a0]\d{3})+(?![\d])(?:\.\d+)?|\d+(?:\.\d+)?(?:[eE][-+]?\d+(?![A-Za-z\d]))?)")
 
 
-#: what is not a claim about a measurement: a path (anything with a slash) and an identifier made of hex groups
-_NOT_NUMBERS = re.compile(r"\S*[/\\]\S*|\b[0-9a-fA-F]{6,}(?:-[0-9a-fA-F]{2,})+\b")
+#: what is not a claim about a measurement: a path (anything with a slash), a file name (sys_20261106-143951.pdb: its digits are a
+#: name, not a value) and an identifier made of hex groups
+_NOT_NUMBERS = re.compile(r"\S*[/\\]\S*|\b[\w.\-]*\d[\w.\-]*\.(?:pdb|psf|dcd|xtc|trr|gro|cif|mmcif|mol2|xyz|prmtop|nc|dx|mrc|ccp4|"
+                          r"cube|mp4|png|jpg|jpeg|tga|bmp|ppm|json|csv|txt|log|tcl|vmd|namd|conf|coor|vel|xsc|sh|md|html|pdf)\b|"
+                          r"(?<![.\d])\b(?=[0-9a-fA-F]*[a-dfA-DF])[0-9a-fA-F]{6,}(?:-[0-9a-fA-F]{2,})+\b", re.I)   # not 1.337814e-09
+_SUPER = str.maketrans("⁰¹²³⁴⁵⁶⁷⁸⁹⁻⁺", "0123456789-+")
+#: scientific notation written for people: 1.3 × 10⁻⁹, 1.3 x 10^-9, 1.3·10^(-9)
+_TIMES_TEN = re.compile(r"(\d(?:\.\d+)?)\s*(?:×|x|·|\*)\s*10\s*(?:\^\s*\(?\s*([-+−]?\d+)\s*\)?|([⁻⁺]?[⁰¹²³⁴⁵⁶⁷⁸⁹]+))")
+
+
+def _times_ten(m: "re.Match") -> str:
+    exp = (m.group(2) or m.group(3).translate(_SUPER)).replace("−", "-")
+    return f"{m.group(1)}e{exp}"
 
 
 def numbers(text: str):
+    """The numbers in a text as (value, decimals): decimals is the precision shown, in absolute terms (1.3e-9 shows 10 decimals)."""
     out = []
-    for m in _NUM.finditer(_NOT_NUMBERS.sub(" ", text)):
+    for m in _NUM.finditer(_NOT_NUMBERS.sub(" ", _TIMES_TEN.sub(_times_ten, text))):
         tok = re.sub(r"[ ,\u202f\u00a0](?=\d{3})", "", m.group(0)) if re.search(r"\d[ ,\u202f\u00a0]\d{3}", m.group(0)) else m.group(0)
         try:
-            out.append((float(tok), len(tok.split(".")[1].split("e")[0].split("E")[0]) if "." in tok else 0))
+            value = float(tok)
         except ValueError:
-            pass
+            continue
+        mantissa, _, exp = tok.lower().partition("e")
+        dec = len(mantissa.split(".")[1]) if "." in mantissa else 0
+        out.append((value, max(0, dec - int(exp)) if exp else dec))
     return out
 
 

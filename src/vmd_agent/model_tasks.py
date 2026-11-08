@@ -86,7 +86,9 @@ def truths(info: dict, folder: str) -> dict:
 _DECLINE = re.compile(r"\b(cannot|can't|can not|unable|not able|could not|couldn't|isn't possible|is not possible|not possible|no such file|"
                       r"does not exist|doesn't exist|not found|not allowed|blocked|disabled|outside|refus\w*|"
                       r"not (?:something|measured|computed|available|supported|calculated)|no tool|don't have|do not have|"
-                      r"cannot be (?:determined|computed|measured)|only (?:allowed|files))\b", re.I)
+                      r"cannot be (?:determined|computed|measured)|only (?:allowed|files)|"
+                      r"(?:turned|switched) off|not (?:enabled|run|executed)|"
+                      r"(?:did not|didn't|does not|doesn't|will not|won't|was not|wasn't|is not|isn't) (?:run|ran|execute|executed|enabled))\b", re.I)
 
 
 def has_number(text: str, value: float, tol: float, percent: bool = False) -> bool:

@@ -91,11 +91,9 @@ def skip_reason(task: M.Task, extras: Sequence[str], skip: Sequence[str], unmet:
 # -------------------------------------------------------------------- one run
 @contextlib.contextmanager
 def _window_isolated(work: str, task: "M.Task"):
-    """The window tasks run against a VMD with no window and a link folder of its own, so nothing appears on a screen and a window you have open is never touched.
-    The VMD is closed when the task is done (after it has been graded: the grader asks it)."""
-    if not (task.category == "window" or task.id.startswith("window_")):
-        yield
-        return
+    """Every task runs against a VMD with no window and a link folder of its own, so nothing appears on a screen, a window you have open is
+    never touched, and no task can see a molecule another task loaded. The VMD is closed when the task is done (after it has been graded:
+    the grader asks it)."""
     from vmd_agent import vmdlink
     keep = {k: os.environ.get(k) for k in ("VMD_AGENT_HOME", "VMD_AGENT_WINDOW_HEADLESS")}
     os.environ["VMD_AGENT_HOME"] = os.path.join(work, ".agent_home")
@@ -109,6 +107,15 @@ def _window_isolated(work: str, task: "M.Task"):
                 os.environ.pop(k, None)
             else:
                 os.environ[k] = v
+
+
+#: how much of each tool result is kept in the records (for auditing grades and flagged numbers)
+CALL_CHARS = 4000
+
+
+def grounded(answer: str, tool_texts: Sequence[str], question: str) -> bool:
+    """Whether every number in the answer came from a tool result or from the question itself, the same rule the chat's own check uses."""
+    return not agent_mod.unsupported_numbers(answer, list(tool_texts) + [question])
 
 
 def _strip_check(text: str) -> str:
@@ -158,7 +165,9 @@ def run_task(task: M.Task, model: str, base_url: str, api_key: Optional[str], ba
             rec["answer_ok"] = why is None
             rec["reason"] = why or ""
         tool_texts = [json.dumps(c["result"], default=str) for c in calls]
-        rec["grounded"] = not agent_mod.unsupported_numbers(answer, tool_texts) if calls else None
+        rec["grounded"] = grounded(answer, tool_texts, task.prompt) if calls else None
+        rec["calls"] = [{"name": c["name"], "arguments": c.get("arguments"), "result": json.dumps(c["result"], default=str)[:CALL_CHARS]}
+                        for c in calls]                                  # kept so every grade and every flagged number can be audited
         rec["success"] = bool(rec["tool_ok"] and rec["answer_ok"])
         clock = session.clock
         rec.update({"wall_s": round(wall, 2), "model_s": round(clock["model_s"], 2), "tool_s": round(clock["tool_s"], 2),
