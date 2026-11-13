@@ -1,0 +1,5 @@
+quantity,VMD-Agent,careful manual VMD,naive manual VMD (no fit),naive / careful
+"CA RMSD, mean over 20 ns (Å)",1.669,1.669,18.751,11.2
+"CA RMSD, maximum (Å)",3.091,3.091,37.21,12.0
+"CA RMSF, mean over residues (Å)",0.752,0.752,15.618,20.8
+"CA RMSF, most rigid residue (Å)",0.38,0.38,13.952,36.7

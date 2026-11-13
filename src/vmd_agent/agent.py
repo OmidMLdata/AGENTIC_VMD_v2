@@ -116,6 +116,7 @@ def _times_ten(m: "re.Match") -> str:
 def numbers(text: str):
     """The numbers in a text as (value, decimals): decimals is the precision shown, in absolute terms (1.3e-9 shows 10 decimals)."""
     out = []
+    text = text.replace("\u2212", "-") if text else text          # the typographic minus sign (−) is a minus: −14.2 is -14.2
     for m in _NUM.finditer(_NOT_NUMBERS.sub(" ", _TIMES_TEN.sub(_times_ten, text))):
         tok = re.sub(r"[ ,\u202f\u00a0](?=\d{3})", "", m.group(0)) if re.search(r"\d[ ,\u202f\u00a0]\d{3}", m.group(0)) else m.group(0)
         try:

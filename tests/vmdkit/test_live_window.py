@@ -214,7 +214,10 @@ def test_the_window_tools_do_what_the_agent_would_ask(window):
     assert t["window_animate"](action="goto", frame=12)["frame"] == 12
     assert t["window_query"](selection="resname ALA")["natoms"] == 20
     assert t["window_molecules"](action="list")["molecules"][0]["frames"] == 50
-    assert t["window_scene"](scene_spec={"reps": [{"selection": "protein", "style": "Tube", "color": "Name"}]}, topology=os.path.join(d, "protein.pdb"))["ok"]
-    assert len(t["window_molecules"]()["molecules"]) == 2
+    r = t["window_scene"](scene_spec={"reps": [{"selection": "protein", "style": "Tube", "color": "Name"}]}, topology=os.path.join(d, "protein.pdb"))
+    assert r["ok"] and r["molecule"] == 0                    # protein.pdb is already in the window: it is redrawn, not loaded a second time
+    assert len(t["window_molecules"]()["molecules"]) == 1
+    reps = win.reps(0)
+    assert [x["style"].split()[0] for x in reps] == ["Tube"] and reps[0]["color"] == "Name"
     shot = t["window_snapshot"](out_png=os.path.join(d, "w.png"), quality="tachyon")
     assert shot["ok"] and os.path.getsize(shot["image"]) > 1000

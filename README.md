@@ -10,6 +10,29 @@ every number in an answer has to come from a tool. You can watch it work in a re
 By default the model runs **on your own computer** (free and open source), so your data never leaves it. You can instead let **Claude** answer, with your own
 Claude account (sign in in the browser, no API key) or with an API key.
 
+## What it looks like
+
+![The vmd-agent web workbench driving a real VMD window](docs/images/vmd-agent-workbench.jpg)
+
+*Asked to show the parts of aquaporin Z that control water flow, the agent removed the see-through water surface that hid everything, drew each
+protein chain as a cartoon and the pore-lining residues as sticks, added the crystal waters from the 1RC2 structure, and then explained in the chat
+what it drew and why. Every picture on the page is VMD's own drawing.*
+
+The web page (`vmd-agent ui`) is a remote control for a real VMD, laid out like VMD's own windows:
+
+| Part of the page | What it does |
+|---|---|
+| **Menus** (top) | VMD's menus: File, Molecule, Graphics, Display, Mouse, Animation, Extensions and Help. |
+| **Molecules** (top left) | What VMD has loaded, read back from VMD: ID, top (T), drawn (D), name, atoms and frames. Here a carbon nanotube, the solvated aquaporin Z system (169,797 atoms) and the 1RC2 crystal structure. |
+| **Files** (left) | Your files folder, the only place the agent may read or write. Drop files on it to add them. |
+| **Display** (centre) | Snapshots of the VMD window. Rotate, Move and Zoom act on VMD's own view, and *live* keeps the picture current. |
+| **Animation bar** (below the display) | Steps through the frames of a trajectory inside VMD. |
+| **Chat, Tools, Whole jobs** (right) | Ask in plain words, fill in a form for any single tool, or start a whole job that writes a report. The answer here lists, element by element, how the scene was drawn. |
+| **Console** (bottom) | Takes VMD commands, and logs every tool call and model call with the seconds it took. |
+| **Status bar** (very bottom) | Who answers (here Claude Opus 5.5 through Claude Code), whether VMD and ffmpeg are ready, how tools are offered to the model, and the vmd-agent version. |
+
+More about the page: [Your VMD window](docs/guide/window.md).
+
 ## What you need
 
 | | |
@@ -89,12 +112,29 @@ Everything the agent does is listed with the seconds it took. Click any line to 
 
 ## Choosing a model
 
-`vmd-agent models` reads your computer and marks each suggested model **fits**, **tight** or **too big**, and names the one to start with. On a 16 GB computer that is usually `granite4.1:8b` (5.4 GB). Details:
+`vmd-agent models` reads your computer and marks each suggested model **fits**, **tight** or **too big**, and names the one to start with. On a 16 GB computer that is usually `granite4.1:8b` (5.4 GB); in the benchmark below, `gemma4:e4b` solved more tasks on a 16 GB Mac. Details:
 [Models](docs/guide/models.md).
 
 **Claude** can answer instead, chosen in setup or in **Model** in the web page: Claude Fable 5.1, Opus 5.5, Sonnet 5.5 or Haiku 5.5. Either with your **Claude account**
 (choose *Claude Code on this computer*; the window installs Claude Code and signs you in, no key), or with an **API key** (choose *Another server*, address
 `https://api.anthropic.com/v1`, a key scoped to a workspace, and a model name such as `claude-sonnet-5-5`). [Claude](docs/guide/models.md#claude).
+
+## How well do models use it?
+
+vmd-agent ships with a [model benchmark](docs/benchmarks/model-benchmark.md): 70 plain-language tasks, each graded by a program against data built to
+have known answers, never by another model. In November 2026 we ran three models on it, three tries per task, with everything except the model held
+fixed (the same tools, tool offering, guard and turn limit):
+
+| Model | Where it ran | Tasks solved | Solved on all three tries | Median time per run |
+|---|---|---|---|---|
+| Claude Opus 5.5 | Anthropic's API | 100% | 100% | 9.1 s |
+| Gemma 4 E4B (`gemma4:e4b`) | Ollama on an Apple M1 MacBook Pro, 16 GB | 87.3% | 82.4% | 25.4 s |
+| Granite 4.1 8B (`granite4.1:8b`) | Ollama on the same computer | 52.0% | 48.5% | 58.0 s |
+
+These figures cover 68 of the 70 tasks: two tasks named a scene file that no tool could read at the time (fixed in 1.1.0). Every failed run was reviewed
+against its saved answer and tool results, and the ten that the graders had marked wrong by mistake were re-graded. Claude helped to build vmd-agent and this benchmark, so read the ranking
+with that in mind, and measure the model you plan to use on your own computer (`vmd-agent bench models --model NAME`). The records, the audit and the
+analysis scripts are in [`paper/`](paper/README.md).
 
 ## Other ways to work
 
@@ -138,7 +178,7 @@ and web tools are switched off), and your Claude password is typed on Claude's s
 ## Learn more
 
 [Install and set up](docs/guide/install.md) · [How it works](docs/guide/how-it-works.md) · [Ways to work](docs/guide/using.md) · [Your VMD window](docs/guide/window.md) · [Models](docs/guide/models.md) · [The command line](docs/guide/commands.md) ·
-[MCP clients](docs/guide/mcp.md) · [Docker](docs/guide/docker.md) · [Development](docs/reference/development.md) · [All the pages](docs/index.md) · [Changelog](docs/CHANGELOG.md)
+[MCP clients](docs/guide/mcp.md) · [Docker](docs/guide/docker.md) · [Development](docs/reference/development.md) · [All the pages](docs/index.md) · [Benchmark data](paper/README.md) · [Changelog](docs/CHANGELOG.md)
 
 ## Contributing and licence
 

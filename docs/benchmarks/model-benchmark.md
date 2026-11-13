@@ -30,7 +30,7 @@ Each task is a plain-language request, asked in a **fresh conversation** and a *
 one task writes cannot help another. The real chat loop runs with the real tools. A **program** (never another model) grades the final answer and the files the model made against
 what the data was built to contain: numbers within a tolerance, words, a file read back with MDAnalysis. Records are appended to `records.jsonl` as they come, a run already
 there is skipped, so you can stop and continue, add a model later, or run models served by different servers one command at a time. `summary.md` and `summary.json` are rebuilt from
-the records. Nothing is stored in the repository: you run it on your models and your computer.
+the records. You run it on your models and your computer; the records of one comparison are kept in the repository as a reference ([below](#results-three-models-november-2026)).
 
 ## The tasks
 
@@ -79,8 +79,32 @@ With few tasks per category the intervals are wide; use `--repeats` (models vary
   the product. `--no-guard` measures the model alone.
 * **A slow answer is not a wrong one.** Time includes the model server's own load and your hardware. The first call of a model also loads it into memory.
 * **The graders are strict on purpose and can still be wrong.** They were checked against a real model's answers, and two were tightened because they let wrong answers through (a
-  "2 protein chains" answer, and a residue count that included the ligand). If you find a task that fails a correct answer or passes a wrong one, that is a bug in the task: tell the author.
+  "2 protein chains" answer, and a residue count that included the ligand). If you find a task that fails a correct answer or passes a wrong one, that is a bug in the task: tell the author. (An audit of the November 2026
+  run found ten such answers, all rejected for their wording; the graders now normalise typographic characters and accept that wording.)
 * **Do not run it with the model that wrote it.** Whatever model helped to write this benchmark should not be one of the models it is used to rank.
+
+## Results: three models, November 2026
+
+We ran Claude Opus 5.5 (Anthropic's API) and two open models served by Ollama 0.40.15 on an Apple M1 MacBook Pro with 16 GB of memory,
+with `--tools auto`, the guard on, `--max-turns 12` and three tries per task (630 runs). The open models ran at temperature 0; vmd-agent sends no
+temperature to Anthropic's API, so its default applied.
+
+| Model | Tasks solved (95% interval) | Solved on all three tries | Right tool called | Median time per run |
+|---|---|---|---|---|
+| Claude Opus 5.5 | 100% (94.7-100) | 100% | 100% | 9.1 s |
+| Gemma 4 E4B | 87.3% (79.9-94.1) | 82.4% | 94.4% | 25.4 s |
+| Granite 4.1 8B | 52.0% (40.2-63.2) | 48.5% | 62.7% | 58.0 s |
+
+Success is the mean over tasks of the share of tries passed, on the 68 valid tasks. `turntable` and `export_scene` named a scene file that no tool
+could read with Tcl off, so no model could pass them; 1.1.0 adds `scene_file` to the scene tools. All 152 failed runs were reviewed against the saved
+answers and tool results: 124 were real model errors, 10 were correct answers that a grader rejected (curly apostrophes, "do not exist", "no problems",
+"extended beta"; all from the two open models), and 18 were the two impossible tasks. The corrected graders were re-applied offline to the saved
+answers; with all 70 tasks, success was 97.1%, 84.8% and 50.5% (re-graded) or 97.1%, 82.4% and 48.1% (as recorded), so the ranking does not depend on
+the corrections.
+
+Two cautions. Claude helped to write vmd-agent and this benchmark, which is the situation the last point above warns about; the graders are programs
+and no grading error favoured Claude, but independent tasks would be a stronger test. And the comparison is not matched for hardware, quantization
+(Granite ran as Q4_K_M) or sampling. The records, manifests, audit table and scripts are in [`paper/`](../../paper/README.md).
 
 ## Adding a task
 

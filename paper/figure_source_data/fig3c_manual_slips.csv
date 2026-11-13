@@ -1,0 +1,9 @@
+slip,dataset,relative_error_percent
+"Mean RMSD, no fit",raw,1023.49
+"Max RMSD, no fit",raw,1103.82
+"Mean RMSF, no fit",raw,1976.86
+"Most rigid residue RMSF, no fit",raw,3571.58
+PDB coordinates kept as frame 0,pre,-2.0
+RMSF before fitting,pre,-0.8
+Terminal φ/ψ zeros averaged,pre,3.9
+Rg weighting mixed up,pre,-0.41

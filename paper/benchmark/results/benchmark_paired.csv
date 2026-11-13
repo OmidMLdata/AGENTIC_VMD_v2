@@ -1,0 +1,3 @@
+comparison,reference,other,n_tasks,mean_difference,ci_lo,ci_hi,tasks_reference_better,tasks_other_better,tasks_tied,p_sign_flip,p_holm
+Claude Opus 5.5 minus Granite 4.1 8B,claude-opus-5-5,granite4.1:8b,68,0.48039215686274517,0.36764705882352944,0.5931372549019608,35,0,33,4.9999750001249995e-06,9.999950000249999e-06
+Claude Opus 5.5 minus Gemma 4 E4B,claude-opus-5-5,gemma4:e4b,68,0.12745098039215688,0.058823529411764705,0.20098039215686278,12,0,56,0.00048828125,0.00048828125

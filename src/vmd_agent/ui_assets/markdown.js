@@ -34,4 +34,4 @@
   }
   const api = { render, esc };
   if (typeof module !== "undefined" && module.exports) module.exports = api; else root.VAMarkdown = api;
-})(typeof window !== "undefined" ? window : globalThis);
+})(typeof window !== "undefined" ? window : typeof globalThis !== "undefined" ? globalThis : this);   // `this` for Node.js older than 12, which has no globalThis

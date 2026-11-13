@@ -299,6 +299,7 @@ def render_image(topology: Optional[str] = None, trajectory: Optional[str] = Non
                  background: str = "white",
                  recipe_path: Optional[str] = None,
                  scene_spec: Optional[dict] = None,
+                 scene_file: Optional[str] = None,
                  vmd_path: Optional[str] = None) -> dict:
     """Render one publication image via headless VMD+Tachyon. Requires VMD (use visualize_and_interpret with
     renderer='matplotlib' without it). With only topology (and trajectory) it draws the system the way detect_system
@@ -306,7 +307,10 @@ def render_image(topology: Optional[str] = None, trajectory: Optional[str] = Non
     isosurfaces: [{file, isovalue, color, style: solid|wireframe|points}], background, frame, rotate: [[axis, degrees]],
     zoom, projection, axes, depthcue, shadows, ambient_occlusion}. Styles: Lines, Licorice, VDW, CPK, NewCartoon, QuickSurf,
     Surf, MSMS, ...; colors: Name, Element, ResName, Chain, Structure, Beta, ColorID n, ... (topology may then be left out
-    for a map-only scene). Use export_session to hand the same scene to a VMD user."""
+    for a map-only scene). Use export_session to hand the same scene to a VMD user. Instead of scene_spec you may give scene_file: a JSON file (such as scene.json) holding the same description."""
+    if scene_file:
+        from vmd_agent.vmdkit import scene
+        scene_spec = scene.load_spec(scene_spec, scene_file)
     if scene_spec is not None:
         from vmd_agent.vmdkit import scene
         return scene.render_scene(scene_spec, _p(topology), _p(trajectory), _p(out_png), width=width, height=height,
@@ -326,14 +330,15 @@ def render_image(topology: Optional[str] = None, trajectory: Optional[str] = Non
 def render_movie(topology: str, trajectory: Optional[str] = None,
                  out_mp4: str = "vmd_movie.mp4", stride: int = 1,
                  fps: int = 24, width: int = 1280, height: int = 720,
-                 spin: bool = False, scene_spec: Optional[dict] = None,
+                 spin: bool = False, scene_spec: Optional[dict] = None, scene_file: Optional[str] = None,
                  frames: int = 72, degrees: float = 360.0, axis: str = "y",
                  vmd_path: Optional[str] = None) -> dict:
     """Render a movie via VMD+Tachyon+ffmpeg. Requires VMD. By default it plays a trajectory (give trajectory) in ONE VMD
     session with a fixed camera. With spin=true it is a rotating-view movie instead (a turntable) of the scene in
-    scene_spec (same form as in render_image): the camera turns `degrees` about `axis` over `frames` frames."""
+    scene_spec (same form as in render_image): the camera turns `degrees` about `axis` over `frames` frames. Instead of scene_spec you may give scene_file: a JSON file (such as scene.json) holding the same description."""
     if spin:
         from vmd_agent.vmdkit import scene
+        scene_spec = scene.load_spec(scene_spec, scene_file)
         return scene.render_turntable(scene_spec or {}, _p(topology), _p(trajectory), _p(out_mp4), frames=frames,
                                       degrees=degrees, axis=axis, fps=fps, width=width, height=height, vmd_path=_p(vmd_path))
     if not trajectory:

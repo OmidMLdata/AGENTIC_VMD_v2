@@ -1,0 +1,9 @@
+data_set,quantity,n_values,max_abs_difference_tool_vs_careful_manual,note
+20 ns run,"CA RMSD to frame 0, fitted",2000,1.4e-6 A,against MDAnalysis the largest difference is 1.3e-6 A
+20 ns run,"CA RMSF, fitted",76,6.0e-8 A,
+50-frame set,"CA RMSD to frame 0, fitted",50,1.2e-6 A,
+50-frame set,"CA RMSF, fitted",76,0,
+50-frame set,"SASA, probe 1.4 A",50,0,
+50-frame set,"Hydrogen bonds (3.0 A, 20 deg)",50,0,
+50-frame set,Radius of gyration,50,0.079 A,"convention: the tool is mass-weighted, VMD's default is unweighted; against mass-weighted MDAnalysis the difference is 2.1e-5 A"
+50-frame set,Backbone phi / psi,74,0.085 deg / 0.091 deg,input: the tool was given the PDB coordinates and the script trajectory frame 0; on identical coordinates the difference is 0

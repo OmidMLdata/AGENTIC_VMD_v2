@@ -1,6 +1,33 @@
 # Changelog
 
-## Unreleased
+## 1.1.0
+
+**Analysis fixes**
+* **Secondary structure:** when STRIDE fails (for example because VMD cannot write its temporary file), the tool now reports the failure instead of
+  returning an all-coil assignment.
+* **VMD's `Structure` colouring is kept.** Bare words such as "structure" or "file" are treated as unfilled placeholders only in file-path arguments,
+  so `color='Structure'` is no longer dropped (with the default colouring used while the tool reported success).
+* **Movies:** an ffmpeg that can encode H.264 is preferred, falling back to the bundled one, instead of the first ffmpeg on the PATH.
+* **Measurements say how they were weighted** (`weighting: mass` or `none`). The radius of gyration is mass-weighted; VMD's own default is unweighted.
+* **Scenes from a file:** `render_image`, `render_movie`, `export_session` and `window_scene` take `scene_file`, a JSON scene description such as
+  `scene.json` inside the files folder, as an alternative to an inline `scene_spec`.
+
+**The answer guard**
+* The typographic minus sign (−) is read as a minus, so −14.2 is no longer taken for 14.2.
+* Digits inside file names (such as a time stamp) are not read as values, numbers written as 1.3 × 10⁻⁹ are read as one number with the precision
+  of the exponent, and tool values in scientific notation are no longer removed by the rule for hexadecimal identifiers.
+
+**The model benchmark**
+* Every task runs with its own VMD, so no task sees molecules left by another.
+* Records keep each tool result (the first 4,000 characters), which makes failed runs auditable.
+* The `grounded` measure accepts numbers that appear in the question, as the guard does.
+* Graders read answers with typographic apostrophes, quotation marks and minus signs normalised, and accept more natural wording: refusals in the
+  model's own words ("turned off", "didn't run", "do not exist"), "no problems found" for a provenance check, and "extended beta" for a strand colour.
+* **Results of a three-model comparison** (Claude Opus 5.5, Gemma 4 E4B, Granite 4.1 8B; November 2026), with the records, the audit of every
+  failed run and the analysis scripts, are in [`paper/`](../paper/README.md).
+
+**Documentation**
+* The README shows the web workbench and explains each part of the page.
 
 **Claude as the assistant**
 * **Your Claude account, no API key:** a new choice, *Claude Code on this computer* (setup choice 2, `setup --use claude`, or **Model** in the
@@ -26,6 +53,8 @@
   call says what to fix and what the window holds. A request in several parts becomes one representation per part.
 
 **Fixes**
+* The web page's scripts also load under Node.js older than version 12, which has no `globalThis`; the page's own tests failed there with
+  "globalThis is not defined".
 * HTTPS uses the operating system's certificates (`truststore`), fixing `CERTIFICATE_VERIFY_FAILED` on Macs and on networks that inspect
   secure traffic, for the model and for downloads.
 

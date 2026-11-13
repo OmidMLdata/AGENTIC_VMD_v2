@@ -31,6 +31,15 @@ CATEGORIES = ["inspect", "claims", "trajectory", "measure_with_vmd", "files", "b
               "hand_off", "records", "network", "decline"]
 
 
+#: typographic characters a model may write in place of plain ones: curly apostrophes and quotes, and the minus sign (−);
+#: the graders' patterns are written with the plain ones, so the answer is read with these replaced
+_TYPOGRAPHIC = str.maketrans({"\u2019": "'", "\u2018": "'", "\u02bc": "'", "\u201c": '"', "\u201d": '"', "\u2212": "-", "\u2011": "-"})
+
+
+def normalise_text(text: str) -> str:
+    return (text or "").translate(_TYPOGRAPHIC)
+
+
 @dataclass
 class Run:
     """What happened on one task: the model's final answer, every tool call with its result, and the folder it worked in."""
@@ -39,6 +48,9 @@ class Run:
     work: str
     truth: dict
     errors: List[str] = field(default_factory=list)
+
+    def __post_init__(self):
+        self.text = normalise_text(self.text)
 
     def p(self, name: str) -> str:
         return os.path.join(self.work, name)
@@ -84,7 +96,7 @@ def truths(info: dict, folder: str) -> dict:
 
 # --------------------------------------------------------------------------- graders
 _DECLINE = re.compile(r"\b(cannot|can't|can not|unable|not able|could not|couldn't|isn't possible|is not possible|not possible|no such file|"
-                      r"does not exist|doesn't exist|not found|not allowed|blocked|disabled|outside|refus\w*|"
+                      r"does not exist|doesn't exist|do not exist|don't exist|not found|not allowed|blocked|disabled|outside|refus\w*|"
                       r"not (?:something|measured|computed|available|supported|calculated)|no tool|don't have|do not have|"
                       r"cannot be (?:determined|computed|measured)|only (?:allowed|files)|"
                       r"(?:turned|switched) off|not (?:enabled|run|executed)|"
@@ -148,7 +160,7 @@ def _tasks() -> List[Task]:
         lambda r: first(None if has_number(r.text, r.truth["disulfides"], 0.01) else "wrong disulfide count",
                         None if has_number(r.text, r.truth["n_residues"], 0.01) else "wrong residue count (111 protein residues; the 112th is the ligand)"))
     add("colours", "inspect", "I coloured a figure by secondary structure ('Structure'). What do the colours mean?", ("color_key",),
-        lambda r: mentions(r.text, r"helix", r"(strand|sheet)"))
+        lambda r: mentions(r.text, r"helix", r"(strand|sheet|beta)"))
     add("representations", "inspect", "Which VMD drawing style is best for showing a binding pocket as a surface, and what does it do?",
         ("list_representations",), lambda r: mentions(r.text, r"QuickSurf|Surf|MSMS"))
 
@@ -291,7 +303,7 @@ def _tasks() -> List[Task]:
 
     # ---- 12. records
     add("provenance", "records", "Re-check the recorded inputs and outputs in the folder prov (provenance.json).", ("verify_provenance",),
-        lambda r: mentions(r.text, r"verif|match|unchanged|intact|ok|consistent|hash"))
+        lambda r: mentions(r.text, r"verif|match|unchanged|intact|ok|consistent|hash|no problems?|no issues?|nothing (?:was )?wrong"))
     add("report", "records", "Write up what is known about protein.pdb from the session folder sess as report.md.", ("assemble_report", "record_visual_interpretation"),
         lambda r: file_has(r, "report.md"))
 

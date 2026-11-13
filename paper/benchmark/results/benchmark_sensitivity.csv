@@ -1,0 +1,10 @@
+analysis,model,n_tasks,success,ci_lo,ci_hi,solved_all_3,claude_minus_model_pts,diff_ci,p_holm
+"Primary: 68 valid tasks, re-graded",Granite 4.1 8B,68,0.5196,0.402,0.6324,0.4853,48.0,+36.8 to +59.3,9.99995000025e-06
+"Primary: 68 valid tasks, re-graded",Gemma 4 E4B,68,0.8725,0.799,0.9412,0.8235,12.7,+5.9 to +20.1,0.00048828125
+"Primary: 68 valid tasks, re-graded",Claude Opus 5.5,68,1.0,0.9472,1.0,1.0,,,
+"Sensitivity A: all 70 tasks, re-graded",Granite 4.1 8B,70,0.5048,0.3951,0.619,0.4714,46.7,+35.2 to +58.1,9.99995000025e-06
+"Sensitivity A: all 70 tasks, re-graded",Gemma 4 E4B,70,0.8476,0.7667,0.919,0.8,12.4,+5.7 to +19.5,0.00048828125
+"Sensitivity A: all 70 tasks, re-graded",Claude Opus 5.5,70,0.9714,0.9286,1.0,0.9714,,,
+"Sensitivity B: all 70 tasks, as recorded",Granite 4.1 8B,70,0.481,0.3714,0.5905,0.4429,49.0,+37.6 to +60.5,9.99995000025e-06
+"Sensitivity B: all 70 tasks, as recorded",Gemma 4 E4B,70,0.8238,0.7333,0.9,0.7857,14.8,+7.6 to +22.9,0.000244140625
+"Sensitivity B: all 70 tasks, as recorded",Claude Opus 5.5,70,0.9714,0.9286,1.0,0.9714,,,

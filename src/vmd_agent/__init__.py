@@ -28,7 +28,7 @@ Design contract
   time axis) and what they cannot show.
 """
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 try:  # trust the operating system's certificates before anything opens a connection (fixes CERTIFICATE_VERIFY_FAILED on Macs)
     import truststore

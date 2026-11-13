@@ -1,0 +1,77 @@
+{
+ "phase": "full",
+ "started_utc": "2026-11-08T17:02:56+00:00",
+ "vmd_agent_version": "1.0.0",
+ "git_commit": "7fabd29d4d23037b8f6165238527e8aa9a8371eb",
+ "git_dirty": false,
+ "tcl_enabled": false,
+ "unsafe_tcl": false,
+ "python": "3.9.13",
+ "os": "macOS-26.1-x86_64-i386-64bit",
+ "cpu": "Apple M1",
+ "memory_gb": 16.0,
+ "vmd": "/Applications/VMD 1.9.4a57-arm64-Rev12.app/Contents/vmd/vmd_MACOSXARM64",
+ "ollama_version": "0.40.15",
+ "ollama_url": "http://localhost:11434/v1",
+ "n_tasks_defined": 70,
+ "smoke_tasks": [
+  "inspect_system",
+  "stats",
+  "claims_mixed",
+  "rg",
+  "rmsd_settled",
+  "keyframes",
+  "drift",
+  "contacts",
+  "secondary",
+  "structure_check",
+  "convert",
+  "build_solvated",
+  "volume_info",
+  "fit_map",
+  "render",
+  "scene",
+  "probe_video",
+  "settled",
+  "slurm",
+  "provenance",
+  "missing_file",
+  "tcl_disabled",
+  "no_such_measure"
+ ],
+ "held_fixed": {
+  "tools": "auto",
+  "guard": true,
+  "max_turns": 12,
+  "repeats": 3
+ },
+ "conditions": [
+  {
+   "model": "granite4.1:8b",
+   "server": "Ollama (local)",
+   "temperature": 0.0,
+   "weights": {
+    "digest": "444af1c4b2fedd6b54041aca558e7300b0b3d5c0468c44619126240323ba2852",
+    "size_bytes": 5347933017,
+    "quantization": "Q4_K_M",
+    "parameter_size": "8.8B"
+   }
+  },
+  {
+   "model": "gemma4:e4b",
+   "server": "Ollama (local)",
+   "temperature": 0.0,
+   "weights": {
+    "digest": "eb2177adf7646d15faead94fdad6d3e170dc8015653418a3b7d5d52a6380be5b",
+    "size_bytes": 9461576343,
+    "quantization": "",
+    "parameter_size": ""
+   }
+  },
+  {
+   "model": "claude-opus-5-5",
+   "server": "Anthropic API (OpenAI-compatible endpoint)",
+   "temperature": "not sent: vmd-agent omits it for api.anthropic.com, so the API default applies"
+  }
+ ]
+}

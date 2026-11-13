@@ -1,0 +1,5 @@
+pitfall,what changes,careful (= VMD-Agent),naive manual,relative error %
+PDB coordinates left in as frame 0 (no `animate delete all`),frames 51 instead of 50; mean CA RMSD,1.655,1.623,-2.0
+RMSF computed before fitting the trajectory,mean CA RMSF (Å),0.748,0.742,-0.8
+Terminal φ/ψ placeholders (0.0) averaged in,mean φ over residues (°),-72.27,-69.41,3.9
+Unweighted vs mass-weighted Rg mixed up,mean Rg (Å),11.971,11.922,-0.41

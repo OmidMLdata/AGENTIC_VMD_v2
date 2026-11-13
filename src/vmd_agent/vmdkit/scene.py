@@ -49,6 +49,32 @@ def _color(c: str) -> str:
     raise security.InvalidInput(f"color must be one of {', '.join(COLORS)} or 'ColorID <n>'")
 
 
+#: a scene file is a small JSON document; anything larger is not a scene description
+SCENE_FILE_MAX_BYTES = 1_000_000
+
+
+def load_spec(scene_spec: Optional[dict] = None, scene_file: Optional[str] = None) -> Optional[dict]:
+    """The scene to draw: ``scene_spec`` as given, or the JSON object in ``scene_file`` (for example scene.json), which
+    must be inside the allowed folders. Giving both is an error, unless ``scene_spec`` is empty."""
+    if not scene_file:
+        return scene_spec
+    if scene_spec:
+        raise security.InvalidInput("give scene_spec or scene_file, not both")
+    path = security.check_path(scene_file)
+    if not os.path.isfile(path):
+        raise security.InvalidInput(f"scene_file {scene_file} does not exist")
+    if os.path.getsize(path) > SCENE_FILE_MAX_BYTES:
+        raise security.InvalidInput(f"scene_file {scene_file} is too large to be a scene description")
+    try:
+        with open(path, encoding="utf-8") as fh:
+            spec = json.load(fh)
+    except (ValueError, UnicodeDecodeError) as e:
+        raise security.InvalidInput(f"scene_file {scene_file} is not valid JSON: {e}")
+    if not isinstance(spec, dict):
+        raise security.InvalidInput(f"scene_file {scene_file} must hold a JSON object (a scene description)")
+    return spec
+
+
 def validate(spec: dict) -> dict:
     """Check a scene spec; returns a normalised copy or raises InvalidInput."""
     if not isinstance(spec, dict):

@@ -215,13 +215,14 @@ def build_nanotube(out_pdb: str, n: int = 6, m: int = 6, length_nm: float = 10.0
 
 @tool()
 @shows_in_window
-def export_session(scene_spec: dict, topology: Optional[str], trajectory: Optional[str], out_dir: str,
-                       copy_inputs: bool = True, vmd_path: Optional[str] = None) -> dict:
+def export_session(scene_spec: Optional[dict], topology: Optional[str], trajectory: Optional[str], out_dir: str,
+                       copy_inputs: bool = True, scene_file: Optional[str] = None, vmd_path: Optional[str] = None) -> dict:
     """Use when the user wants to open or keep a scene in their own VMD. topology and trajectory are the user's own
     files exactly as named (for example protein.pdb and protein.dcd); do not build or convert anything first.
     Writes a folder in out_dir: session.tcl (open with `vmd -e session.tcl`), render.tcl, the input files with relative
     paths, manifest.json (scene, SHA-256 of every input, VMD version) and REPRODUCE.md. The scene is loaded in a real
-    VMD to prove it opens. Same scene_spec as render_image."""
+    VMD to prove it opens. Same scene_spec as render_image. Instead of scene_spec you may give scene_file: a JSON file (such as scene.json) holding the same description."""
+    scene_spec = scene.load_spec(scene_spec, scene_file)
     return scene.export_session(scene_spec, _p(topology), _p(trajectory), _p(out_dir), copy_inputs=copy_inputs,
                                 vmd_path=_p(vmd_path))
 

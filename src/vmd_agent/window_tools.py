@@ -337,11 +337,13 @@ def apply_scene(win: vmdlink.Window, scene_spec: dict, topology: Optional[str] =
 
 @tool()
 @_live
-def window_scene(scene_spec: dict, topology: Optional[str] = None, trajectory: Optional[str] = None) -> dict:
+def window_scene(scene_spec: Optional[dict] = None, topology: Optional[str] = None, trajectory: Optional[str] = None,
+                 scene_file: Optional[str] = None) -> dict:
     """Set up a whole scene in the VMD window at once, from the same description as render_image: {reps: [{selection, style, color, material,
     params}], isosurfaces: [{file, isovalue, color, style: solid|wireframe|points}], background, frame, rotate: [[axis, degrees]], zoom,
     projection, axes, depthcue, shadows, ambient_occlusion}. With topology (and trajectory) it loads them first; without, it redraws the
-    top molecule. The user can then keep working in the window; use window_save to keep the scene."""
+    top molecule. The user can then keep working in the window; use window_save to keep the scene. Instead of scene_spec you may give scene_file: a JSON file (such as scene.json) holding the same description."""
+    scene_spec = scene.load_spec(scene_spec, scene_file)
     scene.validate(scene_spec)
     return apply_scene(_window(open_if_needed=True), scene_spec, topology, trajectory)
 
